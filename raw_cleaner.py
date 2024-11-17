@@ -6,7 +6,7 @@ from os.path import join
 
 #from rm_train import rm_train_ica
 
-def raw_cleaner(cur_data, 
+def raw_cleaner(raw, 
                  l_pass=None,
                  h_pass=None,
                  #ica part  
@@ -21,8 +21,8 @@ def raw_cleaner(cur_data,
                  mw=True,
                  mw_coord_frame='head',
                  mw_destination=None,
-                 mw_calibration_file = './template_files/maxwell/sss_cal_sbg.dat',
-                 mw_cross_talk_file = './template_files/maxwell/ct_sparse_sbg.fif',
+                 mw_calibration_file = '../template_files/maxwell/sss_cal_sbg.dat',
+                 mw_cross_talk_file = '../template_files/maxwell/ct_sparse_sbg.fif',
                  mw_st_duration=None,):
     
 
@@ -44,14 +44,15 @@ def raw_cleaner(cur_data,
     #ica
     if ica:
         from preproc_utils.ica_utils import run_ica
-        ica_kwargs = {'eog': ic_eog,
+        ica_kwargs = {'resample_freq': 200,
+                      'eog': ic_eog,
                       'ecg': ic_ecg,
                       'muscle':ic_muscle,
                       'train':ic_train,
                       'train_freq': ic_train_freq,
                       'ica_corr_thresh': ic_threshold}
         
-        raw = run_ica(raw, ica_kwargs)
+        raw, ics = run_ica(raw, **ica_kwargs)
 
 
-    return raw
+    return raw, ics

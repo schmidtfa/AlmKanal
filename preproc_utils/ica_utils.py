@@ -10,6 +10,7 @@ import os
 def run_ica(raw,
             n_components=None, #selecting 50 components here -> fieldtrip standard in our lab
             method="picard",
+            resample_freq=None,
             eog=True,
             ecg=True,
             train=True,
@@ -21,6 +22,8 @@ def run_ica(raw,
     
     # we run ica on high-pass filtered data
     raw_copy = raw.copy().filter(l_freq=1, h_freq=None)
+    if resample_freq != None:
+        raw_copy.resample(resample_freq)
     ica = mne.preprocessing.ICA(n_components=n_components, method=method)
     ica.fit(raw_copy)
 
@@ -33,7 +36,20 @@ def run_ica(raw,
         bads.append(eog_idcs)   
     if ecg:
         #take ecg based on correlation
-        ecg_idcs, _ = ica.find_bads_ecg(raw_copy, measure='correlation', threshold=ica_corr_thresh)
+        try:
+            ecg_epochs = mne.preprocessing.create_ecg_epochs(raw_copy)  # , picks=ecg_list, verbose=True
+        except Exception as e:
+            print(f"Error creating ECG epochs: {e}")
+            print("Apparently the ECG003 channel is not informative, therefore")
+            print("removing ECG003 channel and trying with the MEG only channels")
+            
+            if 'ECG003' in raw_copy.ch_names:
+                raw_copy.drop_channels('ECG003')
+                
+            ecg_epochs = mne.preprocessing.create_ecg_epochs(raw_copy)
+    
+        # find the ECG components,
+        ecg_idcs, _ = ica.find_bads_ecg(ecg_epochs, measure='correlation', threshold=ica_corr_thresh)
         components_dict.update({'ecg': ecg_idcs})
         bads.append(ecg_idcs)  
     #remove muscle based on slope increase between 9-100hz
