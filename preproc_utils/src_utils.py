@@ -6,17 +6,17 @@ import numpy as np
 import mne
 import joblib
 from pathlib import Path
-from raw_cleaner import preproc_data
+from raw_cleaner import raw_cleaner
 import matplotlib as mpl
-from mne_bids import BIDSPath, read_raw_bids
 
 #%%
-def get_nearest_empty_room_sbg(info):
+def get_nearest_empty_room(info, 
+                            empty_room_path = '/home/schmidtfa/empty_room_data/subject_subject'):
     """
     This function finds the empty room file with the closest date to the current measurement.
     The file is used for the noise covariance estimation.
     """
-    empty_room_path = '/home/schmidtfa/empty_room_data/subject_subject'
+    
     all_empty_room_dates = np.array([datetime.strptime(date, '%y%m%d') for date in listdir(empty_room_path)])
 
     cur_date = info['meas_date']
@@ -31,15 +31,6 @@ def get_nearest_empty_room_sbg(info):
 
         cur_empty_path = join(empty_room_path, nearest_date)
 
-        # do not use 210115 (styrofoam head fake measurement)
-        if cur_empty_path == '/home/schmidtfa/empty_room_data/subject_subject/210115':
-            cur_empty_path = '/home/schmidtfa/empty_room_data/subject_subject/210114'
-        # do not use 210321 (does not start with file id tag)
-        elif '220321' in cur_empty_path:
-            cur_empty_path = '/home/schmidtfa/empty_room_data/subject_subject/220322'
-        elif '220728' in cur_empty_path:
-            cur_empty_path = '/home/schmidtfa/empty_room_data/subject_subject/220721'
-
         if 'supine' in listdir(cur_empty_path)[0]:
             all_empty_room_dates = np.delete(all_empty_room_dates,
                                                 all_empty_room_dates == nearest_date_datetime)
@@ -52,65 +43,82 @@ def get_nearest_empty_room_sbg(info):
     return fname_empty_room
 
 
-
-def raw2source(raw, subject_id, subjects_dir, preproc_settings, src_type='beamformer', source='surface', sbg=False):
-
-    # %Compute a covariance matrix
-    ###### ESTIMATE NOISE COVARIANCE MATRIX
-    #select only meg channels from raw
-    raw.pick(picks=['meg'])
-
-    info = raw.info
-
-    if sbg:
-        fname_empty_room = get_nearest_empty_room_sbg(info)
-    else:
-        base_dir = '/home/schmidtfa/experiments/brain_age/data/data_cam_can/cc700/meg/pipeline/release004/BIDS_20190411/meg_emptyroom'
-        l2_dir = join('sub-' + subject_id, 'emptyroom')
-        fname = 'emptyroom_' + subject_id + '.fif'
-        fname_empty_room = join(base_dir, l2_dir, fname)
-
-    empty_room = preproc_data(fname_empty_room, **preproc_settings)
-
-    noise_cov = mne.compute_raw_covariance(empty_room, rank=None, picks='meg', method='auto')
-    # when using noise cov rank should be based on noise cov
-    true_rank = mne.compute_rank(noise_cov, info=empty_room.info)  # inferring true rank
-
-    ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
-    # The files live in:
-    trans_path = '/home/schmidtfa/experiments/brain_age/data/data_cam_can/headmodels/'
+def make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri):
     
-    fs_path = join(subjects_dir, f'{subject_id}_from_template')
-    #bem_file = f'{fs_path}/bem/{subject_id}_from_template-5120-bem-sol-single-layer.fif'
-    bem_file = f'{fs_path}/bem/{subject_id}_from_template-5120-5120-5120-bem.fif'
+    ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
+    if template_mri:
+        fpath_add_on = '_from_template'
+    else:
+        fpath_add_on = ''
+
+    fs_path = join(subjects_dir, f'{subject_id}{fpath_add_on}')
+    bem_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-5120-5120-5120-bem.fif'
 
     if source == 'volume':
-        src_file = f'{fs_path}/bem/{subject_id}_from_template-vol-10-src.fif'
+        src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-vol-10-src.fif'
         
     elif source == 'surface':
-        src_file = f'{fs_path}/bem/{subject_id}_from_template-ico-4-src.fif'
+        src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-4-src.fif'
     
     fname_trans = join(trans_path, subject_id, subject_id + '-trans.fif')
 
-    bem_sol = mne.make_bem_solution(bem_file, solver='mne', verbose=True) 
-    fwd = mne.make_forward_solution(info=info, trans=fname_trans, src=src_file, bem=bem_sol)
+    bem_sol = mne.make_bem_solution(bem_file, 
+                                    solver='mne', 
+                                    verbose=True) 
+    fwd = mne.make_forward_solution(info=info, 
+                                    trans=fname_trans, 
+                                    src=src_file, 
+                                    bem=bem_sol)
 
-    if src_type == 'mne':
-        inv = mne.minimum_norm.make_inverse_operator(info, fwd, noise_cov, rank=true_rank, loose=0, fixed=True, depth=0.8)
-        snr = 3
-        lambda2 = 1 / snr ** 2  # = default value
-        stc = mne.minimum_norm.apply_inverse_raw(raw, inv, lambda2=lambda2, method='MNE')
-    elif src_type == 'beamformer':
+    return fwd
 
-        data_cov = mne.compute_raw_covariance(raw, rank=None, picks='meg', method='auto')
 
-        filters = mne.beamformer.make_lcmv(info, fwd, data_cov, reg=0.05,
-                                           noise_cov=noise_cov, pick_ori='max-power',
-                                           weight_norm='nai', rank=true_rank)
-        
-        stc = mne.beamformer.apply_lcmv_raw(raw, filters)
+def raw2source(raw, 
+               subject_id, 
+               subjects_dir,
+               preproc_settings,
+               picks='meg', 
+               source='surface',
+               template_mri=True,
+               trans_path = '/home/schmidtfa/experiments/brain_age/data/data_cam_can/headmodels/',
+               nearest_empty = True,
+               empty_room_path='/home/schmidtfa/empty_room_data/subject_subject',
+               
+               ):
+
+    '''This function does source reconstruction using lcmv beamformers based on raw data.'''           
+
+    #%Compute covariance matrices
+    #data covariance based on the actual recording
+    #noise covariance based on empyt rooms
+    #select only meg channels from raw
+    raw.pick(picks=[picks])
+    info = raw.info
+
+    if nearest_empty:
+        fname_empty_room = get_nearest_empty_room(info, empty_room_path)
     else:
-        raise ValueError(f'src_type can be either "beamformer" or "mne" not "{src_type}"')
+        fname_empty_room = empty_room_path
+
+    empty_room = raw_cleaner(fname_empty_room, **preproc_settings)
+
+    if picks == 'meg':
+        noise_cov = mne.compute_raw_covariance(empty_room, rank=None, picks=picks, method='auto')
+        # when using noise cov rank should be based on noise cov
+        true_rank = mne.compute_rank(noise_cov, info=empty_room.info)  # inferring true rank
+
+    data_cov = mne.compute_raw_covariance(raw, rank=None, picks=picks, method='auto')
+
+    fwd = make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri)
+
+    filters = mne.beamformer.make_lcmv(info, fwd, data_cov, 
+                                           reg=0.05,
+                                           noise_cov=noise_cov, 
+                                           pick_ori='max-power',
+                                           weight_norm='nai', 
+                                           rank=true_rank)
+        
+    stc = mne.beamformer.apply_lcmv_raw(raw, filters)
 
     return stc
 

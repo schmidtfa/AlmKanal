@@ -15,9 +15,21 @@ raw = mne.io.read_raw_fif(sample_data_raw_file, preload=True)
 import sys
 sys.path.append('/Users/fabian.schmidt/git/AlmKanal')
 from raw_cleaner import raw_cleaner
-# %%
-raw, ics = raw_cleaner(raw, l_pass=None, h_pass=0.1, ica=True, mw=False)
-# %%
+
+#%%
+preproc_settings = {'l_pass' : None, 
+                    'h_pass' : 0.1,
+                    'mw' : False,
+                    'ica': True,
+                    }
+
+
+raw, ics = raw_cleaner(raw, **preproc_settings)
+
+preproc_settings['ica'] = False
+
+
+#%%
 fs = raw.info['sfreq']
 freq, psd = dsp.welch(ics['ic_src_tc'].get_data(), fs=fs, nperseg=4*fs, noverlap=2*fs)
 # %%
