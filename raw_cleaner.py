@@ -28,7 +28,7 @@ def raw_cleaner(raw,
 
     #maxfilter
     if mw:
-        from preproc_utils.maxwell_utils import run_maxwell
+        from utils.maxwell_utils import run_maxwell
         maxwell_kwargs = {'coord_frame': mw_coord_frame,
                           'destination': mw_destination,
                           'calibration_file': mw_calibration_file,
@@ -43,7 +43,7 @@ def raw_cleaner(raw,
 
     #ica
     if ica:
-        from preproc_utils.ica_utils import run_ica
+        from utils.ica_utils import run_ica
         ica_kwargs = {'resample_freq': 200,
                       'eog': ic_eog,
                       'ecg': ic_ecg,
@@ -54,5 +54,7 @@ def raw_cleaner(raw,
         
         raw, ics = run_ica(raw, **ica_kwargs)
 
-
-    return raw, ics
+        return raw, ics
+    
+    else:
+        return raw
