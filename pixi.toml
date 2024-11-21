@@ -11,3 +11,4 @@ platforms = ["osx-arm64", "linux-64"]
 [dependencies]
 mne = ">=1.8,<1.9"
 pyrasa = ">=1.0.0,<2"
+attrs = ">=24.2.0,<25"

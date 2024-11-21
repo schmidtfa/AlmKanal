@@ -26,16 +26,31 @@ raw = raw_cleaner(raw, **preproc_settings)
 preproc_settings['ica'] = False
 
 from utils.src_utils import raw2source
-pick_dict = {'meg': True, 
+pick_dict = {'meg': 'mag', 
              'eeg': False, 
              'stim': True, 
              'exclude': "bads"}
 
-stc = raw2source(raw, )
+#%% make a fwd model using either a template or real MRI
+# from utils.head_model_utils import make_fwd
+# source='surface'
+# template_mri=True
+# trans_path = '/home/schmidtfa/experiments/brain_age/data/data_cam_can/headmodels/',
+# subject_id = ''
+# subjects_dir = ''
+
+# fwd = make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri)
+
+fwd_fname = os.path.join(meg_path, "sample_audvis-meg-vol-7-fwd.fif")
+fwd = mne.read_forward_solution(fwd_fname)
+
+stc = raw2source(raw,
+                 fwd,
+                 pick_dict=pick_dict,
+                 )
 #%%
 event_fname = os.path.join(meg_path, "sample_audvis_filt-0-40_raw-eve.fif")
 events = mne.read_events(event_fname)
-
 
 from utils.event_utils import gen_epochs
 
@@ -46,14 +61,13 @@ event_dict = {
     "Visual/Right": 4,
 }
 
-picks = mne.pick_types(raw.info, meg=True, eeg=False, stim=True, exclude="bads")
-
 epoch_settings = {
     'tmin': -.1,
     'tmax': 0.3,
     'proj': False,
-    'picks':picks,
+    'picks':None,
     'baseline': None,
 }
 
-epochs = gen_epochs(raw, event_dict=event_dict, events=events, epoch_settings=epoch_settings)
+epochs = gen_epochs(stc, event_dict=event_dict, events=events, epoch_settings=epoch_settings)
+# %%

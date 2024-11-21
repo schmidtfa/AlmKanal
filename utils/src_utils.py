@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import mne
 from raw_cleaner import raw_cleaner
-from utils.head_model_utils import make_fwd
+
 import warnings
 from mne._fiff.pick import _contains_ch_type
 
@@ -44,16 +44,12 @@ def get_nearest_empty_room(info,
 
 
 def raw2source(raw, 
-               subject_id, 
-               subjects_dir,
-               preproc_settings,
-               pick_dict, 
-               source='surface',
-               template_mri=True,
-               trans_path = '/home/schmidtfa/experiments/brain_age/data/data_cam_can/headmodels/',
-               nearest_empty = True,
-               empty_room_path='/home/schmidtfa/empty_room_data/subject_subject',
-               
+               fwd,
+               pick_dict,
+               data_cov=None,
+               noise_cov=None, 
+               preproc_settings=None,
+               empty_room_path=None,
                ):
 
     '''This function does source reconstruction using lcmv beamformers based on raw data.'''           
@@ -64,39 +60,41 @@ def raw2source(raw,
     #select only meg channels from raw
 
     if pick_dict['meg'] not in [True, 'mag', 'grad']:
-        ValueError('Source Projection with the AlmKanal pipeline currently only works with MEG data.')
+        raise ValueError('Source Projection with the AlmKanal pipeline currently only works with MEG data.')
 
-    if pick_dict['eeg'] == True:
+    if pick_dict['eeg']:
         pick_dict['eeg'] = False
         warnings.warn('WARNING: Source Projection with the AlmKanal pipeline currently only works with MEG data. \
                        Removing EEG here.')
-
-    #check if multiple channel types are present
-    n_ch_types = np.sum([_contains_ch_type(raw.info, ch_type) for ch_type in ['mag', 'grad', 'eeg']])
-
+    
     picks = mne.pick_types(raw.info, **pick_dict)
     raw.pick(picks=picks)
     info = raw.info
 
-    # make a fwd model using either a template or real MRI
-    fwd = make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri)
+    #check if multiple channel types are present after picking
+    n_ch_types = np.sum([_contains_ch_type(raw.info, ch_type) for ch_type in ['mag', 'grad', 'eeg']])
 
     # compute a data covariance matrix
-    if data_cov == None:
-        data_cov = mne.compute_raw_covariance(raw, rank=None, picks=picks, method='auto')
+    if data_cov is None:
+        data_cov = mne.compute_raw_covariance(raw, rank=None, method='auto')
 
     #if you have mixed sensor types we need a noise covariance matrix
     #per default we take this from an empty room recording
-    #TODO: Think about whether or not we want to allow users to supply their own.
     #importantly this should be preprocessed similarly to the actual data (except for ICA)
-    if n_ch_types > 1:
-        if nearest_empty:
+    if np.logical_and(n_ch_types > 1, noise_cov==None):
+        print('Multiple channel types and no noise covariance matrix detected. \
+               Trying to build noise covariance matrix using empty room recordings.')
+        if preproc_settings is None:
+            raise ValueError('You need to supply your preprocessing settings, if you are doing beamforming \
+                       using a combination of different sensor types. Either you pick "mag" or "grad" or you supply your preprocessing settings.')
+            
+        if empty_room_path is None:
             fname_empty_room = get_nearest_empty_room(info, empty_room_path)
         else:
             fname_empty_room = empty_room_path
-
         empty_room = raw_cleaner(fname_empty_room, **preproc_settings)
-        noise_cov = mne.compute_raw_covariance(empty_room, rank=None, picks=picks, method='auto')
+        empty_room.pick(picks=picks)
+        noise_cov = mne.compute_raw_covariance(empty_room, rank=None, method='auto')
         # when using noise cov rank should be based on noise cov
         true_rank = mne.compute_rank(noise_cov, info=empty_room.info)  # inferring true rank
     elif n_ch_types == 1:
