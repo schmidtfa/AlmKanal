@@ -1,58 +1,45 @@
 #%%
 import mne
 import os
-import matplotlib.pyplot as plt
-import scipy.signal as dsp
+import sys
+sys.path.append('/Users/fabian.schmidt/git/AlmKanal')
+from AlmKanal import AlmKanal
 
 sample_data_folder = mne.datasets.sample.data_path()
 meg_path = os.path.join(sample_data_folder, "MEG", "sample",)
 sample_data_raw_file = os.path.join(meg_path, "sample_audvis_raw.fif")
 raw = mne.io.read_raw_fif(sample_data_raw_file, preload=True)
-# %%
-import sys
-sys.path.append('/Users/fabian.schmidt/git/AlmKanal')
-from raw_cleaner import raw_cleaner
 
-#%%
+#%% Lets initialize the almkanal
+ak = AlmKanal(raw=raw)
 
-preproc_settings = {'l_pass' : None, 
-                    'h_pass' : 0.1,
-                    'mw' : False,
-                    'ica': False,
-                    }
+#%% you can easily use common workflows like maxfiltering in one call
+# default arguments have been decided upon by gianpaolo, thomas, nathan and fabian
+ak.do_maxwell()
+# %% you can always use common mne methods like filtering that modify 
+# the raw and epoched objects in place
+ak.raw.filter(l_freq=.1, h_freq=100)
+#%% one shot call to ica
+ak.do_ica( n_components=50,
+            method="picard",
+            resample_freq=100,
+            eog=True,
+            ecg=True,
+            muscle=False,
+            train=False,
+            train_freq=16.6,
+            threshold=0.4,)
 
-raw = raw_cleaner(raw, **preproc_settings)
+#%% this places the ic object in your almkanal pipeline
+# you access it by calling
+ak.ica
 
-preproc_settings['ica'] = False
+#%% find events in the data
+# they will be automatically added to the AlmKanal
+ak.do_events()
 
-from utils.src_utils import raw2source
-pick_dict = {'meg': 'mag', 
-             'eeg': False, 
-             'stim': True, 
-             'exclude': "bads"}
-
-#%% make a fwd model using either a template or real MRI
-# from utils.head_model_utils import make_fwd
-# source='surface'
-# template_mri=True
-# trans_path = '/home/schmidtfa/experiments/brain_age/data/data_cam_can/headmodels/',
-# subject_id = ''
-# subjects_dir = ''
-
-# fwd = make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri)
-
-fwd_fname = os.path.join(meg_path, "sample_audvis-meg-vol-7-fwd.fif")
-fwd = mne.read_forward_solution(fwd_fname)
-
-stc = raw2source(raw,
-                 fwd,
-                 pick_dict=pick_dict,
-                 )
-#%%
-event_fname = os.path.join(meg_path, "sample_audvis_filt-0-40_raw-eve.fif")
-events = mne.read_events(event_fname)
-
-from utils.event_utils import gen_epochs
+ak.events
+#%% now we want to epoch the data
 
 event_dict = {
     "Auditory/Left": 1,
@@ -61,13 +48,19 @@ event_dict = {
     "Visual/Right": 4,
 }
 
-epoch_settings = {
-    'tmin': -.1,
-    'tmax': 0.3,
-    'proj': False,
-    'picks':None,
-    'baseline': None,
-}
+ak.do_epochs(event_id=event_dict)
 
-epochs = gen_epochs(stc, event_dict=event_dict, events=events, epoch_settings=epoch_settings)
+#%% When you have the necessary components assembled you can push the data
+# to src space
+fwd_fname = os.path.join(meg_path, "sample_audvis-meg-vol-7-fwd.fif")
+fwd = mne.read_forward_solution(fwd_fname)
+
+ak.pick_dict['meg'] = 'mag'
+ak.fwd = fwd
+
+stc = ak.do_src()
+
+#%%
+
+stc_ave = mne.beamformer.apply_lcmv(ak.epoched["Auditory/Left"].average(), ak.filters) 
 # %%

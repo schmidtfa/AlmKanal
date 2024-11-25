@@ -12,3 +12,6 @@ platforms = ["osx-arm64", "linux-64"]
 mne = ">=1.8,<1.9"
 pyrasa = ">=1.0.0,<2"
 attrs = ">=24.2.0,<25"
+
+[pypi-dependencies]
+obob_mne = "~=0.0.22"

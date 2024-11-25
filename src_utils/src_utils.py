@@ -4,7 +4,7 @@ from os.path import join
 from datetime import datetime
 import numpy as np
 import mne
-from raw_cleaner import raw_cleaner
+from old.raw_cleaner import raw_cleaner
 
 import warnings
 from mne._fiff.pick import _contains_ch_type
@@ -43,7 +43,8 @@ def get_nearest_empty_room(info,
     return fname_empty_room
 
 
-def raw2source(raw, 
+
+def data2source(data, 
                fwd,
                pick_dict,
                data_cov=None,
@@ -66,17 +67,21 @@ def raw2source(raw,
         pick_dict['eeg'] = False
         warnings.warn('WARNING: Source Projection with the AlmKanal pipeline currently only works with MEG data. \
                        Removing EEG here.')
-    
-    picks = mne.pick_types(raw.info, **pick_dict)
-    raw.pick(picks=picks)
-    info = raw.info
+
+    picks = mne.pick_types(data.info, **pick_dict)
+    data.pick(picks=picks)
+    info = data.info
 
     #check if multiple channel types are present after picking
-    n_ch_types = np.sum([_contains_ch_type(raw.info, ch_type) for ch_type in ['mag', 'grad', 'eeg']])
+    n_ch_types = np.sum([_contains_ch_type(data.info, ch_type) for ch_type in ['mag', 'grad', 'eeg']])
 
     # compute a data covariance matrix
-    if data_cov is None:
-        data_cov = mne.compute_raw_covariance(raw, rank=None, method='auto')
+    if np.logical_and(data_cov is None, isinstance(data, mne.io.fiff.raw.Raw)):
+        data_cov = mne.compute_raw_covariance(data, rank=None, method='auto')
+    elif np.logical_and(data_cov is None, isinstance(data, mne.epochs.Epochs)):
+        data_cov = mne.compute_covariance(data, rank=None, method='auto')
+    else:
+        print('Data covariance matrix supplied by the analyst')
 
     #if you have mixed sensor types we need a noise covariance matrix
     #per default we take this from an empty room recording
@@ -110,7 +115,14 @@ def raw2source(raw,
                                        pick_ori='max-power',
                                        weight_norm='nai', 
                                        rank=true_rank)
-        
-    stc = mne.beamformer.apply_lcmv_raw(raw, filters)
+    
 
-    return stc
+    if isinstance(data, mne.io.fiff.raw.Raw):
+
+        stc = mne.beamformer.apply_lcmv_raw(data, filters)
+
+    elif isinstance(data, mne.epochs.Epochs):
+        
+        stc = mne.beamformer.apply_lcmv_epochs(data, filters)
+
+    return stc, filters

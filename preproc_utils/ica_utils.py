@@ -8,7 +8,7 @@ import os
 
 
 def run_ica(raw,
-            n_components=None, #selecting 50 components here -> fieldtrip standard in our lab
+            n_components=None,
             method="picard",
             resample_freq=None,
             eog=True,
@@ -68,9 +68,9 @@ def run_ica(raw,
 
     raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
     #get ica data
-    ic_signal = ica.get_sources(raw)
-    ic_info = {'ic_src_tc': ic_signal,
-               'rej_ic_idcs': components_dict}
+    #ic_signal = ica.get_sources(raw)
+    #ic_info = {'ic_src_tc': ic_signal,
+     #          'rej_ic_idcs': components_dict}
     
     #plot data if wanted
     if img_path != None:
@@ -95,7 +95,7 @@ def run_ica(raw,
     #% drop physiological components
     ica.apply(raw, exclude=bad_ids)
 
-    return raw, ic_info
+    return raw, ica
 
 
 

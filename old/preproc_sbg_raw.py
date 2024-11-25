@@ -3,7 +3,7 @@
 from obob_mne.raw import Raw as RawTemplate
 import numpy as np
 import mne
-from raw_cleaner import raw_cleaner
+from old.raw_cleaner import raw_cleaner
 
 
 class Raw(RawTemplate):
