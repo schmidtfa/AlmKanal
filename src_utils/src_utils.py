@@ -77,6 +77,8 @@ def process_empty_room(data,
             raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
             raw_er = run_maxwell(raw_er, **preproc_info['maxwell'])
 
+        #TODO: Add filtering here -> i.e. check if deviation between empty and real data and then filter
+
         if preproc_info['ica'] is not None:
             #we loop here, because you could have done more than one ica
             for ica, ica_id in zip(icas, ica_ids):
