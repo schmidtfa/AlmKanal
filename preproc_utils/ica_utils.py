@@ -95,7 +95,7 @@ def run_ica(raw,
     #% drop physiological components
     ica.apply(raw, exclude=bad_ids)
 
-    return raw, ica
+    return raw, ica, bad_ids
 
 
 

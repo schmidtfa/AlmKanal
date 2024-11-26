@@ -43,10 +43,48 @@ def get_nearest_empty_room(info,
     return fname_empty_room
 
 
+def process_empty_room(data,
+                       info,
+                       picks,
+                       icas,
+                       ica_ids,
+                       empty_room_path,
+                       preproc_settings):
+        
+        print('Multiple channel types and no noise covariance matrix detected. \
+               Trying to build noise covariance matrix using empty room recordings.')
+        if preproc_settings is None:
+            raise ValueError('You need to supply your preprocessing settings, if you are doing beamforming \
+                       using a combination of different sensor types. Either you pick "mag" or "grad" or you supply your preprocessing settings.')
+            
+        if empty_room_path is None:
+            fname_empty_room = get_nearest_empty_room(info, empty_room_path)
+        else:
+            fname_empty_room = empty_room_path
+
+        empty_room = raw_cleaner(fname_empty_room, **preproc_settings)
+        if icas is not None:
+            for ica, ica_id in zip(icas, ica_ids):
+                ica.apply(empty_room, exclude=ica_id)
+
+        empty_room.pick(picks=picks)
+        if isinstance(data, mne.io.fiff.raw.Raw):
+            noise_cov = mne.compute_raw_covariance(empty_room, rank=None, method='auto')
+        elif isinstance(data, mne.epochs.Epochs):
+            t_length = np.abs(data.epoched.tmax - data.epoched.tmin)
+            empty_room = mne.make_fixed_length_epochs(empty_room, duration=t_length)
+            noise_cov = mne.compute_covariance(empty_room, rank=None, method='auto')
+        # when using noise cov rank should be based on noise cov
+        true_rank = mne.compute_rank(noise_cov, info=empty_room.info)  # inferring true rank
+
+
+        return true_rank, noise_cov
 
 def data2source(data, 
                fwd,
                pick_dict,
+               icas=None,
+               ica_ids=None,
                data_cov=None,
                noise_cov=None, 
                preproc_settings=None,
@@ -87,21 +125,15 @@ def data2source(data,
     #per default we take this from an empty room recording
     #importantly this should be preprocessed similarly to the actual data (except for ICA)
     if np.logical_and(n_ch_types > 1, noise_cov==None):
-        print('Multiple channel types and no noise covariance matrix detected. \
-               Trying to build noise covariance matrix using empty room recordings.')
-        if preproc_settings is None:
-            raise ValueError('You need to supply your preprocessing settings, if you are doing beamforming \
-                       using a combination of different sensor types. Either you pick "mag" or "grad" or you supply your preprocessing settings.')
-            
-        if empty_room_path is None:
-            fname_empty_room = get_nearest_empty_room(info, empty_room_path)
-        else:
-            fname_empty_room = empty_room_path
-        empty_room = raw_cleaner(fname_empty_room, **preproc_settings)
-        empty_room.pick(picks=picks)
-        noise_cov = mne.compute_raw_covariance(empty_room, rank=None, method='auto')
-        # when using noise cov rank should be based on noise cov
-        true_rank = mne.compute_rank(noise_cov, info=empty_room.info)  # inferring true rank
+
+        true_rank, noise_cov = process_empty_room(data,
+                                                    info,
+                                                    picks,
+                                                    icas,
+                                                    ica_ids,
+                                                    empty_room_path,
+                                                    preproc_settings)
+
     elif n_ch_types == 1:
         # when we dont have a noise cov we just use the data cov for rank comp
         true_rank = mne.compute_rank(data_cov, info=info)

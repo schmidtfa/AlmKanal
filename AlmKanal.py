@@ -21,6 +21,7 @@ class AlmKanal:
     events: None | np.ndarray = None
     fwd: None | mne.Forward = None
     ica: None | mne.preprocessing.ICA = None
+    ica_ids: None | list = None
     filters: None | mne.beamformer.Beamformer = None
     stim: None | np.ndarray  = None #This is for TRF stuff
     info: dict = {'maxwell': None,
@@ -68,13 +69,13 @@ class AlmKanal:
     def do_ica( self,
                 n_components=None,
                 method="picard",
-                resample_freq=None,
+                resample_freq=200, #downsample to 200hz per default
                 eog=True,
                 ecg=True,
                 muscle=False,
-                train=False,
+                train=True,
                 train_freq=16.6,
-                threshold=0.5,):
+                threshold=0.4,):
         #this should do an ica
         ica_info = {'n_components': n_components,
                     'method': method,
@@ -89,16 +90,18 @@ class AlmKanal:
         if self.info['ica'] is None:
             self.info['ica'] = ica_info
             
-            self.raw, ica = run_ica(self.raw, **self.info['ica'])
+            self.raw, ica, ica_ids = run_ica(self.raw, **self.info['ica'])
             self.ica = [ica]
+            self.ica_ids = [ica_ids]
         else:
             #Take care of case where you ran multiple icas.
             #TODO: When we end up applying them to the noise cov dont forget 
             # to also do it successively.
             self.info['ica'].update(ica_info)
                 
-            self.raw, ica = run_ica(self.raw, **self.info['ica'])
+            self.raw, ica, ica_ids = run_ica(self.raw, **self.info['ica'])
             self.ica.append(ica)
+            self.ica_ids.append(ica_ids)
 
 
     def do_events(self,
@@ -132,7 +135,7 @@ class AlmKanal:
                   tmin= -.2,
                   tmax= 0.5,
                   baseline=None,
-                  preload=False, 
+                  preload=True, 
                   picks=None,
                   reject=None, 
                   flat=None, 
