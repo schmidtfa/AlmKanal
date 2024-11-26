@@ -9,6 +9,10 @@ from old.raw_cleaner import raw_cleaner
 import warnings
 from mne._fiff.pick import _contains_ch_type
 
+from preproc_utils.maxwell_utils import run_maxwell
+from preproc_utils.ica_utils import run_ica
+
+
 #%%
 def get_nearest_empty_room(info, 
                             empty_room_path = '/home/schmidtfa/empty_room_data/subject_subject'):
@@ -49,34 +53,46 @@ def process_empty_room(data,
                        icas,
                        ica_ids,
                        empty_room_path,
-                       preproc_settings):
+                       preproc_info):
         
-        print('Multiple channel types and no noise covariance matrix detected. \
-               Trying to build noise covariance matrix using empty room recordings.')
-        if preproc_settings is None:
-            raise ValueError('You need to supply your preprocessing settings, if you are doing beamforming \
-                       using a combination of different sensor types. Either you pick "mag" or "grad" or you supply your preprocessing settings.')
+        # print('Multiple channel types and no noise covariance matrix detected. \
+        #        Trying to build noise covariance matrix using empty room recordings.')
+        # # if preproc_settings is None:
+        # #     raise ValueError('You need to supply your preprocessing settings, if you are doing beamforming \
+        # #                using a combination of different sensor types. Either you pick "mag" or "grad" or you supply your preprocessing settings.')
             
         if empty_room_path is None:
             fname_empty_room = get_nearest_empty_room(info, empty_room_path)
         else:
             fname_empty_room = empty_room_path
 
-        empty_room = raw_cleaner(fname_empty_room, **preproc_settings)
-        if icas is not None:
+        raw_er = mne.io.read_raw(fname_empty_room)
+        
+        if preproc_info['maxwell'] is not None:
+            if isinstance(data, mne.epochs.Epochs):
+                raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
+            elif isinstance(data, mne.io.fiff.raw.Raw):
+                raw = data
+
+            raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
+            raw_er = run_maxwell(raw_er, **preproc_info['maxwell'])
+
+        if preproc_info['ica'] is not None:
+            #we loop here, because you could have done more than one ica
             for ica, ica_id in zip(icas, ica_ids):
-                ica.apply(empty_room, exclude=ica_id)
+                ica.apply(raw_er, exclude=ica_id)
 
-        empty_room.pick(picks=picks)
+        raw_er.pick(picks=picks)
         if isinstance(data, mne.io.fiff.raw.Raw):
-            noise_cov = mne.compute_raw_covariance(empty_room, rank=None, method='auto')
-        elif isinstance(data, mne.epochs.Epochs):
-            t_length = np.abs(data.epoched.tmax - data.epoched.tmin)
-            empty_room = mne.make_fixed_length_epochs(empty_room, duration=t_length)
-            noise_cov = mne.compute_covariance(empty_room, rank=None, method='auto')
-        # when using noise cov rank should be based on noise cov
-        true_rank = mne.compute_rank(noise_cov, info=empty_room.info)  # inferring true rank
+            noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
 
+        elif isinstance(data, mne.epochs.Epochs):
+
+            t_length = np.abs(data.epoched.tmax - data.epoched.tmin)
+            raw_er = mne.make_fixed_length_epochs(raw_er, duration=t_length)
+            noise_cov = mne.compute_covariance(raw_er, rank=None, method='auto')
+        # when using noise cov rank should be based on noise cov
+        true_rank = mne.compute_rank(noise_cov, info=raw_er.info)  # inferring true rank
 
         return true_rank, noise_cov
 
@@ -119,7 +135,7 @@ def data2source(data,
     elif np.logical_and(data_cov is None, isinstance(data, mne.epochs.Epochs)):
         data_cov = mne.compute_covariance(data, rank=None, method='auto')
     else:
-        print('Data covariance matrix supplied by the analyst')
+        print('Data covariance matrix not computed as it was supplied by the analyst.')
 
     #if you have mixed sensor types we need a noise covariance matrix
     #per default we take this from an empty room recording

@@ -85,3 +85,23 @@ ak.fwd = mne.read_forward_solution(fwd_fname)
 ak.pick_dict['meg'] = 'mag' #pick only mags
 
 stc = ak.do_src()
+
+#%% Lets initialize the almkanal
+import mne
+from AlmKanal import AlmKanal
+
+raw = mne.io.read_raw("PATH/TO/RAW")
+
+ak = AlmKanal(raw=raw)
+
+#% do raw preproc
+ak.do_maxwell()
+ak.raw.filter(l_freq=.1, h_freq=100)
+ak.do_ica()
+
+#% do src
+fwd_fname = os.path.join(meg_path, "sample_audvis-meg-vol-7-fwd.fif")
+ak.fwd = mne.read_forward_solution(fwd_fname)
+ak.pick_dict['meg'] = 'mag' #pick only mags
+
+stc = ak.do_src()

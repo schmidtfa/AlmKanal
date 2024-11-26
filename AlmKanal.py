@@ -199,7 +199,6 @@ class AlmKanal:
     def do_src(self,
                data_cov=None,
                noise_cov=None, 
-               preproc_settings=None,
                empty_room_path=None,):
         #here we want to embed the logic that, if your object has been epoched we do epoched2src else raw2src
         if self.fwd is not None:
@@ -209,11 +208,11 @@ class AlmKanal:
                 data = self.epoched
 
             stc, self.filters = data2source(data = data, 
-                             fwd = self.fwd, 
+                             fwd = self.fwd,
                              pick_dict = self.pick_dict,
                              data_cov=data_cov,
                              noise_cov=noise_cov,
-                             preproc_settings=preproc_settings,
+                             preproc_info=self.info,
                              empty_room_path=empty_room_path)
 
         else:
