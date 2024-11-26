@@ -8,6 +8,8 @@ from preproc_utils.maxwell_utils import run_maxwell
 from preproc_utils.ica_utils import run_ica
 from src_utils.src_utils import data2source
 from data_utils.check_data import check_raw_epoch
+from headmodel_utils import compute_headmodel, make_fwd
+from os.path import join
 
 @define
 class AlmKanal:
@@ -190,10 +192,38 @@ class AlmKanal:
         pass
 
 
-    def do_fwd_model(self):
+    def do_fwd_model(self,
+                     subject_id,
+                     base_data_path,
+                     source='surface',
+                     template_mri=True,
+                     redo_hdm=True
+                     ):
         #This should generate a fwd model
+        if self.raw is not None:
+            cur_info = self.raw.info
+        elif self.epoched is not None:
+            cur_info = self.epoched.info
 
-        pass
+        if redo_hdm:
+            #recompute or take the saved one
+            trans = compute_headmodel(info=cur_info,
+                                    subject_id=subject_id,
+                                    base_data_path=base_data_path,
+                                    pick_dict=self.pick_dict,
+                                    template_mri=template_mri)
+        else:
+            
+            trans = join(base_data_path, 'headmodels', subject_id, subject_id) + '-trans.fif'
+        
+        fwd = make_fwd(cur_info, 
+                       source=source, 
+                       trans_path=trans, 
+                       subjects_dir=join(base_data_path, 'freesurfer', subject_id), 
+                       subject_id=subject_id, 
+                       template_mri=template_mri)
+
+        self.fwd = fwd
 
 
     def do_src(self,

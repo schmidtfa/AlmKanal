@@ -6,13 +6,16 @@ from os.path import join
 import os
 import pickle
 
-def compute_headmodel(raw,
+def compute_headmodel(info,
                       subject_id,
                       base_data_path,
+                      pick_dict,
+                      template_mri=True,
                       savefig=True):
     
     '''
     base_data_path: The path to the data directory where freesurfer and the headmodels are going to be stored.
+                    The folder in which the data is saved is dependent on this.
 
     '''
     
@@ -20,7 +23,7 @@ def compute_headmodel(raw,
     out_folder = join(base_data_path, 'headmodels', subject_id)
     trans = 'fsaverage' 
     
-    info = mne.pick_info(raw.info, mne.pick_types(raw.info, meg=True))
+    info = mne.pick_info(info, mne.pick_types(info, **pick_dict))
 
     #%% do the coregistration
     coreg = Coregistration(info, trans, mri_path)
@@ -34,8 +37,11 @@ def compute_headmodel(raw,
     print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "f"/ {np.min(dists):.2f} mm / "
         f"{np.max(dists):.2f} mm")
     
-    #%% create and save a scaled copy of mri subject fs average
-    new_source_identifier = subject_id + '_from_template'
+    #%% create and save a scaled copy of mri subject fs average         
+    if  template_mri:
+        new_source_identifier = subject_id + '_from_template'
+    else:
+        new_source_identifier = subject_id
 
     #Dont forget this sdcales bem, atlas and source space automatically too
     mne.coreg.scale_mri("fsaverage", new_source_identifier, 
@@ -110,9 +116,11 @@ def compute_headmodel(raw,
         plt.savefig(join(out_folder, subject_id) +  '_coreg.png', dpi=300)
         # not sohw ... plt.show()
 
+    return coreg.trans
 
 
-def make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri):
+
+def make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri=False):
     
     ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
     if template_mri:
@@ -129,7 +137,8 @@ def make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri):
     elif source == 'surface':
         src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-4-src.fif'
     
-    fname_trans = join(trans_path, subject_id, subject_id + '-trans.fif')
+    if isinstance(trans_path, str):
+        fname_trans = join(trans_path, subject_id, subject_id + '-trans.fif')
 
     bem_sol = mne.make_bem_solution(bem_file, 
                                     solver='mne', 

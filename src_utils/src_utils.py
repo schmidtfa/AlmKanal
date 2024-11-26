@@ -4,13 +4,12 @@ from os.path import join
 from datetime import datetime
 import numpy as np
 import mne
-from old.raw_cleaner import raw_cleaner
 
 import warnings
 from mne._fiff.pick import _contains_ch_type
 
 from preproc_utils.maxwell_utils import run_maxwell
-from preproc_utils.ica_utils import run_ica
+
 
 
 #%%
