@@ -133,7 +133,7 @@ def make_fwd(info, source, fname_trans, subjects_dir, subject_id, template_mri=F
         src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-vol-10-src.fif'
         
     elif source == 'surface':
-        src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-5-src.fif'
+        src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-4-src.fif'
     
     # if isinstance(fname_trans, str):
     #     fname_trans = os.path.join(fname_trans, subject_id, subject_id + '-trans.fif')

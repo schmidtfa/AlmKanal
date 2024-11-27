@@ -3,7 +3,7 @@ import attrs
 import mne
 import numpy as np
 import os
-
+from pathlib import Path
 #all them utility functions
 from preproc_utils.maxwell_utils import run_maxwell
 from preproc_utils.ica_utils import run_ica
@@ -198,10 +198,21 @@ class AlmKanal:
             cur_info = self.epoched.info
 
         #TODO: Include workflow that fetches fsaverage if subjects_dir is not yet there
-        if os.path.isdir(os.path.join(subjects_dir, 'freesurfer')) == False:
-            from pathlib import Path
+        freesurfer_dir = Path(os.path.join(subjects_dir, 'freesurfer'))
+        if os.path.isdir(freesurfer_dir) == False:
             print('Download missing freesurfer fsaverage data for source modelling.')
-            mne.datasets.fetch_fsaverage(Path(os.path.join(subjects_dir, 'freesurfer')))
+            mne.datasets.fetch_fsaverage(freesurfer_dir)
+            #also build a downsampled version of the ico-5 to save some processing power
+            src = mne.setup_source_space(
+                        subject='fsaverage',        # Subject name
+                        spacing="ico4",          # Use ico-4 source spacing
+                        add_dist=False,           # Avoid computing inter-source distances (optional)
+                        subjects_dir=freesurfer_dir # FreeSurfer's subjects directory
+                    )
+
+            # Save the source space to a file
+            mne.write_source_spaces(f"{freesurfer_dir}/fsaverage/bem/fsaverage-ico-4-src.fif", src)
+
         
         if redo_hdm:
             #recompute or take the saved one
