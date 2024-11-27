@@ -10,8 +10,14 @@ meg_path = os.path.join(sample_data_folder, "MEG", "sample",)
 sample_data_raw_file = os.path.join(meg_path, "sample_audvis_raw.fif")
 raw = mne.io.read_raw_fif(sample_data_raw_file, preload=True)
 
+
+
 #%% Lets initialize the almkanal
 ak = AlmKanal(raw=raw)
+#%%
+ak.do_fwd_model(subject_id='19610202mrln',
+                subjects_dir='/Users/fabian.schmidt/git/AlmKanal/data_old/',)
+
 #%% you can easily use common workflows like maxfiltering in one call
 # default arguments have been decided upon by gianpaolo, thomas, nathan and fabian
 ak.do_maxwell()

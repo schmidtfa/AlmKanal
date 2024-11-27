@@ -2,6 +2,7 @@ from attrs import define, field
 import attrs
 import mne
 import numpy as np
+import os
 
 #all them utility functions
 from preproc_utils.maxwell_utils import run_maxwell
@@ -9,7 +10,6 @@ from preproc_utils.ica_utils import run_ica
 from src_utils.src_utils import data2source
 from data_utils.check_data import check_raw_epoch
 from src_utils.headmodel_utils import compute_headmodel, make_fwd
-from os.path import join
 
 @define
 class AlmKanal:
@@ -46,7 +46,6 @@ class AlmKanal:
         if getattr(self, "_initialized", False) and name in {'raw', 'epoched'}:
             check_raw_epoch(self)
         
-
 
     def do_maxwell( self, 
                     mw_coord_frame: str = 'head',
@@ -187,7 +186,7 @@ class AlmKanal:
 
     def do_fwd_model(self,
                      subject_id,
-                     base_data_path,
+                     subjects_dir,
                      source='surface',
                      template_mri=True,
                      redo_hdm=True
@@ -198,21 +197,27 @@ class AlmKanal:
         elif self.epoched is not None:
             cur_info = self.epoched.info
 
+        #TODO: Include workflow that fetches fsaverage if subjects_dir is not yet there
+        if os.path.isdir(os.path.join(subjects_dir, 'freesurfer')) == False:
+            from pathlib import Path
+            print('Download missing freesurfer fsaverage data for source modelling.')
+            mne.datasets.fetch_fsaverage(Path(os.path.join(subjects_dir, 'freesurfer')))
+        
         if redo_hdm:
             #recompute or take the saved one
             trans = compute_headmodel(info=cur_info,
                                     subject_id=subject_id,
-                                    base_data_path=base_data_path,
+                                    subjects_dir=subjects_dir,
                                     pick_dict=self.pick_dict,
                                     template_mri=template_mri)
         else:
             
-            trans = join(base_data_path, 'headmodels', subject_id, subject_id) + '-trans.fif'
+            trans = os.path.join(subjects_dir, 'headmodels', subject_id, subject_id) + '-trans.fif'
         
         fwd = make_fwd(cur_info, 
                        source=source, 
                        fname_trans=trans, 
-                       subjects_dir=join(base_data_path, 'freesurfer'), 
+                       subjects_dir=subjects_dir, 
                        subject_id=subject_id, 
                        template_mri=template_mri)
 
@@ -225,6 +230,7 @@ class AlmKanal:
                empty_room_path=None,):
         #here we want to embed the logic that, if your object has been epoched we do epoched2src else raw2src
         if self.fwd is not None:
+
             if self.raw is not None:
                 data = self.raw
             else:

@@ -1,14 +1,12 @@
-from os.path import join
 import numpy as np
 import mne
 from mne.coreg import Coregistration
-from os.path import join
 import os
 import pickle
 
 def compute_headmodel(info,
                       subject_id,
-                      base_data_path,
+                      subjects_dir,
                       pick_dict,
                       template_mri=True,
                       savefig=True):
@@ -19,8 +17,8 @@ def compute_headmodel(info,
 
     '''
     
-    mri_path = join(base_data_path, 'freesurfer')
-    out_folder = join(base_data_path, 'headmodels', subject_id)
+    mri_path = os.path.join(subjects_dir, 'freesurfer')
+    out_folder = os.path.join(subjects_dir, 'headmodels', subject_id)
     trans = 'fsaverage' 
     
     info = mne.pick_info(info, mne.pick_types(info, **pick_dict))
@@ -51,11 +49,11 @@ def compute_headmodel(info,
 
     if os.path.isdir(out_folder) == False:
         os.makedirs(out_folder)
-    file = open(join(out_folder, subject_id) + "info.pickle", 'wb')
+    file = open(os.path.join(out_folder, subject_id) + "info.pickle", 'wb')
     pickle.dump(info, file)
     file.close()    
     
-    mne.write_trans(join(out_folder, subject_id) + '-trans.fif', coreg.trans, overwrite=True)
+    mne.write_trans(os.path.join(out_folder, subject_id) + '-trans.fif', coreg.trans, overwrite=True)
     print('Coregistration done!')
 
     if savefig: # REDO IT LATER
@@ -113,7 +111,7 @@ def compute_headmodel(info,
 
         plt.tight_layout()
         # save 
-        plt.savefig(join(out_folder, subject_id) +  '_coreg.png', dpi=300)
+        plt.savefig(os.path.join(out_folder, subject_id) +  '_coreg.png', dpi=300)
         # not sohw ... plt.show()
 
     return coreg.trans
@@ -128,7 +126,7 @@ def make_fwd(info, source, fname_trans, subjects_dir, subject_id, template_mri=F
     else:
         fpath_add_on = ''
 
-    fs_path = join(subjects_dir, f'{subject_id}{fpath_add_on}')
+    fs_path = os.path.join(subjects_dir, f'{subject_id}{fpath_add_on}')
     bem_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-5120-5120-5120-bem.fif'
 
     if source == 'volume':
@@ -138,7 +136,7 @@ def make_fwd(info, source, fname_trans, subjects_dir, subject_id, template_mri=F
         src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-4-src.fif'
     
     if isinstance(fname_trans, str):
-        fname_trans = join(fname_trans, subject_id, subject_id + '-trans.fif')
+        fname_trans = os.path.join(fname_trans, subject_id, subject_id + '-trans.fif')
 
     bem_sol = mne.make_bem_solution(bem_file, 
                                     solver='mne', 
