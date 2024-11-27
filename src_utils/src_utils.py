@@ -48,7 +48,7 @@ def get_nearest_empty_room(info,
 
 def process_empty_room(data,
                        info,
-                       picks,
+                       pick_dict,
                        icas,
                        ica_ids,
                        empty_room_path,
@@ -56,7 +56,7 @@ def process_empty_room(data,
         
         # print('Multiple channel types and no noise covariance matrix detected. \
         #        Trying to build noise covariance matrix using empty room recordings.')
-        # # if preproc_settings is None:
+        # # if preproc_info is None:
         # #     raise ValueError('You need to supply your preprocessing settings, if you are doing beamforming \
         # #                using a combination of different sensor types. Either you pick "mag" or "grad" or you supply your preprocessing settings.')
             
@@ -65,7 +65,7 @@ def process_empty_room(data,
         else:
             fname_empty_room = empty_room_path
 
-        raw_er = mne.io.read_raw(fname_empty_room)
+        raw_er = mne.io.read_raw(fname_empty_room, preload=True)
         
         if preproc_info['maxwell'] is not None:
             if isinstance(data, mne.epochs.Epochs):
@@ -76,13 +76,28 @@ def process_empty_room(data,
             raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
             raw_er = run_maxwell(raw_er, **preproc_info['maxwell'])
 
-        #TODO: Add filtering here -> i.e. check if deviation between empty and real data and then filter
+        #Add filtering here -> i.e. check if deviation between empty and real data and then filter
+        if np.logical_and(np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) == False,  
+                          (np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01),) == False):
+            raw_er.filter(l_freq=data.info['highpass'], h_freq=data.info['lowpass'])
+        elif np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) == False:
+            raw_er.filter(l_freq=data.info['highpass'], h_freq=None,)
+        elif np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01) == False:
+            raw_er.filter(l_freq=None, h_freq=data.info['lowpass'])
+        else:
+            print('No filtering applied')
+
+        #TODO: Also make sure that the sampling rate is the same
+        if np.isclose(data.info['sfreq'], raw_er.info['sfreq'], atol=.9) == False:
+            #adjust for small floating point differences
+            raw_er.resample(data.info['sfreq'])
 
         if preproc_info['ica'] is not None:
             #we loop here, because you could have done more than one ica
             for ica, ica_id in zip(icas, ica_ids):
                 ica.apply(raw_er, exclude=ica_id)
 
+        picks = mne.pick_types(raw_er.info, **pick_dict)
         raw_er.pick(picks=picks)
         if isinstance(data, mne.io.fiff.raw.Raw):
             noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
@@ -104,7 +119,7 @@ def data2source(data,
                ica_ids=None,
                data_cov=None,
                noise_cov=None, 
-               preproc_settings=None,
+               preproc_info=None,
                empty_room_path=None,
                ):
 
@@ -145,11 +160,11 @@ def data2source(data,
 
         true_rank, noise_cov = process_empty_room(data,
                                                     info,
-                                                    picks,
+                                                    pick_dict,
                                                     icas,
                                                     ica_ids,
                                                     empty_room_path,
-                                                    preproc_settings)
+                                                    preproc_info)
 
     elif n_ch_types == 1:
         # when we dont have a noise cov we just use the data cov for rank comp
