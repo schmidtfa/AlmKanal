@@ -211,8 +211,8 @@ class AlmKanal:
         
         fwd = make_fwd(cur_info, 
                        source=source, 
-                       trans_path=trans, 
-                       subjects_dir=join(base_data_path, 'freesurfer', subject_id), 
+                       fname_trans=trans, 
+                       subjects_dir=join(base_data_path, 'freesurfer'), 
                        subject_id=subject_id, 
                        template_mri=template_mri)
 

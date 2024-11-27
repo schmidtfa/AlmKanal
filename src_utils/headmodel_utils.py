@@ -120,7 +120,7 @@ def compute_headmodel(info,
 
 
 
-def make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri=False):
+def make_fwd(info, source, fname_trans, subjects_dir, subject_id, template_mri=False):
     
     ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
     if template_mri:
@@ -137,8 +137,8 @@ def make_fwd(info, source, trans_path, subjects_dir, subject_id, template_mri=Fa
     elif source == 'surface':
         src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-4-src.fif'
     
-    if isinstance(trans_path, str):
-        fname_trans = join(trans_path, subject_id, subject_id + '-trans.fif')
+    if isinstance(fname_trans, str):
+        fname_trans = join(fname_trans, subject_id, subject_id + '-trans.fif')
 
     bem_sol = mne.make_bem_solution(bem_file, 
                                     solver='mne', 
