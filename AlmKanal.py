@@ -8,7 +8,7 @@ from preproc_utils.maxwell_utils import run_maxwell
 from preproc_utils.ica_utils import run_ica
 from src_utils.src_utils import data2source
 from data_utils.check_data import check_raw_epoch
-from headmodel_utils import compute_headmodel, make_fwd
+from src_utils.headmodel_utils import compute_headmodel, make_fwd
 from os.path import join
 
 @define
@@ -185,13 +185,6 @@ class AlmKanal:
             print('You need both `raw` data and `events` in the pipeline to create epochs')
 
 
-
-    def do_trf_epochs(self):
-        #mne only allows epochs of equal length. 
-        #This should become a shorthand to split the raw file in smaller raw files based on events
-        pass
-
-
     def do_fwd_model(self,
                      subject_id,
                      base_data_path,
@@ -249,6 +242,12 @@ class AlmKanal:
             print('The pipeline needs a forward model to be able to go to source.')
 
         return stc
+
+
+    def do_trf_epochs(self):
+        #mne only allows epochs of equal length. 
+        #This should become a shorthand to split the raw file in smaller raw files based on events
+        pass
 
 
     def convert2eelbrain(self):
