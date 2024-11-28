@@ -43,6 +43,4 @@ def gen_trf_epochs(raw, stim, event_dict, events=None, sti_ch='STI101'):
     if events is None:
        events = get_events_from_sti(raw, sti_ch=sti_ch)
 
-
-
     return trf_epochs

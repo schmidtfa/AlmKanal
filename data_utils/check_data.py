@@ -11,13 +11,13 @@ def check_raw_epoch(self):
         return
 
     if np.logical_and(self.raw is not None, self.epoched is None):
-        self.info['raw'] = True
-        self.info['epoched'] = False
+        self.info.raw = True
+        self.info.epoched = False
         self.raw.fix_mag_coil_types() #https://mne.tools/stable/generated/mne.channels.fix_mag_coil_types.html
 
     elif np.logical_and(self.raw is None, self.epoched is not None):
-        self.info['raw'] = False
-        self.info['epoched'] = True
+        self.info.raw = False
+        self.info.epoched = True
 
     elif np.logical_and(self.raw is None, self.epoched is None):
         raise ValueError('This pipeline needs to be intialized using either an `mne.io.Raw` or `mne.Epochs` object.')
