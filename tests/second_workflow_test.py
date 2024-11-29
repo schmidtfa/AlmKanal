@@ -1,9 +1,5 @@
 # %%
-import sys
-
 import mne
-
-sys.path.append('../../AlmKanal')
 from AlmKanal import AlmKanal
 
 # %%
@@ -16,7 +12,9 @@ ak.raw.filter(l_freq=0.1, h_freq=100)
 ak.do_ica()
 
 # %% do fwd model
-ak.do_fwd_model(subject_id='19610202mrln', subjects_dir='/home/schmidtfa/git/AlmKanal/data_old/', redo_hdm=False)
+ak.do_fwd_model(subject_id='19610202mrln', 
+                subjects_dir='/home/schmidtfa/git/AlmKanal/data_old/', 
+                redo_hdm=False)
 # %% go 2 source
 stc = ak.do_src(
     subject_id='19610202mrln',

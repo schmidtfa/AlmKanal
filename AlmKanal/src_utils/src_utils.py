@@ -49,14 +49,14 @@ def process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, pr
 
     raw_er = mne.io.read_raw(fname_empty_room, preload=True)
 
-    if preproc_info['maxwell'] is not None:
+    if preproc_info.maxwell is not None:
         if isinstance(data, mne.epochs.Epochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
         elif isinstance(data, mne.io.fiff.raw.Raw):
             raw = data
 
         raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
-        raw_er = run_maxwell(raw_er, **preproc_info['maxwell'])
+        raw_er = run_maxwell(raw_er, **preproc_info.maxwell)
 
     # Add filtering here -> i.e. check if deviation between empty and real data and then filter
     if np.logical_and(
@@ -79,7 +79,7 @@ def process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, pr
         # adjust for small floating point differences
         raw_er.resample(data.info['sfreq'])
 
-    if preproc_info['ica'] is not None:
+    if preproc_info.ica is not None:
         # we loop here, because you could have done more than one ica
         for ica, ica_id in zip(icas, ica_ids):
             ica.apply(raw_er, exclude=ica_id)
@@ -186,8 +186,8 @@ def src2parc(stc, subject_id, subjects_dir, atlas='glasser', source='surface'):
         labels_mne = mne.read_labels_from_annot(f'{subject_id}_from_template', parc=surf_atlas, subjects_dir=fs_dir)
         names_order_mne = np.array([label.name[:-3] for label in labels_mne])
 
-        rh = labels_mne.hemi == 'rh'  # [True if label.hemi == 'rh' else False for label in labels_mne]
-        lh = labels_mne.hemi == 'lh'  # [True if label.hemi == 'lh' else False for label in labels_mne]
+        rh = [label.hemi == 'rh' for label in labels_mne]
+        lh = [label.hemi == 'lh' for label in labels_mne]
 
         parc = {'lh': lh, 'rh': rh, 'parc': surf_atlas, 'names_order_mne': names_order_mne}
         parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='mean_flip')})

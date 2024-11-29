@@ -199,7 +199,7 @@ class AlmKanal:
 
         # fetch fsaverage if subjects_dir is not yet there
         freesurfer_dir = Path(subjects_dir) / 'freesurfer'
-        if Path.isdir(freesurfer_dir) is False:
+        if freesurfer_dir.is_dir() is False:
             print('Download missing freesurfer fsaverage data for source modelling.')
             mne.datasets.fetch_fsaverage(freesurfer_dir)
             # also build a downsampled version of the ico-5 to save some processing power
@@ -223,7 +223,7 @@ class AlmKanal:
                 template_mri=template_mri,
             )
         else:
-            trans = Path(subjects_dir) / 'headmodels' / subject_id / subject_id + '-trans.fif'
+            trans = Path(subjects_dir) / 'headmodels' / subject_id / (subject_id + '-trans.fif')
 
         fwd = make_fwd(
             cur_info,

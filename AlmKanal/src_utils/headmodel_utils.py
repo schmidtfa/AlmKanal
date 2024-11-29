@@ -43,14 +43,14 @@ def compute_headmodel(info, subject_id, subjects_dir, pick_dict, template_mri=Tr
         'fsaverage', new_source_identifier, scale=coreg.scale, subjects_dir=mri_path, annot=True, overwrite=True
     )
 
-    if Path.is_dir(out_folder) is False:
-        Path.mkdir(out_folder, parents=True)
-    file = Path.open(Path(out_folder) / subject_id + 'info.pickle', 'wb')
+    if out_folder.is_dir() is False:
+        out_folder.mkdir(parents=True)
+    file = Path.open(out_folder / (subject_id + 'info.pickle'), 'wb')
     # open(os.path.join(out_folder, subject_id) + 'info.pickle', 'wb')
     pickle.dump(info, file)
     file.close()
 
-    mne.write_trans(Path(out_folder) / subject_id + '-trans.fif', coreg.trans, overwrite=True)
+    mne.write_trans(Path(out_folder) / (subject_id + '-trans.fif'), coreg.trans, overwrite=True)
     print('Coregistration done!')
 
     if savefig:  # REDO IT LATER
@@ -113,7 +113,7 @@ def compute_headmodel(info, subject_id, subjects_dir, pick_dict, template_mri=Tr
         plt.tight_layout()
         # save
 
-        plt.savefig(Path(out_folder) / subject_id + '_coreg.png', dpi=300)
+        plt.savefig(Path(out_folder) / (subject_id + '_coreg.png'), dpi=300)
         # plt.savefig(os.path.join(out_folder, subject_id) + '_coreg.png', dpi=300)
         # not sohw ... plt.show()
 
