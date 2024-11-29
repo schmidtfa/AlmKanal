@@ -1,29 +1,26 @@
-import numpy as np
-import mne
-from mne.coreg import Coregistration
-import os
 import pickle
+from pathlib import Path
 
-def compute_headmodel(info,
-                      subject_id,
-                      subjects_dir,
-                      pick_dict,
-                      template_mri=True,
-                      savefig=True):
-    
-    '''
+import matplotlib.pyplot as plt
+import mne
+import numpy as np
+from mne.coreg import Coregistration
+
+
+def compute_headmodel(info, subject_id, subjects_dir, pick_dict, template_mri=True, savefig=True):
+    """
     base_data_path: The path to the data directory where freesurfer and the headmodels are going to be stored.
                     The folder in which the data is saved is dependent on this.
 
-    '''
-    
-    mri_path = os.path.join(subjects_dir, 'freesurfer')
-    out_folder = os.path.join(subjects_dir, 'headmodels', subject_id)
-    trans = 'fsaverage' 
-    
+    """
+
+    mri_path = Path(subjects_dir) / 'freesurfer'  # os.path.join(subjects_dir, 'freesurfer')
+    out_folder = Path(subjects_dir) / 'headmodels' / subject_id  # os.path.join(subjects_dir, 'headmodels', subject_id)
+    trans = 'fsaverage'
+
     info = mne.pick_info(info, mne.pick_types(info, **pick_dict))
 
-    #%% do the coregistration
+    # %% do the coregistration
     coreg = Coregistration(info, trans, mri_path)
     coreg.set_scale_mode('3-axis')
     coreg.fit_fiducials(verbose=True)
@@ -32,36 +29,36 @@ def compute_headmodel(info,
     coreg.fit_icp(n_iterations=20, nasion_weight=10, verbose=True)
 
     dists = coreg.compute_dig_mri_distances() * 1e3  # in mm
-    print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "f"/ {np.min(dists):.2f} mm / "
-        f"{np.max(dists):.2f} mm")
-    
-    #%% create and save a scaled copy of mri subject fs average         
-    if  template_mri:
-        new_source_identifier = subject_id + '_from_template'
-    else:
-        new_source_identifier = subject_id
+    print(
+        f'Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm '
+        f'/ {np.min(dists):.2f} mm / '
+        f'{np.max(dists):.2f} mm'
+    )
 
-    #Dont forget this sdcales bem, atlas and source space automatically too
-    mne.coreg.scale_mri("fsaverage", new_source_identifier, 
-                        scale=coreg.scale, 
-                        subjects_dir=mri_path, 
-                        annot=True, overwrite=True)
+    # %% create and save a scaled copy of mri subject fs average
+    new_source_identifier = subject_id + '_from_template' if template_mri else subject_id
 
-    if os.path.isdir(out_folder) == False:
-        os.makedirs(out_folder)
-    file = open(os.path.join(out_folder, subject_id) + "info.pickle", 'wb')
+    # Dont forget this sdcales bem, atlas and source space automatically too
+    mne.coreg.scale_mri(
+        'fsaverage', new_source_identifier, scale=coreg.scale, subjects_dir=mri_path, annot=True, overwrite=True
+    )
+
+    if Path.is_dir(out_folder) is False:
+        Path.mkdir(out_folder, parents=True)
+    file = Path.open(Path(out_folder) / subject_id + 'info.pickle', 'wb')
+    # open(os.path.join(out_folder, subject_id) + 'info.pickle', 'wb')
     pickle.dump(info, file)
-    file.close()    
-    
-    mne.write_trans(os.path.join(out_folder, subject_id) + '-trans.fif', coreg.trans, overwrite=True)
+    file.close()
+
+    mne.write_trans(Path(out_folder) / subject_id + '-trans.fif', coreg.trans, overwrite=True)
     print('Coregistration done!')
 
-    if savefig: # REDO IT LATER
-            
+    if savefig:  # REDO IT LATER
         # PLACEHOLDER: plot 3d stuff when xvfb is available
-        import matplotlib.pyplot as plt  # Assuming 'info' is your data structure containing sensor and digitization information
-        head_mri_t = mne.transforms._get_trans(coreg.trans, "head", "mri")[0]
-        coord_frame = "head"
+        # Assuming 'info' is your data structure containing sensor and digitization information
+
+        head_mri_t = mne.transforms._get_trans(coreg.trans, 'head', 'mri')[0]
+        coord_frame = 'head'
         to_cf_t = mne.transforms._get_transforms_to_coord_frame(info, head_mri_t, coord_frame=coord_frame)
 
         sensor_locs = np.array([ch['loc'][:3] for ch in info['chs'] if ch['ch_name'].startswith('MEG')])
@@ -103,47 +100,44 @@ def compute_headmodel(info,
         # 3D plot
         ax4 = fig.add_subplot(224, projection='3d')
         ax4.scatter(sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], s=20, c='r', label='Sensors')
-        ax4.plot(sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], color='k', linewidth=0.5)  # Connect sensors with lines
-        ax4.scatter(head_shape_points[:, 0], head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b', label='Head Shape')
+        ax4.plot(
+            sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], color='k', linewidth=0.5
+        )  # Connect sensors with lines
+        ax4.scatter(
+            head_shape_points[:, 0], head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b', label='Head Shape'
+        )
         ax4.set_title('3D View')
         ax4.grid(False)  # Remove grid
         ax4.axis('off')  # Remove axis
 
         plt.tight_layout()
-        # save 
-        plt.savefig(os.path.join(out_folder, subject_id) +  '_coreg.png', dpi=300)
+        # save
+
+        plt.savefig(Path(out_folder) / subject_id + '_coreg.png', dpi=300)
+        # plt.savefig(os.path.join(out_folder, subject_id) + '_coreg.png', dpi=300)
         # not sohw ... plt.show()
 
     return coreg.trans
 
 
-
 def make_fwd(info, source, fname_trans, subjects_dir, subject_id, template_mri=False):
-    
     ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
-    if template_mri:
-        fpath_add_on = '_from_template'
-    else:
-        fpath_add_on = ''
+    fpath_add_on = '_from_template' if template_mri else ''
 
-    fs_path = os.path.join(subjects_dir, 'freesurfer', f'{subject_id}{fpath_add_on}')
+    # fs_path = os.path.join(subjects_dir, 'freesurfer', f'{subject_id}{fpath_add_on}')
+    fs_path = Path(subjects_dir) / 'freesurfer' / f'{subject_id}{fpath_add_on}'
     bem_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-5120-5120-5120-bem.fif'
 
     if source == 'volume':
         src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-vol-10-src.fif'
-        
+
     elif source == 'surface':
         src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-4-src.fif'
-    
+
     # if isinstance(fname_trans, str):
     #     fname_trans = os.path.join(fname_trans, subject_id, subject_id + '-trans.fif')
 
-    bem_sol = mne.make_bem_solution(bem_file, 
-                                    solver='mne', 
-                                    verbose=True) 
-    fwd = mne.make_forward_solution(info=info, 
-                                    trans=fname_trans, 
-                                    src=src_file, 
-                                    bem=bem_sol)
+    bem_sol = mne.make_bem_solution(bem_file, solver='mne', verbose=True)
+    fwd = mne.make_forward_solution(info=info, trans=fname_trans, src=src_file, bem=bem_sol)
 
     return fwd

@@ -1,10 +1,11 @@
-from attrs import define
 from typing import TypedDict
 
-@define
-class info_class:
+from attrs import define
 
-    '''Container for the info field of the AlmKanal workflow'''
+
+@define
+class InfoClass:
+    """Container for the info field of the AlmKanal workflow"""
 
     raw: bool = False
     epoched: bool = False
@@ -14,12 +15,11 @@ class info_class:
     trf_epochs: dict | None = None
 
 
-class pick_dict_class(TypedDict):
+class PickDictClass(TypedDict):
+    """Container for data picking"""
 
-    '''Container for data picking'''
-
-    meg: bool = True 
+    meg: bool = True
     eog: bool = True
     ecg: bool = True
     eeg: bool = False
-    stim: bool = True 
+    stim: bool = True
