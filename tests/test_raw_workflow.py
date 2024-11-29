@@ -2,7 +2,7 @@
 import mne
 import os
 import sys
-sys.path.append('/Users/fabian.schmidt/git/AlmKanal')
+sys.path.append('../../AlmKanal')
 from AlmKanal import AlmKanal
 
 sample_data_folder = mne.datasets.sample.data_path()
@@ -15,9 +15,6 @@ raw = mne.io.read_raw_fif(sample_data_raw_file, preload=True)
 
 #%% Lets initialize the almkanal
 ak = AlmKanal(raw=raw)
-#%%
-ak.do_fwd_model(subject_id='19610202mrln',
-                subjects_dir='/Users/fabian.schmidt/git/AlmKanal/data_old/',)
 
 #%% you can easily use common workflows like maxfiltering in one call
 # default arguments have been decided upon by gianpaolo, thomas, nathan and fabian
@@ -34,7 +31,11 @@ ak.ica
 
 #%% find events in the data
 # they will be automatically added to the AlmKanal
+#TODO: add a set_events method
+#TODO: Avoid breaking api by using setter
 ak.do_events()
+
+
 
 ak.events
 #%% now we want to epoch the data
@@ -46,7 +47,9 @@ event_dict = {
     "Visual/Right": 4,
 }
 
-ak.do_epochs(event_id=event_dict)
+ak.do_epochs(tmin=-.2,
+             tmax=.5,
+            event_id=event_dict)
 
 #%% When you have the necessary components assembled you can push the data
 # to src space
@@ -55,7 +58,7 @@ fwd = mne.read_forward_solution(fwd_fname)
 
 ak.pick_dict['meg'] = 'mag'
 ak.fwd = fwd
-
+#
 stc = ak.do_src()
 
 #%%

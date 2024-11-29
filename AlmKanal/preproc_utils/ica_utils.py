@@ -67,10 +67,6 @@ def run_ica(raw,
         bad_ids = []
 
     raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
-    #get ica data
-    #ic_signal = ica.get_sources(raw)
-    #ic_info = {'ic_src_tc': ic_signal,
-     #          'rej_ic_idcs': components_dict}
     
     #plot data if wanted
     if img_path != None:
@@ -96,7 +92,6 @@ def run_ica(raw,
     ica.apply(raw, exclude=bad_ids)
 
     return raw, ica, bad_ids
-
 
 
 

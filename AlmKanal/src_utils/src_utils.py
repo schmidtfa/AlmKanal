@@ -1,9 +1,9 @@
 #%%imports
-from os import listdir
-from os.path import join
+import os
 from datetime import datetime
 import numpy as np
 import mne
+from pathlib import Path
 
 import warnings
 from mne._fiff.pick import _contains_ch_type
@@ -20,7 +20,7 @@ def get_nearest_empty_room(info,
     The file is used for the noise covariance estimation.
     """
     
-    all_empty_room_dates = np.array([datetime.strptime(date, '%y%m%d') for date in listdir(empty_room_path)])
+    all_empty_room_dates = np.array([datetime.strptime(date, '%y%m%d') for date in os.listdir(empty_room_path)])
 
     cur_date = info['meas_date']
     cur_date_truncated = datetime(cur_date.year, cur_date.month, cur_date.day)  # necessary to truncate
@@ -32,16 +32,16 @@ def get_nearest_empty_room(info,
         nearest_date_datetime = _nearest(all_empty_room_dates, cur_date_truncated)
         nearest_date = nearest_date_datetime.strftime("%y%m%d")
 
-        cur_empty_path = join(empty_room_path, nearest_date)
+        cur_empty_path = os.path.join(empty_room_path, nearest_date)
 
-        if 'supine' in listdir(cur_empty_path)[0]:
+        if 'supine' in os.listdir(cur_empty_path)[0]:
             all_empty_room_dates = np.delete(all_empty_room_dates,
                                                 all_empty_room_dates == nearest_date_datetime)
-        elif np.logical_and('68' in listdir(cur_empty_path)[0],
-                            'sss' not in listdir(cur_empty_path)[0].lower()):
+        elif np.logical_and('68' in os.listdir(cur_empty_path)[0],
+                            'sss' not in os.listdir(cur_empty_path)[0].lower()):
             break
 
-    fname_empty_room = join(cur_empty_path, listdir(cur_empty_path)[0])
+    fname_empty_room = os.path.join(cur_empty_path, os.listdir(cur_empty_path)[0])
 
     return fname_empty_room
 
@@ -190,3 +190,70 @@ def data2source(data,
         stc = mne.beamformer.apply_lcmv_epochs(data, filters)
 
     return stc, filters
+
+
+
+def src2parc(stc,
+             subject_id,
+             subjects_dir,
+             atlas='glasser',
+             source='surface'):
+        
+        if atlas == 'dk':
+             vol_atlas = 'aparc+aseg'
+             surf_atlas = 'aparc'
+        elif atlas == 'destrieux':
+             vol_atlas = 'aparc.a2009s+aseg'
+             surf_atlas = 'aparc.a2009s'
+        elif atlas == 'glasser':
+             if source == 'volume':
+                ValueError('No volumetric model for the glasser atlas available')
+             surf_atlas = 'HCPMMP1'
+
+        fs_dir = Path(os.path.join(subjects_dir, 'freesurfer'))
+        # mean flip time series costs significantly less memory than averaging the irasa'd spectra
+        if source == 'surface':
+
+            src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-ico-4-src.fif'
+            src = mne.read_source_spaces(src_file)
+            labels_mne = mne.read_labels_from_annot(f'{subject_id}_from_template', 
+                                                    parc=surf_atlas, 
+                                                    subjects_dir=fs_dir)
+            names_order_mne = np.array([label.name[:-3] for label in labels_mne])
+
+            rh = [True if label.hemi == 'rh' else False for label in labels_mne]
+            lh = [True if label.hemi == 'lh' else False for label in labels_mne]
+
+            parc = {'lh': lh,
+                            'rh': rh,
+                            'parc': surf_atlas,
+                            'names_order_mne': names_order_mne}
+            parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='mean_flip')})
+        elif source == 'volume':
+
+            src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-10-src.fif'
+            src = mne.read_source_spaces(src_file)
+            labels_mne = os.path.join(fs_dir, f'{subject_id}_from_template', 'mri/' + vol_atlas + '.mgz')
+            label_names = mne.get_volume_labels_from_aseg(labels_mne)
+
+            ctx_logical = [True if 'ctx' in label else False for label in label_names]
+            sctx_logical = [True if f == False else False for f in ctx_logical]
+            
+            ctx_labels = [label[4:] for label in label_names if 'ctx' in label]
+            sctx_labels = list(np.array(label_names)[sctx_logical])
+            rh = [True if label[:2] == 'rh' else False for label in ctx_labels]
+            lh = [True if label[:2] == 'lh' else False for label in ctx_labels]
+
+            parc = {'lh': lh,
+                    'rh': rh,
+                    'parc': vol_atlas + '.mgz',
+                    'ctx_labels': ctx_labels,
+                    'ctx_logical': ctx_logical,
+                    'sctx_logical': sctx_logical,
+                    'sctx_labels': sctx_labels}
+            parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='auto')})
+
+        else:
+            raise ValueError('the only valid options for source are `surface` and `volume`.')
+
+        return parc
