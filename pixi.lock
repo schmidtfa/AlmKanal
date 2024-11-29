@@ -783,7 +783,7 @@ packages:
   name: almkanal
   version: 1.0.0.dev0
   path: .
-  sha256: 7eedb856de0f1b42117ba0864f4d090c5c3cd2c78ba4ebff6915751c67bda761
+  sha256: a84d27a61e2333704bdd02d467d74076547901f1374a79812c26ba06ef319a63
   requires_dist:
   - attrs<25,>=24.2.0
   - mne<1.9,>=1.8
