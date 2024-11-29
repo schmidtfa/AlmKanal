@@ -6,9 +6,8 @@ from pathlib import Path
 
 import mne
 import numpy as np
+from almkanal.preproc_utils.maxwell_utils import run_maxwell
 from mne._fiff.pick import _contains_ch_type
-
-from AlmKanal.preproc_utils.maxwell_utils import run_maxwell
 
 
 # %%
@@ -44,11 +43,7 @@ def get_nearest_empty_room(info, empty_room_path='/home/schmidtfa/empty_room_dat
     return fname_empty_room
 
 
-def process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, preproc_info):
-    fname_empty_room = get_nearest_empty_room(info, empty_room_path) if empty_room_path is None else empty_room_path
-
-    raw_er = mne.io.read_raw(fname_empty_room, preload=True)
-
+def preproc_empty_room(raw_er, data, preproc_info, icas, ica_ids):
     if preproc_info.maxwell is not None:
         if isinstance(data, mne.epochs.Epochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
@@ -83,6 +78,16 @@ def process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, pr
         # we loop here, because you could have done more than one ica
         for ica, ica_id in zip(icas, ica_ids):
             ica.apply(raw_er, exclude=ica_id)
+
+    return raw_er
+
+
+def process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, preproc_info):
+    fname_empty_room = get_nearest_empty_room(info, empty_room_path) if empty_room_path is None else empty_room_path
+
+    raw_er = mne.io.read_raw(fname_empty_room, preload=True)
+
+    raw_er = preproc_empty_room(raw_er, data, preproc_info, icas, ica_ids)
 
     picks = mne.pick_types(raw_er.info, **pick_dict)
     raw_er.pick(picks=picks)

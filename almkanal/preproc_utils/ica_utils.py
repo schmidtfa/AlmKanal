@@ -7,6 +7,26 @@ from pyrasa.utils.peak_utils import get_band_info
 from scipy.stats import zscore
 
 
+def plot_ica(raw, ica, components_dict, bad_ids, fname, img_path):
+    """Function to plot the ICA components"""
+
+    if len(bad_ids) > 0:
+        titles = {}
+        for key, vals in components_dict.items():
+            for val in vals:
+                titles.update({int(val): f'IC {key}'})
+        # save the ica figures
+        fig = ica.plot_components(picks=bad_ids, ch_type='mag', inst=raw, title=titles, show=False)
+        plot_file_name = f'{fname}_ICA_summary_plot.png'
+        # if the directory doesn't exist, create it
+        if not Path.exists(Path(img_path) / 'ica_pngs'):
+            Path.mkdir(Path(img_path) / 'ica_pngs')
+
+        fig.savefig(Path(img_path) / 'ica_pngs' / plot_file_name)
+    else:
+        print('Error: No Components detected using the current settings. So no plots will be generated.')
+
+
 def run_ica(
     raw,
     n_components=None,
@@ -68,22 +88,7 @@ def run_ica(
 
     # plot data if wanted
     if img_path is not None:
-        if len(bad_ids) > 0:
-            titles = {}
-            for key, vals in components_dict.items():
-                for val in vals:
-                    titles.update({int(val): f'IC {key}'})
-            # save the ica figures
-            fig = ica.plot_components(picks=bad_ids, ch_type='mag', inst=raw, title=titles, show=False)
-            plot_file_name = f'{fname}_ICA_summary_plot.png'
-            # if the directory doesn't exist, create it
-            if not Path.exists(Path(img_path) / 'ica_pngs'):
-                Path.mkdir(Path(img_path) / 'ica_pngs')
-
-            fig.savefig(Path(img_path) / 'ica_pngs' / plot_file_name)
-        else:
-            print('Error: No Components detected using the current settings. So no plots will be generated.')
-
+        plot_ica(raw, ica, components_dict, bad_ids, fname, img_path)
     # % drop physiological components
     ica.apply(raw, exclude=bad_ids)
 

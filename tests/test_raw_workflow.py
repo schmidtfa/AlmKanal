@@ -3,7 +3,7 @@ import os
 
 import mne
 
-from AlmKanal import AlmKanal
+from almkanal import AlmKanal
 
 sample_data_folder = mne.datasets.sample.data_path()
 meg_path = os.path.join(
@@ -67,7 +67,7 @@ stc_ave = mne.beamformer.apply_lcmv(ak.epoched['Auditory/Left'].average(), ak.fi
 # %% Lets initialize the almkanal
 import mne
 
-from AlmKanal import AlmKanal
+from almkanal import AlmKanal
 
 raw = mne.io.read_raw('PATH/TO/RAW')
 
@@ -99,7 +99,7 @@ stc = ak.do_src()
 # %% Lets initialize the almkanal
 import mne
 
-from AlmKanal import AlmKanal
+from almkanal import AlmKanal
 
 raw = mne.io.read_raw('PATH/TO/RAW')
 

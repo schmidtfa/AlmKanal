@@ -1,6 +1,6 @@
 # %%
 import mne
-from AlmKanal import AlmKanal
+from almkanal import AlmKanal
 
 # %%
 raw = mne.io.read_raw('../test_data/19610202mrln_resting.fif')

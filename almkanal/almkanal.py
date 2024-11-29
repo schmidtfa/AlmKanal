@@ -5,14 +5,14 @@ import mne
 import numpy as np
 from attrs import define, field
 
-from AlmKanal.data_utils.check_data import check_raw_epoch
-from AlmKanal.data_utils.data_classes import InfoClass, PickDictClass
-from AlmKanal.preproc_utils.ica_utils import run_ica
+from almkanal.data_utils.check_data import check_raw_epoch
+from almkanal.data_utils.data_classes import InfoClass, PickDictClass
+from almkanal.preproc_utils.ica_utils import run_ica
 
 # all them utility functions
-from AlmKanal.preproc_utils.maxwell_utils import run_maxwell
-from AlmKanal.src_utils.headmodel_utils import compute_headmodel, make_fwd
-from AlmKanal.src_utils.src_utils import data2source, src2parc
+from almkanal.preproc_utils.maxwell_utils import run_maxwell
+from almkanal.src_utils.headmodel_utils import compute_headmodel, make_fwd
+from almkanal.src_utils.src_utils import data2source, src2parc
 
 
 @define

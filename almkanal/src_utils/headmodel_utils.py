@@ -56,68 +56,72 @@ def compute_headmodel(info, subject_id, subjects_dir, pick_dict, template_mri=Tr
     if savefig:  # REDO IT LATER
         # PLACEHOLDER: plot 3d stuff when xvfb is available
         # Assuming 'info' is your data structure containing sensor and digitization information
-
-        head_mri_t = mne.transforms._get_trans(coreg.trans, 'head', 'mri')[0]
-        coord_frame = 'head'
-        to_cf_t = mne.transforms._get_transforms_to_coord_frame(info, head_mri_t, coord_frame=coord_frame)
-
-        sensor_locs = np.array([ch['loc'][:3] for ch in info['chs'] if ch['ch_name'].startswith('MEG')])
-        sensor_locs = mne.transforms.apply_trans(to_cf_t['meg'], sensor_locs)
-
-        # Extract Digitization Points (excluding fiducials)
-        head_shape_points = np.array([point['r'] for point in info['dig'] if point['kind'] == 4])
-        head_shape_points = mne.transforms.apply_trans(to_cf_t['head'], head_shape_points)
-
-        # Create a 2x2 subplot layout
-        fig = plt.figure(figsize=(10, 10))
-        fig.suptitle(f'MEG - DIG Coregistration of {subject_id}', fontsize=16)
-
-        # Axial view
-        ax1 = fig.add_subplot(221)
-        ax1.scatter(sensor_locs[:, 0], sensor_locs[:, 1], s=20, c='r', label='Sensors')
-        ax1.scatter(head_shape_points[:, 0], head_shape_points[:, 1], s=10, c='b', label='Head Shape')
-        ax1.set_title('Axial View')
-        ax1.set_xlabel('Distance (m)')
-        ax1.set_ylabel('Distance (m)')
-        ax1.legend()
-
-        # Coronal view
-        ax2 = fig.add_subplot(222)
-        ax2.scatter(sensor_locs[:, 0], sensor_locs[:, 2], s=20, c='r')
-        ax2.scatter(head_shape_points[:, 0], head_shape_points[:, 2], s=10, c='b')
-        ax2.set_title('Coronal View')
-        ax2.set_xlabel('Distance (m)')
-        ax2.set_ylabel('Distance (m)')
-
-        # Sagittal view
-        ax3 = fig.add_subplot(223)
-        ax3.scatter(sensor_locs[:, 1], sensor_locs[:, 2], s=20, c='r')
-        ax3.scatter(head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b')
-        ax3.set_title('Sagittal View')
-        ax3.set_xlabel('Distance (m)')
-        ax3.set_ylabel('Distance (m)')
-
-        # 3D plot
-        ax4 = fig.add_subplot(224, projection='3d')
-        ax4.scatter(sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], s=20, c='r', label='Sensors')
-        ax4.plot(
-            sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], color='k', linewidth=0.5
-        )  # Connect sensors with lines
-        ax4.scatter(
-            head_shape_points[:, 0], head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b', label='Head Shape'
-        )
-        ax4.set_title('3D View')
-        ax4.grid(False)  # Remove grid
-        ax4.axis('off')  # Remove axis
-
-        plt.tight_layout()
-        # save
-
-        plt.savefig(Path(out_folder) / (subject_id + '_coreg.png'), dpi=300)
+        plot_head_model(coreg, info, subject_id, out_folder)
         # plt.savefig(os.path.join(out_folder, subject_id) + '_coreg.png', dpi=300)
         # not sohw ... plt.show()
 
     return coreg.trans
+
+
+def plot_head_model(coreg, info, subject_id, out_folder):
+    head_mri_t = mne.transforms._get_trans(coreg.trans, 'head', 'mri')[0]
+    coord_frame = 'head'
+    to_cf_t = mne.transforms._get_transforms_to_coord_frame(info, head_mri_t, coord_frame=coord_frame)
+
+    sensor_locs = np.array([ch['loc'][:3] for ch in info['chs'] if ch['ch_name'].startswith('MEG')])
+    sensor_locs = mne.transforms.apply_trans(to_cf_t['meg'], sensor_locs)
+
+    # Extract Digitization Points (excluding fiducials)
+    fids = 4
+    head_shape_points = np.array([point['r'] for point in info['dig'] if point['kind'] == fids])
+    head_shape_points = mne.transforms.apply_trans(to_cf_t['head'], head_shape_points)
+
+    # Create a 2x2 subplot layout
+    fig = plt.figure(figsize=(10, 10))
+    fig.suptitle(f'MEG - DIG Coregistration of {subject_id}', fontsize=16)
+
+    # Axial view
+    ax1 = fig.add_subplot(221)
+    ax1.scatter(sensor_locs[:, 0], sensor_locs[:, 1], s=20, c='r', label='Sensors')
+    ax1.scatter(head_shape_points[:, 0], head_shape_points[:, 1], s=10, c='b', label='Head Shape')
+    ax1.set_title('Axial View')
+    ax1.set_xlabel('Distance (m)')
+    ax1.set_ylabel('Distance (m)')
+    ax1.legend()
+
+    # Coronal view
+    ax2 = fig.add_subplot(222)
+    ax2.scatter(sensor_locs[:, 0], sensor_locs[:, 2], s=20, c='r')
+    ax2.scatter(head_shape_points[:, 0], head_shape_points[:, 2], s=10, c='b')
+    ax2.set_title('Coronal View')
+    ax2.set_xlabel('Distance (m)')
+    ax2.set_ylabel('Distance (m)')
+
+    # Sagittal view
+    ax3 = fig.add_subplot(223)
+    ax3.scatter(sensor_locs[:, 1], sensor_locs[:, 2], s=20, c='r')
+    ax3.scatter(head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b')
+    ax3.set_title('Sagittal View')
+    ax3.set_xlabel('Distance (m)')
+    ax3.set_ylabel('Distance (m)')
+
+    # 3D plot
+    ax4 = fig.add_subplot(224, projection='3d')
+    ax4.scatter(sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], s=20, c='r', label='Sensors')
+    ax4.plot(
+        sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], color='k', linewidth=0.5
+    )  # Connect sensors with lines
+    ax4.scatter(
+        head_shape_points[:, 0], head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b', label='Head Shape'
+    )
+    ax4.set_title('3D View')
+    ax4.grid(False)  # Remove grid
+    ax4.axis('off')  # Remove axis
+
+    plt.tight_layout()
+    # save
+
+    plt.savefig(Path(out_folder) / (subject_id + '_coreg.png'), dpi=300)
 
 
 def make_fwd(info, source, fname_trans, subjects_dir, subject_id, template_mri=False):
