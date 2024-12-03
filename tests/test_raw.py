@@ -25,6 +25,27 @@ def test_ica(gen_mne_data_raw, train, eog, ecg, resample_freq, threshold):
               resample_freq=resample_freq,
               threshold=threshold
               )
+    
+
+def test_double_ica(gen_mne_data_raw):
+
+    ak = AlmKanal(raw=gen_mne_data_raw)
+    ak.do_ica(n_components=10,
+              train=False,
+              eog=True,
+              ecg=False,
+              resample_freq=100,
+              threshold=0.4
+              )
+    
+    ak.do_ica(n_components=10,
+              train=False,
+              eog=True,
+              ecg=False,
+              resample_freq=100,
+              threshold=0.4
+              )
+
 
 def test_epoching(gen_mne_data_raw):
     ak = AlmKanal(raw=gen_mne_data_raw)
@@ -46,13 +67,10 @@ def test_fwd(gen_mne_data_raw):
     ak.do_fwd_model(subject_id='sample',
                     subjects_dir='./')
     
-    # data_path = mne.datasets.sample.data_path()
-    # meg_path = data_path / 'MEG' / 'sample'
-    # raw_fname = meg_path / 'sample_audvis_raw.fif'
-    # ak.do_src(subject_id = 'sample',
-    #           subjects_dir = './',
-    #           return_parc=True,
-    #           empty_room_path=raw_fname,)
+    ak.pick_dict['meg'] = 'mag'
+    ak.do_src(subject_id = 'sample',
+              subjects_dir = './',
+              return_parc=True,)
     
 
 
