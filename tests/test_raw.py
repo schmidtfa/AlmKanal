@@ -46,8 +46,13 @@ def test_fwd(gen_mne_data_raw):
     ak.do_fwd_model(subject_id='sample',
                     subjects_dir='./')
     
+    data_path = mne.datasets.sample.data_path()
+    meg_path = data_path / 'MEG' / 'sample'
+    raw_fname = meg_path / 'sample_audvis_raw.fif'
     ak.do_src(subject_id = 'sample',
-              subjects_dir = './')
+              subjects_dir = './',
+              return_parc=True,
+              empty_room_path=raw_fname,)
     
 
 
