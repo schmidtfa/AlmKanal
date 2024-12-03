@@ -1,7 +1,8 @@
 import mne
 from almkanal.almkanal import AlmKanal
 
-def test_src(gen_mne_data_epochs): #, ch_picks
+
+def test_src(gen_mne_data_epochs): 
 
     ak = AlmKanal(epoched=gen_mne_data_epochs)
 

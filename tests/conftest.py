@@ -11,7 +11,7 @@ def gen_mne_data_raw():
 
     yield raw
 
-
+@pytest.fixture(scope='session')
 def gen_mne_data_epochs():
 
     # % now lets check-out the events
