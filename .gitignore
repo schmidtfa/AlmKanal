@@ -29,7 +29,7 @@ __pycache__
 dist
 
 # Ignore ruff stuff
-.ruff_cache# pixi environments
+# pixi environments
 .pixi
 *.egg-info
 *.lcov
@@ -39,3 +39,7 @@ dist
 test_data
 old
 data_old
+
+.mypy_cache
+.pytest_cache
+.ruff_cache

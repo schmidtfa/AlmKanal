@@ -1,5 +1,5 @@
 [run]
-source = Almkanal
+source = almkanal
 omit =
     *__init__*
-    Almkanal/tests/*
+    AlmKanal/tests/*
