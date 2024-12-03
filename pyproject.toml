@@ -74,6 +74,9 @@ py312 = {dependencies = {python="3.12.*"}}
 
 [tool.pixi.environments]
 default = {features = [], solve-group = "default"}
+jupyter = {features = ["jupyter"], solve-group = "default"}
+testpy311 = ['py311']
+testpy312 = ['py312']
 
 [tool.hatch.version]
 source = "regex_commit"
@@ -109,7 +112,6 @@ addopts = "--ignore=almkanal/__version__.py"
 [tool.mypy]
 disable_error_code = "import-untyped"
 disallow_untyped_defs = false
-exclude = './tests/'
 
 [[tool.mypy.overrides]]
 module = "almkanal.*"
