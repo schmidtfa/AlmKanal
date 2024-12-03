@@ -26,17 +26,30 @@ def test_ica(gen_mne_data_raw, train, eog, ecg, resample_freq, threshold):
               threshold=threshold
               )
 
-# @pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
-# def test_src(gen_mne_data_raw, ch_picks):
-#     data_path = mne.datasets.sample.data_path()
-#     meg_path = data_path / 'MEG' / 'sample'
-#     ak = AlmKanal(raw=gen_mne_data_raw)
+def test_epoching(gen_mne_data_raw):
+    ak = AlmKanal(raw=gen_mne_data_raw)
 
-#     fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
-#     fwd = mne.read_forward_solution(fwd_fname)
-#     ak.pick_dict['meg'] = ch_picks
-#     ak.fwd = fwd
-#     if ch_picks:
-#         ak.do_src(noise_cov=mne.make_ad_hoc_cov(ak.raw.info))
-#     else:
-#         ak.do_src()
+    ak.do_events()
+
+    event_dict = {
+    'Auditory/Left': 1,
+    'Auditory/Right': 2,
+    'Visual/Left': 3,
+    'Visual/Right': 4,
+    }
+
+    ak.do_epochs(tmin=-0.2, tmax=0.5, event_id=event_dict)
+
+
+#@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
+def test_src(gen_mne_data_raw): #, ch_picks
+    data_path = mne.datasets.sample.data_path()
+    meg_path = data_path / 'MEG' / 'sample'
+    ak = AlmKanal(raw=gen_mne_data_raw)
+
+    fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
+    fwd = mne.read_forward_solution(fwd_fname)
+    ak.pick_dict['meg'] = 'mag'
+    ak.fwd = fwd
+
+    ak.do_src()
