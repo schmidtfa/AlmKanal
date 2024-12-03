@@ -7,7 +7,9 @@ from pyrasa.utils.peak_utils import get_band_info
 from scipy.stats import zscore
 
 
-def plot_ica(raw, ica, components_dict, bad_ids, fname, img_path):
+def plot_ica(
+    raw: mne.io.Raw, ica: mne.preprocessing.ICA, components_dict: dict, bad_ids: list, fname: str, img_path: str
+) -> None:
     """Function to plot the ICA components"""
 
     if len(bad_ids) > 0:
@@ -28,19 +30,19 @@ def plot_ica(raw, ica, components_dict, bad_ids, fname, img_path):
 
 
 def run_ica(
-    raw,
-    n_components=None,
-    method='picard',
-    resample_freq=None,
-    eog=True,
-    ecg=True,
-    train=True,
-    train_freq=16,
-    muscle=False,
-    ica_corr_thresh=0.5,
-    img_path=None,
-    fname=None,
-):
+    raw: mne.io.Raw,
+    n_components: None | int | float = None,
+    method: str = 'picard',
+    resample_freq: None | int = None,
+    eog: bool = True,
+    ecg: bool = True,
+    train: bool = True,
+    train_freq: int = 16,
+    muscle: bool = False,
+    ica_corr_thresh: float = 0.5,
+    img_path: None | str = None,
+    fname: None | str = None,
+) -> tuple[mne.io.Raw, mne.preprocessing.ICA, list]:
     # we run ica on high-pass filtered data
     raw_copy = raw.copy().filter(l_freq=1, h_freq=None)
     if resample_freq is not None:
@@ -87,15 +89,30 @@ def run_ica(
     raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
 
     # plot data if wanted
-    if img_path is not None:
+    if np.logical_and(img_path is not None, fname is not None):
+        assert isinstance(
+            fname, str
+        ), 'You need to specify both a filename (fname) and image path (img_path) to save your ica plots'
+        assert isinstance(
+            img_path, str
+        ), 'You need to specify both a filename (fname) and image path (img_path) to save your ica plots'
         plot_ica(raw, ica, components_dict, bad_ids, fname, img_path)
+
     # % drop physiological components
     ica.apply(raw, exclude=bad_ids)
 
     return raw, ica, bad_ids
 
 
-def find_train_ica(raw, ica, train_freq, duration=4, overlap=0.5, hmax=2, sd=2):
+def find_train_ica(
+    raw: mne.io.Raw,
+    ica: mne.preprocessing.ICA,
+    train_freq: int,
+    duration: int = 4,
+    overlap: float = 0.5,
+    hmax: float = 2,
+    sd: float = 2,
+) -> list:
     """
     This function extracts independent components based on narrowband spectral peaks.
     We use this mainly to detect an artifact in our MEG data caused, by a nearby train station.
@@ -124,7 +141,7 @@ def find_train_ica(raw, ica, train_freq, duration=4, overlap=0.5, hmax=2, sd=2):
     )
 
     train_peaks = get_band_info(
-        irasa_out.get_peaks(), freq_range=(train_freq - 1, train_freq + 1), ch_names=np.arange(ic_signal.shape[0])
+        irasa_out.get_peaks(), freq_range=(train_freq - 1, train_freq + 1), ch_names=list(np.arange(ic_signal.shape[0]))
     ).dropna()
 
     # select the right number of components based on a thresholding procedure

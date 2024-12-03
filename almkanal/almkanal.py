@@ -3,10 +3,12 @@ from pathlib import Path
 import attrs
 import mne
 import numpy as np
+import pandas as pd
 from attrs import define, field
+from numpy.typing import ArrayLike, NDArray
 
 from almkanal.data_utils.check_data import check_raw_epoch
-from almkanal.data_utils.data_classes import InfoClass, PickDictClass
+from almkanal.data_utils.data_classes import ICAInfoDict, InfoClass, PickDictClass
 from almkanal.preproc_utils.ica_utils import run_ica
 
 # all them utility functions
@@ -19,25 +21,25 @@ from almkanal.src_utils.src_utils import data2source, src2parc
 class AlmKanal:
     raw: None | mne.io.Raw = None
     epoched: None | mne.Epochs = None
-    pick_dict: dict = PickDictClass(meg=True, eog=True, ecg=True, eeg=False, stim=True)
+    pick_dict: PickDictClass = PickDictClass(meg=True, eog=True, ecg=True, eeg=False, stim=True)
     events: None | np.ndarray = None
     fwd: None | mne.Forward = None
     ica: None | mne.preprocessing.ICA = None
     ica_ids: None | list = None
     filters: None | mne.beamformer.Beamformer = None
     stim: None | np.ndarray = None  # This is for TRF stuff
-    info: dict = field(default=attrs.Factory(InfoClass))
+    info: InfoClass = field(default=attrs.Factory(InfoClass))
     _initialized: bool = field(default=False, init=False)  # Internal flag for initialization
     _data_check_disabled: bool = field(default=False, init=False)  # Disable data check temporarily
 
     # TODO: Use attrs validators -> checks whenver a field is set
     # Check that we only have either raw or epoched data when we initalize the method
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         check_raw_epoch(self)
         self._initialized = True
 
     # Check that we only have either raw or epoched data whenever we add a raw or epoched attribute
-    def __setattr__(self, name, value):
+    def __setattr__(self, name: str, value: bool) -> None:
         # Call the special method before returning any other method
         super().__setattr__(name, value)
 
@@ -51,7 +53,7 @@ class AlmKanal:
         mw_calibration_file: str | None = None,
         mw_cross_talk_file: str | None = None,
         mw_st_duration: int | None = None,
-    ):
+    ) -> None:
         # this should do maxwell filtering
         # should only be possible on raw data and only if no other preprocessing apart from filtering was done
         if self.info.maxwell is None:
@@ -69,58 +71,59 @@ class AlmKanal:
 
     def do_ica(
         self,
-        n_components=None,
-        method='picard',
-        resample_freq=200,  # downsample to 200hz per default
-        eog=True,
-        ecg=True,
-        muscle=False,
-        train=True,
-        train_freq=16.6,
-        threshold=0.4,
-    ):
+        n_components: None | int | float = None,
+        method: str = 'picard',
+        resample_freq: int = 200,  # downsample to 200hz per default
+        eog: bool = True,
+        ecg: bool = True,
+        muscle: bool = False,
+        train: bool = True,
+        train_freq: int = 16,
+        threshold: float = 0.4,
+    ) -> None:
         # this should do an ica
-        ica_info = {
-            'n_components': n_components,
-            'method': method,
-            'resample_freq': resample_freq,
-            'eog': eog,
-            'ecg': ecg,
-            'muscle': muscle,
-            'train': train,
-            'train_freq': train_freq,
-            'ica_corr_thresh': threshold,
-        }
+        ica_info = ICAInfoDict(
+            n_components=n_components,
+            method=method,
+            resample_freq=resample_freq,
+            eog=eog,
+            ecg=ecg,
+            muscle=muscle,
+            train=train,
+            train_freq=train_freq,
+            ica_corr_thresh=threshold,
+        )
 
         if self.info.ica is None:
             self.info.ica = ica_info
 
-            self.raw, ica, ica_ids = run_ica(self.raw, **self.info.ica)
+            self.raw, ica, ica_ids = run_ica(self.raw, **ica_info)
             self.ica = [ica]
             self.ica_ids = [ica_ids]
-        else:
+        elif self.info.ica is not None:
+            assert isinstance(self.info.ica, list)
             # Take care of case where you ran multiple icas.
             # TODO: When we end up applying them to the noise cov dont forget
             # to also do it successively.
             self.info.ica.update(ica_info)
 
-            self.raw, ica, ica_ids = run_ica(self.raw, **self.info['ica'])
+            self.raw, ica, ica_ids = run_ica(self.raw, **ica_info)
             self.ica.append(ica)
             self.ica_ids.append(ica_ids)
 
     def do_events(
         self,
-        stim_channel=None,
-        output='onset',
-        consecutive='increasing',
-        min_duration=0,
-        shortest_event=2,
-        mask=None,
-        uint_cast=False,
-        mask_type='and',
-        initial_event=False,
-        verbose=None,
-    ):
+        stim_channel: None | str = None,
+        output: str = 'onset',
+        consecutive: bool | str = 'increasing',
+        min_duration: float = 0.0,
+        shortest_event: int = 2,
+        mask: int | None = None,
+        uint_cast: bool = False,
+        mask_type: str = 'and',
+        initial_event: bool = False,
+        verbose: bool | str | int | None = None,
+    ) -> None:
         # this should build events based on information stored in the raw file
         events = mne.find_events(
             self.raw,
@@ -139,25 +142,25 @@ class AlmKanal:
 
     def do_epochs(
         self,
-        tmin,
-        tmax,
-        event_id=None,
-        baseline=None,
-        preload=True,
-        picks=None,
-        reject=None,
-        flat=None,
-        proj=True,
-        decim=1,
-        reject_tmin=None,
-        reject_tmax=None,
-        detrend=None,
-        on_missing='raise',
-        reject_by_annotation=True,
-        metadata=None,
-        event_repeated='error',
-        verbose=None,
-    ):
+        tmin: float,
+        tmax: float,
+        event_id: None | dict = None,
+        baseline: None | tuple = None,
+        preload: bool = True,
+        picks: str | ArrayLike | None = None,
+        reject: dict | None = None,
+        flat: dict | None = None,
+        proj: bool | str = True,
+        decim: int = 1,
+        reject_tmin: float | None = None,
+        reject_tmax: float | None = None,
+        detrend: int | None = None,
+        on_missing: str = 'raise',
+        reject_by_annotation: bool = True,
+        metadata: None | pd.DataFrame = None,
+        event_repeated: str = 'error',
+        verbose: bool | str | int | None = None,
+    ) -> None:
         # this should take raw and events and epoch the data
         if np.logical_and(self.raw is not None, self.events is not None):
             epoched = mne.Epochs(
@@ -190,7 +193,14 @@ class AlmKanal:
         else:
             print('You need both `raw` data and `events` in the pipeline to create epochs')
 
-    def do_fwd_model(self, subject_id, subjects_dir, source='surface', template_mri=True, redo_hdm=True):
+    def do_fwd_model(
+        self,
+        subject_id: str,
+        subjects_dir: str,
+        source: str = 'surface',
+        template_mri: bool = True,
+        redo_hdm: bool = True,
+    ) -> None:
         # This should generate a fwd model
         if self.raw is not None:
             cur_info = self.raw.info
@@ -238,16 +248,16 @@ class AlmKanal:
 
     def do_src(
         self,
-        data_cov=None,
-        noise_cov=None,
-        empty_room_path=None,
-        return_parc=False,
-        subject_id=None,
-        subjects_dir=None,
-        fwd=None,
-        atlas='glasser',
-        source='surface',
-    ):
+        data_cov: None | NDArray = None,
+        noise_cov: None | NDArray = None,
+        empty_room_path: None | str = None,
+        return_parc: bool = False,
+        subject_id: None | str = None,
+        subjects_dir: None | str = None,
+        fwd: None | mne.Forward = None,
+        atlas: str = 'glasser',
+        source: str = 'surface',
+    ) -> None:
         # here we want to embed the logic that, if your object has been epoched we do epoched2src else raw2src
         if np.logical_and(self.fwd is not None, fwd is not None):
             raise ValueError('You cannot set fwd as you already have a fwd model in the Almkanal.')
@@ -270,25 +280,25 @@ class AlmKanal:
                 empty_room_path=empty_room_path,
             )
 
-            if return_parc:
-                if np.logical_and(subject_id is not None, subjects_dir is not None):
-                    stc = src2parc(stc, subject_id=subject_id, subjects_dir=subjects_dir, atlas=atlas, source=source)
-                else:
-                    raise ValueError(
-                        """You need to set the correct name for the `subject_id` and `subjects_dir`
-                        if you want to parcels."""
-                    )
+            if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):
+                assert isinstance(
+                    subject_id, str
+                ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
+                assert isinstance(
+                    subjects_dir, str
+                ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
+                stc = src2parc(stc, subject_id=subject_id, subjects_dir=subjects_dir, atlas=atlas, source=source)
 
         else:
             raise ValueError('The pipeline needs a forward model to be able to go to source.')
 
         return stc
 
-    def do_trf_epochs(self):
+    def do_trf_epochs(self) -> None:
         # mne only allows epochs of equal length.
         # This should become a shorthand to split the raw file in smaller raw files based on events
         pass
 
-    def convert2eelbrain(self):
+    def convert2eelbrain(self) -> None:
         # This should take the thht mixin to convert raw, epoched or stc objects into eelbrain
         pass

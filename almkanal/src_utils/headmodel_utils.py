@@ -6,8 +6,17 @@ import mne
 import numpy as np
 from mne.coreg import Coregistration
 
+from almkanal.data_utils.data_classes import PickDictClass
 
-def compute_headmodel(info, subject_id, subjects_dir, pick_dict, template_mri=True, savefig=True):
+
+def compute_headmodel(
+    info: mne.Info,
+    subject_id: str,
+    subjects_dir: str,
+    pick_dict: PickDictClass,
+    template_mri: bool = True,
+    savefig: bool = True,
+) -> mne.transforms.Transform:
     """
     base_data_path: The path to the data directory where freesurfer and the headmodels are going to be stored.
                     The folder in which the data is saved is dependent on this.
@@ -63,7 +72,7 @@ def compute_headmodel(info, subject_id, subjects_dir, pick_dict, template_mri=Tr
     return coreg.trans
 
 
-def plot_head_model(coreg, info, subject_id, out_folder):
+def plot_head_model(coreg: mne.transforms.Transform, info: mne.Info, subject_id: str, out_folder: Path) -> None:
     head_mri_t = mne.transforms._get_trans(coreg.trans, 'head', 'mri')[0]
     coord_frame = 'head'
     to_cf_t = mne.transforms._get_transforms_to_coord_frame(info, head_mri_t, coord_frame=coord_frame)
@@ -107,13 +116,25 @@ def plot_head_model(coreg, info, subject_id, out_folder):
 
     # 3D plot
     ax4 = fig.add_subplot(224, projection='3d')
-    ax4.scatter(sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], s=20, c='r', label='Sensors')
+    ax4.scatter(
+        sensor_locs[:, 0],
+        sensor_locs[:, 1],
+        sensor_locs[:, 2],
+        s=20,
+        c='r',
+        label='Sensors',
+    )  # type: ignore
     ax4.plot(
         sensor_locs[:, 0], sensor_locs[:, 1], sensor_locs[:, 2], color='k', linewidth=0.5
     )  # Connect sensors with lines
     ax4.scatter(
-        head_shape_points[:, 0], head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b', label='Head Shape'
-    )
+        head_shape_points[:, 0],
+        head_shape_points[:, 1],
+        head_shape_points[:, 2],
+        s=10,
+        c='b',
+        label='Head Shape',
+    )  # type: ignore
     ax4.set_title('3D View')
     ax4.grid(False)  # Remove grid
     ax4.axis('off')  # Remove axis
@@ -124,7 +145,9 @@ def plot_head_model(coreg, info, subject_id, out_folder):
     plt.savefig(Path(out_folder) / (subject_id + '_coreg.png'), dpi=300)
 
 
-def make_fwd(info, source, fname_trans, subjects_dir, subject_id, template_mri=False):
+def make_fwd(
+    info: mne.Info, source: str, fname_trans: str, subjects_dir: str, subject_id: str, template_mri: bool = False
+) -> mne.Forward:
     ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
     fpath_add_on = '_from_template' if template_mri else ''
 

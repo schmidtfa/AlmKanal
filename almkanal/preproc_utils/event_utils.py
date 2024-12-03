@@ -1,7 +1,8 @@
 import mne
+from numpy.typing import ArrayLike, NDArray
 
 
-def get_events_from_sti(data_raw, sti_ch='STI101'):
+def get_events_from_sti(data_raw: mne.io.Raw, sti_ch: None | str = 'STI101') -> NDArray:
     """This function gets all events from the stimulus channel"""
 
     trigger_min_duration = 9e-3
@@ -12,7 +13,13 @@ def get_events_from_sti(data_raw, sti_ch='STI101'):
     return events
 
 
-def gen_epochs(raw, event_dict, epoch_settings, events=None, sti_ch='STI101'):
+def gen_epochs(
+    raw: mne.io.Raw,
+    event_dict: dict | None,
+    epoch_settings: dict,
+    events: None | ArrayLike = None,
+    sti_ch: None | str = 'STI101',
+) -> mne.Epochs:
     """
     This function generates epoched data based on an event dictionary.
     """

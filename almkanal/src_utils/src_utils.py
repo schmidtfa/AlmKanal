@@ -6,30 +6,33 @@ from pathlib import Path
 
 import mne
 import numpy as np
-from almkanal.preproc_utils.maxwell_utils import run_maxwell
 from mne._fiff.pick import _contains_ch_type
+from numpy.typing import NDArray
+
+from almkanal.data_utils.data_classes import InfoClass, PickDictClass
+from almkanal.preproc_utils.maxwell_utils import run_maxwell
 
 
 # %%
-def get_nearest_empty_room(info, empty_room_path='/home/schmidtfa/empty_room_data/subject_subject'):
+def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
     """
     This function finds the empty room file with the closest date to the current measurement.
     The file is used for the noise covariance estimation.
     """
 
-    all_empty_room_dates = np.array([datetime.strptime(date, '%y%m%d') for date in os.listdir(empty_room_path)])
+    all_empty_room_dates = np.array([datetime.strptime(date, '%y%m%d') for date in os.listdir(empty_room_dir)])
 
     cur_date = info['meas_date']
     cur_date_truncated = datetime(cur_date.year, cur_date.month, cur_date.day)  # necessary to truncate
 
-    def _nearest(items, pivot):
+    def _nearest(items: NDArray, pivot: datetime) -> datetime:
         return min(items, key=lambda x: abs(x - pivot))
 
     while True:
         nearest_date_datetime = _nearest(all_empty_room_dates, cur_date_truncated)
         nearest_date = nearest_date_datetime.strftime('%y%m%d')
 
-        cur_empty_path = Path(empty_room_path) / nearest_date  # os.path.join(empty_room_path, nearest_date)
+        cur_empty_path = Path(empty_room_dir) / nearest_date
 
         if 'supine' in os.listdir(cur_empty_path)[0]:
             all_empty_room_dates = np.delete(all_empty_room_dates, all_empty_room_dates == nearest_date_datetime)
@@ -43,7 +46,9 @@ def get_nearest_empty_room(info, empty_room_path='/home/schmidtfa/empty_room_dat
     return fname_empty_room
 
 
-def preproc_empty_room(raw_er, data, preproc_info, icas, ica_ids):
+def preproc_empty_room(
+    raw_er: mne.io.Raw, data: mne.io.Raw | mne.Epochs, preproc_info: InfoClass, icas: None | list, ica_ids: None | list
+) -> mne.io.Raw:
     if preproc_info.maxwell is not None:
         if isinstance(data, mne.epochs.Epochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
@@ -76,18 +81,29 @@ def preproc_empty_room(raw_er, data, preproc_info, icas, ica_ids):
 
     if preproc_info.ica is not None:
         # we loop here, because you could have done more than one ica
+        assert isinstance(icas, list)
+        assert isinstance(ica_ids, list)
         for ica, ica_id in zip(icas, ica_ids):
             ica.apply(raw_er, exclude=ica_id)
 
     return raw_er
 
 
-def process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, preproc_info):
-    fname_empty_room = get_nearest_empty_room(info, empty_room_path) if empty_room_path is None else empty_room_path
+def process_empty_room(
+    data: mne.io.Raw | mne.Epochs,
+    info: mne.Info,
+    pick_dict: PickDictClass,
+    icas: None | list,
+    ica_ids: None | list,
+    preproc_info: InfoClass,
+    empty_room_path: str,
+    get_nearest: bool = False,
+) -> tuple[NDArray, NDArray]:
+    fname_empty_room = get_nearest_empty_room(info, empty_room_dir=empty_room_path) if get_nearest else empty_room_path
 
     raw_er = mne.io.read_raw(fname_empty_room, preload=True)
 
-    raw_er = preproc_empty_room(raw_er, data, preproc_info, icas, ica_ids)
+    raw_er = preproc_empty_room(raw_er=raw_er, data=data, preproc_info=preproc_info, icas=icas, ica_ids=ica_ids)
 
     picks = mne.pick_types(raw_er.info, **pick_dict)
     raw_er.pick(picks=picks)
@@ -105,16 +121,16 @@ def process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, pr
 
 
 def data2source(
-    data,
-    fwd,
-    pick_dict,
-    icas=None,
-    ica_ids=None,
-    data_cov=None,
-    noise_cov=None,
-    preproc_info=None,
-    empty_room_path=None,
-):
+    data: mne.io.Raw | mne.Epochs,
+    fwd: mne.Forward,
+    pick_dict: PickDictClass,
+    preproc_info: InfoClass,
+    icas: None | list = None,
+    ica_ids: None | list = None,
+    data_cov: None | NDArray = None,
+    noise_cov: None | NDArray = None,
+    empty_room_path: None | str = None,
+) -> tuple[mne.SourceEstimate, mne.beamformer.Beamformer]:
     """This function does source reconstruction using lcmv beamformers based on raw data."""
 
     # %Compute covariance matrices
@@ -151,7 +167,17 @@ def data2source(
     # per default we take this from an empty room recording
     # importantly this should be preprocessed similarly to the actual data (except for ICA)
     if np.logical_and(n_ch_types > 1, noise_cov is None):
-        true_rank, noise_cov = process_empty_room(data, info, pick_dict, icas, ica_ids, empty_room_path, preproc_info)
+        assert isinstance(empty_room_path, str), """Please specify either a path that leads directly
+         to an empty_room recording or a folder with a bunch of empty room recordings"""
+        true_rank, noise_cov = process_empty_room(
+            data=data,
+            info=info,
+            pick_dict=pick_dict,
+            preproc_info=preproc_info,
+            icas=icas,
+            ica_ids=ica_ids,
+            empty_room_path=empty_room_path,
+        )
 
     elif n_ch_types == 1:
         # when we dont have a noise cov we just use the data cov for rank comp
@@ -171,7 +197,9 @@ def data2source(
     return stc, filters
 
 
-def src2parc(stc, subject_id, subjects_dir, atlas='glasser', source='surface'):
+def src2parc(
+    stc: mne.SourceEstimate, subject_id: str, subjects_dir: str, atlas: str = 'glasser', source: str = 'surface'
+) -> dict:
     if atlas == 'dk':
         vol_atlas = 'aparc+aseg'
         surf_atlas = 'aparc'
@@ -200,14 +228,14 @@ def src2parc(stc, subject_id, subjects_dir, atlas='glasser', source='surface'):
         src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-10-src.fif'
         src = mne.read_source_spaces(src_file)
         labels_mne = (
-            fs_dir / f'{subject_id}_from_template' / 'mri' / vol_atlas + '.mgz'
+            fs_dir / f'{subject_id}_from_template' / 'mri' / (vol_atlas + '.mgz')
         )  # os.path.join(fs_dir, f'{subject_id}_from_template', 'mri/' + vol_atlas + '.mgz')
         label_names = mne.get_volume_labels_from_aseg(labels_mne)
 
         ctx_logical = 'ctx' in label_names  # [True if 'ctx' in label else False for label in label_names]
         sctx_logical = not ctx_logical  # [True if not f else False for f in ctx_logical]
 
-        ctx_labels = [label[4:] for label in label_names if 'ctx' in label]
+        ctx_labels = np.array([label[4:] for label in label_names if 'ctx' in label])
         sctx_labels = list(np.array(label_names)[sctx_logical])
         rh = ctx_labels[:2] == 'rh'  # [True if label[:2] == 'rh' else False for label in ctx_labels]
         lh = ctx_labels[:2] == 'lh'  # [True if label[:2] == 'lh' else False for label in ctx_labels]

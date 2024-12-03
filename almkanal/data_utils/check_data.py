@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def check_raw_epoch(self):
+def check_raw_epoch(self) -> None:  # type: ignore
     # TODO: this should run whenever the data object is used to make sure that only epoched or raw data is there
 
     """We want to make sure that we either have epoched or raw data supplied to the object."""

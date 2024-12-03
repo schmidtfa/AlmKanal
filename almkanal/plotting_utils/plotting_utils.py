@@ -1,9 +1,19 @@
 import mne
 import nibabel as nib
 import numpy as np
+from numpy.typing import NDArray
 
 
-def plot_parc(stc_parc, stc_mask, labels_mne, subjects_dir, cmap, clevels, plot_kwargs, parc='HCPMMP1'):
+def plot_parc(
+    stc_parc: NDArray,
+    stc_mask: NDArray,
+    labels_mne: list,
+    subjects_dir: str,
+    cmap: str,
+    clevels: list,
+    plot_kwargs: dict,
+    parc: str = 'HCPMMP1',
+) -> NDArray:
     # mpl.use('Qt5Agg')
 
     labels_mne = mne.read_labels_from_annot('fsaverage', parc='HCPMMP1', subjects_dir=subjects_dir)

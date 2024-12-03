@@ -1,8 +1,6 @@
 # %%
 import os
-
 import mne
-
 from almkanal import AlmKanal
 
 sample_data_folder = mne.datasets.sample.data_path()
