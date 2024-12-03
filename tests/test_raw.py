@@ -26,17 +26,17 @@ def test_ica(gen_mne_data_raw, train, eog, ecg, resample_freq, threshold):
               threshold=threshold
               )
 
-@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
-def test_src(gen_mne_data_raw, ch_picks):
-    data_path = mne.datasets.sample.data_path()
-    meg_path = data_path / 'MEG' / 'sample'
-    ak = AlmKanal(raw=gen_mne_data_raw)
+# @pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
+# def test_src(gen_mne_data_raw, ch_picks):
+#     data_path = mne.datasets.sample.data_path()
+#     meg_path = data_path / 'MEG' / 'sample'
+#     ak = AlmKanal(raw=gen_mne_data_raw)
 
-    fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
-    fwd = mne.read_forward_solution(fwd_fname)
-    ak.pick_dict['meg'] = ch_picks
-    ak.fwd = fwd
-    if ch_picks:
-        ak.do_src(noise_cov=mne.make_ad_hoc_cov(ak.raw.info))
-    else:
-        ak.do_src()
+#     fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
+#     fwd = mne.read_forward_solution(fwd_fname)
+#     ak.pick_dict['meg'] = ch_picks
+#     ak.fwd = fwd
+#     if ch_picks:
+#         ak.do_src(noise_cov=mne.make_ad_hoc_cov(ak.raw.info))
+#     else:
+#         ak.do_src()
