@@ -25,6 +25,8 @@ class ICAInfoDict(TypedDict):
     train: bool
     train_freq: int
     ica_corr_thresh: float
+    img_path: None | str
+    fname: None | str
 
 
 @define

@@ -27,24 +27,38 @@ def test_ica(gen_mne_data_raw, train, eog, ecg, resample_freq, threshold):
               )
     
 
-def test_double_ica(gen_mne_data_raw):
+# def test_double_ica(gen_mne_data_raw):
 
+#     ak = AlmKanal(raw=gen_mne_data_raw)
+#     ak.do_ica(n_components=10,
+#               train=False,
+#               eog=True,
+#               ecg=False,
+#               resample_freq=100,
+#               threshold=0.4
+#               )
+    
+#     ak.do_ica(n_components=10,
+#               train=False,
+#               eog=True,
+#               ecg=False,
+#               resample_freq=100,
+#               threshold=0.4
+#               )
+
+
+def test_ica_plot(gen_mne_data_raw):
     ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_ica(n_components=10,
+    ak.do_ica(n_components=40,
               train=False,
               eog=True,
-              ecg=False,
+              ecg=True,
               resample_freq=100,
-              threshold=0.4
+              threshold=0.4,
+              fname='test',
+              img_path='./'
               )
     
-    ak.do_ica(n_components=10,
-              train=False,
-              eog=True,
-              ecg=False,
-              resample_freq=100,
-              threshold=0.4
-              )
 
 
 def test_epoching(gen_mne_data_raw):

@@ -80,6 +80,8 @@ class AlmKanal:
         train: bool = True,
         train_freq: int = 16,
         threshold: float = 0.4,
+        img_path: None | str = None,
+        fname: None | str = None,
     ) -> None:
         # this should do an ica
         ica_info = ICAInfoDict(
@@ -92,6 +94,8 @@ class AlmKanal:
             train=train,
             train_freq=train_freq,
             ica_corr_thresh=threshold,
+            img_path=img_path,
+            fname=fname,
         )
 
         if self.info.ica is None:
