@@ -15,4 +15,5 @@ MW_DESTINATION = [None, (0, 0, .4)]
 
 #Source options
 SOURCE = [('surface', 'glasser'), 
-          ('volume', 'dk')]
+          #('volume', 'dk')
+          ]

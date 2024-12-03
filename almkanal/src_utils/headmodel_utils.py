@@ -156,7 +156,7 @@ def make_fwd(
     bem_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-5120-5120-5120-bem.fif'
 
     if source == 'volume':
-        src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-vol-10-src.fif'
+        src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-vol-5-src.fif'
 
     elif source == 'surface':
         src_file = f'{fs_path}/bem/{subject_id}{fpath_add_on}-ico-4-src.fif'
