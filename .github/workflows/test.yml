@@ -1,0 +1,59 @@
+name: Run pytest tests
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v[0-9]+\.[0-9]+\.[0-9]+\.dev[0-9]+'
+      - 'v[0-9]+\.[0-9]+\.[0-9]+'
+  pull_request:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        test_environment: [testpy311np1pd21, testpy311np1pd22, testpy311np1pd-latest, testpy311np2pd22, testpy311np2pd-latest, testpy312np1pd21, testpy312np1pd22, testpy312np1pd-latest, testpy312np2pd22, testpy312np2pd-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+          locked: false
+          frozen: false
+          environments: ${{ matrix.test_environment }}
+      - run: pixi run -e ${{ matrix.test_environment }} test
+      - name: Coveralls
+        uses: coverallsapp/github-action@v2
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+          locked: false
+          frozen: false
+      - run: pixi run lint_ci
+  type_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: prefix-dev/setup-pixi@v0.8.1
+        with:
+          pixi-version: latest
+          cache: true
+          locked: false
+          frozen: false
+      - run: pixi run -e mne check_types
