@@ -41,6 +41,16 @@ def test_epoching(gen_mne_data_raw):
     ak.do_epochs(tmin=-0.2, tmax=0.5, event_id=event_dict)
 
 
+def test_fwd(gen_mne_data_raw):
+    ak = AlmKanal(raw=gen_mne_data_raw)
+    ak.do_fwd_model(subject_id='sample',
+                    subjects_dir='./')
+    
+    ak.do_src(subject_id = 'sample',
+              subjects_dir = './')
+    
+
+
 #@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
 def test_src(gen_mne_data_raw): #, ch_picks
     data_path = mne.datasets.sample.data_path()
