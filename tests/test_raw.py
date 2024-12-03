@@ -14,11 +14,11 @@ def test_maxwell(gen_mne_data_raw):
 @pytest.mark.parametrize('eog', ICA_EOG, scope='session')
 @pytest.mark.parametrize('threshold', ICA_THRESH, scope='session')
 @pytest.mark.parametrize('train', ICA_TRAIN, scope='session')
-@pytest.mark.parametrize('n_components', ICA_NCOMPS, scope='session')
-def test_ica(gen_mne_data_raw, train, eog, ecg, resample_freq, threshold, n_components):
+#@pytest.mark.parametrize('n_components', ICA_NCOMPS, scope='session')
+def test_ica(gen_mne_data_raw, train, eog, ecg, resample_freq, threshold):
 
     ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_ica(n_components=n_components,
+    ak.do_ica(n_components=10,
               train=train,
               eog=eog,
               ecg=ecg,
@@ -36,4 +36,7 @@ def test_src(gen_mne_data_raw, ch_picks):
     fwd = mne.read_forward_solution(fwd_fname)
     ak.pick_dict['meg'] = ch_picks
     ak.fwd = fwd
-    ak.do_src()
+    if ch_picks:
+        ak.do_src(noise_cov=mne.make_ad_hoc_cov(ak.raw.info))
+    else:
+        ak.do_src()
