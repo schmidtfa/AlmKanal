@@ -75,8 +75,8 @@ def test_epoching(gen_mne_data_raw):
 
     ak.do_epochs(tmin=-0.2, tmax=0.5, event_id=event_dict)
 
-@pytest.mark.parametrize('source', SOURCE, scope='session')
-def test_fwd(gen_mne_data_raw, source):
+@pytest.mark.parametrize('source, atlas', SOURCE, scope='session')
+def test_fwd(gen_mne_data_raw, source, atlas):
     ak = AlmKanal(raw=gen_mne_data_raw)
     ak.do_fwd_model(subject_id='sample',
                     subjects_dir='./')
@@ -85,6 +85,7 @@ def test_fwd(gen_mne_data_raw, source):
     ak.do_src(subject_id = 'sample',
               subjects_dir = './',
               source=source,
+              atlas=atlas,
               return_parc=True,)
     
 
