@@ -99,7 +99,7 @@ class AlmKanal:
         )
 
         if self.info.ica is None:
-            self.info.ica = ica_info
+            self.info.ica = [ica_info]
 
             self.raw, ica, ica_ids = run_ica(self.raw, **ica_info)
             self.ica = [ica]
@@ -109,10 +109,12 @@ class AlmKanal:
             # Take care of case where you ran multiple icas.
             # TODO: When we end up applying them to the noise cov dont forget
             # to also do it successively.
-            self.info.ica.update(ica_info)
+            self.info.ica.append(ica_info)
 
             self.raw, ica, ica_ids = run_ica(self.raw, **ica_info)
+            assert isinstance(self.ica, list)
             self.ica.append(ica)
+            assert isinstance(self.ica_ids, list)
             self.ica_ids.append(ica_ids)
 
     def do_events(

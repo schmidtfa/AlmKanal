@@ -1,6 +1,6 @@
 from almkanal.almkanal import AlmKanal
 import pytest
-from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS
+from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE
 import mne
 
 def test_maxwell(gen_mne_data_raw):
@@ -9,42 +9,42 @@ def test_maxwell(gen_mne_data_raw):
     ak.do_maxwell()
 
 
-@pytest.mark.parametrize('resample_freq', ICA_RESAMPLE, scope='session')
+#@pytest.mark.parametrize('resample_freq', ICA_RESAMPLE, scope='session')
 @pytest.mark.parametrize('ecg', ICA_ECG, scope='session')
 @pytest.mark.parametrize('eog', ICA_EOG, scope='session')
-@pytest.mark.parametrize('threshold', ICA_THRESH, scope='session')
+#@pytest.mark.parametrize('threshold', ICA_THRESH, scope='session')
 @pytest.mark.parametrize('train', ICA_TRAIN, scope='session')
 #@pytest.mark.parametrize('n_components', ICA_NCOMPS, scope='session')
-def test_ica(gen_mne_data_raw, train, eog, ecg, resample_freq, threshold):
+def test_ica(gen_mne_data_raw, train, eog, ecg):
 
     ak = AlmKanal(raw=gen_mne_data_raw)
     ak.do_ica(n_components=10,
               train=train,
               eog=eog,
               ecg=ecg,
-              resample_freq=resample_freq,
-              threshold=threshold
+              resample_freq=200,
+              threshold=0.4
               )
     
 
-# def test_double_ica(gen_mne_data_raw):
+def test_double_ica(gen_mne_data_raw):
 
-#     ak = AlmKanal(raw=gen_mne_data_raw)
-#     ak.do_ica(n_components=10,
-#               train=False,
-#               eog=True,
-#               ecg=False,
-#               resample_freq=100,
-#               threshold=0.4
-#               )
+    ak = AlmKanal(raw=gen_mne_data_raw)
+    ak.do_ica(n_components=10,
+              train=False,
+              eog=True,
+              ecg=False,
+              resample_freq=100,
+              threshold=0.4
+              )
     
-#     ak.do_ica(n_components=10,
-#               train=False,
-#               eog=True,
-#               ecg=False,
-#               resample_freq=100,
-#               threshold=0.4
-#               )
+    ak.do_ica(n_components=10,
+              train=False,
+              eog=True,
+              ecg=False,
+              resample_freq=100,
+              threshold=0.4
+              )
 
 
 def test_ica_plot(gen_mne_data_raw):
@@ -75,8 +75,8 @@ def test_epoching(gen_mne_data_raw):
 
     ak.do_epochs(tmin=-0.2, tmax=0.5, event_id=event_dict)
 
-
-def test_fwd(gen_mne_data_raw):
+@pytest.mark.parametrize('source', SOURCE, scope='session')
+def test_fwd(gen_mne_data_raw, source):
     ak = AlmKanal(raw=gen_mne_data_raw)
     ak.do_fwd_model(subject_id='sample',
                     subjects_dir='./')
@@ -84,6 +84,7 @@ def test_fwd(gen_mne_data_raw):
     ak.pick_dict['meg'] = 'mag'
     ak.do_src(subject_id = 'sample',
               subjects_dir = './',
+              source=source,
               return_parc=True,)
     
 

@@ -36,5 +36,5 @@ class InfoClass:
     raw: bool = False
     epoched: bool = False
     maxwell: dict | None = None
-    ica: ICAInfoDict | None = None
+    ica: list[ICAInfoDict] | None = None
     trf_epochs: dict | None = None
