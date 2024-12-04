@@ -77,7 +77,7 @@ def test_ica_plot(gen_mne_data_raw):
               resample_freq=100,
               threshold=0.4,
               fname='test',
-              img_path='./'
+              img_path='./data_old/'
               )
     
 
