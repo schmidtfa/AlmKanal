@@ -9,6 +9,8 @@ def gen_mne_data_raw():
     raw_fname = meg_path / 'sample_audvis_raw.fif'
     raw = mne.io.read_raw_fif(raw_fname, preload=True)#.crop(tmin=0, tmax=60)
 
+    raw = raw.pick(picks=['meg', 'eog', 'stim'])
+
     yield raw
 
 @pytest.fixture(scope='session')
