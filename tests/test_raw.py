@@ -9,6 +9,13 @@ def test_src(gen_mne_data_raw): #, ch_picks
     meg_path = data_path / 'MEG' / 'sample'
     ak = AlmKanal(raw=gen_mne_data_raw)
 
+    ak.do_maxwell()
+    # %% you can always use common mne methods like filtering that modify
+    # the raw and epoched objects in place
+    ak.raw.filter(l_freq=0.1, h_freq=100)
+    # %% one shot call to ica
+    ak.do_ica()
+
     fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
     fwd = mne.read_forward_solution(fwd_fname)
     ak.pick_dict['meg'] = True
