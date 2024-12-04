@@ -256,7 +256,7 @@ class AlmKanal:
         self,
         data_cov: None | NDArray = None,
         noise_cov: None | NDArray = None,
-        empty_room_path: None | str = None,
+        empty_room: None | str | mne.io.Raw = None,
         return_parc: bool = False,
         subject_id: None | str = None,
         subjects_dir: None | str = None,
@@ -283,7 +283,7 @@ class AlmKanal:
                 data_cov=data_cov,
                 noise_cov=noise_cov,
                 preproc_info=self.info,
-                empty_room_path=empty_room_path,
+                empty_room=empty_room,
             )
 
             if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):

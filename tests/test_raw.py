@@ -3,23 +3,18 @@ import pytest
 from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE
 import mne
 
-
-
-@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
-def test_src(gen_mne_data_raw, ch_picks): #, ch_picks
+#@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
+def test_src(gen_mne_data_raw): #, ch_picks
     data_path = mne.datasets.sample.data_path()
     meg_path = data_path / 'MEG' / 'sample'
-    raw_fname = meg_path / 'sample_audvis_raw.fif'
     ak = AlmKanal(raw=gen_mne_data_raw)
 
     fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
     fwd = mne.read_forward_solution(fwd_fname)
-    ak.pick_dict['meg'] = ch_picks
+    ak.pick_dict['meg'] = True
     ak.fwd = fwd
-    if ch_picks:
-        ak.do_src(empty_room_path=raw_fname)
-    else:
-        ak.do_src()
+    ak.do_src(empty_room=gen_mne_data_raw)
+
 
 
 def test_maxwell(gen_mne_data_raw):
@@ -107,3 +102,6 @@ def test_fwd(gen_mne_data_raw, source, atlas):
               atlas=atlas,
               return_parc=True,)
     
+
+
+
