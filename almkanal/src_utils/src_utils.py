@@ -96,12 +96,16 @@ def process_empty_room(
     icas: None | list,
     ica_ids: None | list,
     preproc_info: InfoClass,
-    empty_room_path: str,
+    empty_room: str | mne.io.Raw,
     get_nearest: bool = False,
 ) -> tuple[NDArray, NDArray]:
-    fname_empty_room = get_nearest_empty_room(info, empty_room_dir=empty_room_path) if get_nearest else empty_room_path
-
-    raw_er = mne.io.read_raw(fname_empty_room, preload=True)
+    if np.logical_and(get_nearest, isinstance(empty_room, str)):
+        fname_empty_room = get_nearest_empty_room(info, empty_room_dir=empty_room)
+        raw_er = mne.io.read_raw(fname_empty_room, preload=True)
+    elif np.logical_and(not get_nearest, isinstance(empty_room, str)):
+        raw_er = mne.io.read_raw(empty_room, preload=True)
+    elif isinstance(empty_room, mne.io.Raw):
+        raw_er = empty_room
 
     raw_er = preproc_empty_room(raw_er=raw_er, data=data, preproc_info=preproc_info, icas=icas, ica_ids=ica_ids)
 
@@ -129,7 +133,7 @@ def data2source(
     ica_ids: None | list = None,
     data_cov: None | NDArray = None,
     noise_cov: None | NDArray = None,
-    empty_room_path: None | str = None,
+    empty_room: None | str | mne.io.Raw = None,
 ) -> tuple[mne.SourceEstimate, mne.beamformer.Beamformer]:
     """This function does source reconstruction using lcmv beamformers based on raw data."""
 
@@ -167,7 +171,8 @@ def data2source(
     # per default we take this from an empty room recording
     # importantly this should be preprocessed similarly to the actual data (except for ICA)
     if np.logical_and(n_ch_types > 1, noise_cov is None):
-        assert isinstance(empty_room_path, str), """Please specify either a path that leads directly
+        assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
+        supply either a mne.io.raw object, a path that leads directly
          to an empty_room recording or a folder with a bunch of empty room recordings"""
         true_rank, noise_cov = process_empty_room(
             data=data,
@@ -176,7 +181,7 @@ def data2source(
             preproc_info=preproc_info,
             icas=icas,
             ica_ids=ica_ids,
-            empty_room_path=empty_room_path,
+            empty_room=empty_room,
         )
 
     elif n_ch_types == 1:
@@ -225,7 +230,7 @@ def src2parc(
         parc = {'lh': lh, 'rh': rh, 'parc': surf_atlas, 'names_order_mne': names_order_mne}
         parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='mean_flip')})
     elif source == 'volume':
-        src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-10-src.fif'
+        src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-5-src.fif'
         src = mne.read_source_spaces(src_file)
         labels_mne = (
             fs_dir / f'{subject_id}_from_template' / 'mri' / (vol_atlas + '.mgz')

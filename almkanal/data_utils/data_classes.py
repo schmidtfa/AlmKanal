@@ -25,6 +25,8 @@ class ICAInfoDict(TypedDict):
     train: bool
     train_freq: int
     ica_corr_thresh: float
+    img_path: None | str
+    fname: None | str
 
 
 @define
@@ -34,5 +36,5 @@ class InfoClass:
     raw: bool = False
     epoched: bool = False
     maxwell: dict | None = None
-    ica: ICAInfoDict | None = None
+    ica: list[ICAInfoDict] | None = None
     trf_epochs: dict | None = None

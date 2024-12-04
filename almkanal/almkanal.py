@@ -80,6 +80,8 @@ class AlmKanal:
         train: bool = True,
         train_freq: int = 16,
         threshold: float = 0.4,
+        img_path: None | str = None,
+        fname: None | str = None,
     ) -> None:
         # this should do an ica
         ica_info = ICAInfoDict(
@@ -92,10 +94,12 @@ class AlmKanal:
             train=train,
             train_freq=train_freq,
             ica_corr_thresh=threshold,
+            img_path=img_path,
+            fname=fname,
         )
 
         if self.info.ica is None:
-            self.info.ica = ica_info
+            self.info.ica = [ica_info]
 
             self.raw, ica, ica_ids = run_ica(self.raw, **ica_info)
             self.ica = [ica]
@@ -105,10 +109,12 @@ class AlmKanal:
             # Take care of case where you ran multiple icas.
             # TODO: When we end up applying them to the noise cov dont forget
             # to also do it successively.
-            self.info.ica.update(ica_info)
+            self.info.ica.append(ica_info)
 
             self.raw, ica, ica_ids = run_ica(self.raw, **ica_info)
+            assert isinstance(self.ica, list)
             self.ica.append(ica)
+            assert isinstance(self.ica_ids, list)
             self.ica_ids.append(ica_ids)
 
     def do_events(
@@ -250,7 +256,7 @@ class AlmKanal:
         self,
         data_cov: None | NDArray = None,
         noise_cov: None | NDArray = None,
-        empty_room_path: None | str = None,
+        empty_room: None | str | mne.io.Raw = None,
         return_parc: bool = False,
         subject_id: None | str = None,
         subjects_dir: None | str = None,
@@ -277,7 +283,7 @@ class AlmKanal:
                 data_cov=data_cov,
                 noise_cov=noise_cov,
                 preproc_info=self.info,
-                empty_room_path=empty_room_path,
+                empty_room=empty_room,
             )
 
             if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):
