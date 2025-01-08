@@ -150,7 +150,7 @@ def find_train_ica(
         while (zscore(train_peaks['pw']) > sd).sum() > 0:
             bad_ch = train_peaks[zscore(train_peaks['pw']) > sd]['ch_name'].values
             bad_ics.append(bad_ch)
-            train_peaks = train_peaks.query(f'ch_name != {bad_ch}')
+            train_peaks = train_peaks.query(f'ch_name not in {list(bad_ch)}')
     else:
         bad_ics.append(train_peaks['ch_name'].values)
 
