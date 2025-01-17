@@ -47,7 +47,8 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
 
 
 def preproc_empty_room(
-    raw_er: mne.io.Raw, data: mne.io.Raw | mne.Epochs, preproc_info: InfoClass, icas: None | list, ica_ids: None | list
+    raw_er: mne.io.Raw, data: mne.io.Raw | mne.Epochs, 
+    preproc_info: InfoClass, icas: None | list, ica_ids: None | list,
 ) -> mne.io.Raw:
     if preproc_info.maxwell is not None:
         if isinstance(data, mne.epochs.Epochs):
@@ -107,10 +108,10 @@ def process_empty_room(
     elif isinstance(empty_room, mne.io.Raw):
         raw_er = empty_room
 
-    raw_er = preproc_empty_room(raw_er=raw_er, data=data, preproc_info=preproc_info, icas=icas, ica_ids=ica_ids)
-
     picks = mne.pick_types(raw_er.info, **pick_dict)
     raw_er.pick(picks=picks)
+    raw_er = preproc_empty_room(raw_er=raw_er, data=data, preproc_info=preproc_info, icas=icas, ica_ids=ica_ids)
+    
     if isinstance(data, mne.io.fiff.raw.Raw):
         noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
 
@@ -134,6 +135,7 @@ def data2source(
     data_cov: None | NDArray = None,
     noise_cov: None | NDArray = None,
     empty_room: None | str | mne.io.Raw = None,
+    get_nearest_empty_room: bool = False,
 ) -> tuple[mne.SourceEstimate, mne.beamformer.Beamformer]:
     """This function does source reconstruction using lcmv beamformers based on raw data."""
 
@@ -182,6 +184,7 @@ def data2source(
             icas=icas,
             ica_ids=ica_ids,
             empty_room=empty_room,
+            get_nearest=get_nearest_empty_room,
         )
 
     elif n_ch_types == 1:
