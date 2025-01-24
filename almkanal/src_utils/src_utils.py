@@ -209,7 +209,12 @@ def data2source(
 
 
 def src2parc(
-    stc: mne.SourceEstimate, subject_id: str, subjects_dir: str, atlas: str = 'glasser', source: str = 'surface'
+    stc: mne.SourceEstimate,
+    subject_id: str,
+    subjects_dir: str,
+    atlas: str = 'glasser',
+    source: str = 'surface',
+    label_mode: str = 'mean_flip',
 ) -> dict:
     if atlas == 'dk':
         vol_atlas = 'aparc+aseg'
@@ -234,7 +239,7 @@ def src2parc(
         lh = [label.hemi == 'lh' for label in labels_mne]
 
         parc = {'lh': lh, 'rh': rh, 'parc': surf_atlas, 'names_order_mne': names_order_mne}
-        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='mean_flip')})
+        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode=label_mode)})
     elif source == 'volume':
         src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-5-src.fif'
         src = mne.read_source_spaces(src_file)

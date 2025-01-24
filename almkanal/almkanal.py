@@ -259,6 +259,7 @@ class AlmKanal:
         empty_room: None | str | mne.io.Raw = None,
         get_nearest_empty_room: bool = False,
         return_parc: bool = False,
+        label_mode: str = 'mean-flip',
         subject_id: None | str = None,
         subjects_dir: None | str = None,
         fwd: None | mne.Forward = None,
@@ -295,7 +296,14 @@ class AlmKanal:
                 assert isinstance(
                     subjects_dir, str
                 ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
-                stc = src2parc(stc, subject_id=subject_id, subjects_dir=subjects_dir, atlas=atlas, source=source)
+                stc = src2parc(
+                    stc,
+                    subject_id=subject_id,
+                    subjects_dir=subjects_dir,
+                    atlas=atlas,
+                    source=source,
+                    label_mode=label_mode,
+                )
 
         else:
             raise ValueError('The pipeline needs a forward model to be able to go to source.')
