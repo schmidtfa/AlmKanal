@@ -108,5 +108,20 @@ def test_fwd(gen_mne_data_raw, source, atlas):
               return_parc=True,)
     
 
+@pytest.mark.parametrize('source, atlas', SOURCE, scope='session')
+def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
+    ak = AlmKanal(raw=gen_mne_data_raw)
+    ak.do_fwd_model(subject_id='sample',
+                    subjects_dir='./data_old/')
+    
+    ak.pick_dict['meg'] = True
+    ak.do_spatial_filters()
+    ak.do_src(subject_id = 'sample',
+              subjects_dir = './data_old/',
+              source=source,
+              atlas=atlas,
+              return_parc=True,)
+    
+
 
 
