@@ -44,7 +44,6 @@ def test_ica(gen_mne_data_raw, train, eog, ecg):
               eog=eog,
               ecg=ecg,
               resample_freq=200,
-              threshold=0.4
               )
     
 
@@ -56,7 +55,6 @@ def test_double_ica(gen_mne_data_raw):
               eog=True,
               ecg=False,
               resample_freq=100,
-              threshold=0.4
               )
     
     ak.do_ica(n_components=10,
@@ -64,7 +62,6 @@ def test_double_ica(gen_mne_data_raw):
               eog=True,
               ecg=False,
               resample_freq=100,
-              threshold=0.4
               )
 
 
@@ -75,7 +72,6 @@ def test_ica_plot(gen_mne_data_raw):
               eog=True,
               ecg=True,
               resample_freq=100,
-              threshold=0.4,
               fname='test',
               img_path='./'
               )
