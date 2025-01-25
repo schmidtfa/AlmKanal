@@ -186,7 +186,7 @@ def data2source(
 
     # if you have mixed sensor types we need a noise covariance matrix
     # per default we take this from an empty room recording
-    # importantly this should be preprocessed similarly to the actual data (except for ICA)
+    # importantly this should be preprocessed similarly to the actual data
     if np.logical_and(n_ch_types > 1, noise_cov is None):
         assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
         supply either a mne.io.raw object, a path that leads directly

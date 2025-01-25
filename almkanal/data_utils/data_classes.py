@@ -18,13 +18,18 @@ class ICAInfoDict(TypedDict):
 
     n_components: int | float | None
     method: str
+    random_state: None | int
+    fit_params: dict | None
+    ica_hp_freq: None | float
+    ica_lp_freq: None | float
     resample_freq: None | int
     eog: bool
+    eog_corr_thresh: float
     ecg: bool
+    ecg_corr_thresh: float
     muscle: bool
     train: bool
     train_freq: int
-    ica_corr_thresh: float
     img_path: None | str
     fname: None | str
 
