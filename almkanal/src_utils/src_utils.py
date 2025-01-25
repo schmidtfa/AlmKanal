@@ -140,7 +140,7 @@ def process_empty_room(
     return true_rank, noise_cov
 
 
-def data2source(
+def comp_spatial_filters(
     data: mne.io.Raw | mne.Epochs,
     fwd: mne.Forward,
     pick_dict: PickDictClass,
@@ -187,10 +187,13 @@ def data2source(
     # if you have mixed sensor types we need a noise covariance matrix
     # per default we take this from an empty room recording
     # importantly this should be preprocessed similarly to the actual data
-    if np.logical_and(n_ch_types > 1, noise_cov is None):
-        assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
-        supply either a mne.io.raw object, a path that leads directly
-         to an empty_room recording or a folder with a bunch of empty room recordings"""
+    if np.logical_and(
+        np.logical_and(n_ch_types > 1, noise_cov is None),
+        np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)),
+    ):
+        # assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
+        # supply either a mne.io.raw object, a path that leads directly
+        #  to an empty_room recording or a folder with a bunch of empty room recordings"""
         true_rank, noise_cov = process_empty_room(
             data=data,
             info=info,
@@ -202,14 +205,32 @@ def data2source(
             get_nearest=get_nearest_empty_room,
         )
 
+    elif np.logical_and(
+        np.logical_and(n_ch_types > 1, noise_cov is None),
+        np.logical_and(empty_room is None, not get_nearest_empty_room),
+    ):
+        warnings.warn("""You have multiple sensor types, but did neither specify a noise covariance
+                      matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix..
+                      ATTENTION: THIS IS NOT THE OPTIMAL WAY OF DOING THINGS!!!""")
+        noise_cov = mne.make_ad_hoc_cov(info)
+        # TODO: check in with thomas if rank should be computed on data_cov if ad-hoc cov is created
+        true_rank = mne.compute_rank(data_cov, info=info)
+
     elif n_ch_types == 1:
         # when we dont have a noise cov we just use the data cov for rank comp
         true_rank = mne.compute_rank(data_cov, info=info)
+        noise_cov = None
+
+    lcmv_settings = {
+        'reg': 0.05,
+        'noise_cov': noise_cov,
+        'pick_ori': 'max-power',
+        'weight_norm': 'nai',
+        'rank': true_rank,
+    }
 
     # build and apply filters
-    filters = mne.beamformer.make_lcmv(
-        info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori='max-power', weight_norm='nai', rank=true_rank
-    )
+    filters = mne.beamformer.make_lcmv(info, fwd, data_cov, **lcmv_settings)
 
     return filters
 

@@ -14,7 +14,7 @@ from almkanal.preproc_utils.ica_utils import run_ica
 # all them utility functions
 from almkanal.preproc_utils.maxwell_utils import run_maxwell
 from almkanal.src_utils.headmodel_utils import compute_headmodel, make_fwd
-from almkanal.src_utils.src_utils import data2source, src2parc
+from almkanal.src_utils.src_utils import comp_spatial_filters, src2parc
 
 
 @define
@@ -280,7 +280,7 @@ class AlmKanal:
         if self.fwd is not None:
             data = self.raw if self.raw is not None else self.epoched
 
-            self.filters = data2source(
+            self.filters = comp_spatial_filters(
                 data=data,
                 fwd=self.fwd,
                 pick_dict=self.pick_dict,
@@ -315,21 +315,21 @@ class AlmKanal:
         elif isinstance(data, mne.epochs.Epochs):
             stc = mne.beamformer.apply_lcmv_epochs(data, self.filters)
 
-            if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):
-                assert isinstance(
-                    subject_id, str
-                ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
-                assert isinstance(
-                    subjects_dir, str
-                ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
-                stc = src2parc(
-                    stc,
-                    subject_id=subject_id,
-                    subjects_dir=subjects_dir,
-                    atlas=atlas,
-                    source=source,
-                    label_mode=label_mode,
-                )
+        if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):
+            assert isinstance(
+                subject_id, str
+            ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
+            assert isinstance(
+                subjects_dir, str
+            ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
+            stc = src2parc(
+                stc,
+                subject_id=subject_id,
+                subjects_dir=subjects_dir,
+                atlas=atlas,
+                source=source,
+                label_mode=label_mode,
+            )
 
         return stc
 
