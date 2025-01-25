@@ -32,12 +32,13 @@ class RestingPipe(Job):
         ak.do_ica()
         # % do fwd model
         ak.do_fwd_model(subject_id=subject_id, subjects_dir=subjects_dir, redo_hdm=True)
+
+        ak.do_spatial_filters(empty_room_path=empty_room_path)
         # % go 2 source
         stc = ak.do_src(
             subject_id=subject_id,
             subjects_dir=subjects_dir,
             return_parc=True,
-            empty_room_path=empty_room_path,
         )
 
         joblib.dump(stc, self.full_output_path)

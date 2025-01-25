@@ -20,7 +20,8 @@ def test_src(gen_mne_data_raw): #, ch_picks
     fwd = mne.read_forward_solution(fwd_fname)
     ak.pick_dict['meg'] = True
     ak.fwd = fwd
-    ak.do_src(empty_room=gen_mne_data_raw)
+    ak.do_spatial_filters(empty_room=gen_mne_data_raw)
+    ak.do_src()
 
 
 
@@ -44,7 +45,6 @@ def test_ica(gen_mne_data_raw, train, eog, ecg):
               eog=eog,
               ecg=ecg,
               resample_freq=200,
-              threshold=0.4
               )
     
 
@@ -56,7 +56,6 @@ def test_double_ica(gen_mne_data_raw):
               eog=True,
               ecg=False,
               resample_freq=100,
-              threshold=0.4
               )
     
     ak.do_ica(n_components=10,
@@ -64,7 +63,6 @@ def test_double_ica(gen_mne_data_raw):
               eog=True,
               ecg=False,
               resample_freq=100,
-              threshold=0.4
               )
 
 
@@ -75,7 +73,6 @@ def test_ica_plot(gen_mne_data_raw):
               eog=True,
               ecg=True,
               resample_freq=100,
-              threshold=0.4,
               fname='test',
               img_path='./'
               )
@@ -103,6 +100,22 @@ def test_fwd(gen_mne_data_raw, source, atlas):
                     subjects_dir='./data_old/')
     
     ak.pick_dict['meg'] = 'mag'
+    ak.do_spatial_filters()
+    ak.do_src(subject_id = 'sample',
+              subjects_dir = './data_old/',
+              source=source,
+              atlas=atlas,
+              return_parc=True,)
+    
+
+@pytest.mark.parametrize('source, atlas', SOURCE, scope='session')
+def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
+    ak = AlmKanal(raw=gen_mne_data_raw)
+    ak.do_fwd_model(subject_id='sample',
+                    subjects_dir='./data_old/')
+    
+    ak.pick_dict['meg'] = True
+    ak.do_spatial_filters()
     ak.do_src(subject_id = 'sample',
               subjects_dir = './data_old/',
               source=source,

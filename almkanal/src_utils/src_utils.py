@@ -47,9 +47,17 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
 
 
 def preproc_empty_room(
-    raw_er: mne.io.Raw, data: mne.io.Raw | mne.Epochs, 
-    preproc_info: InfoClass, icas: None | list, ica_ids: None | list,
+    raw_er: mne.io.Raw,
+    data: mne.io.Raw | mne.Epochs,
+    preproc_info: InfoClass,
+    icas: None | list,
+    ica_ids: None | list,
+    pick_dict: PickDictClass,
 ) -> mne.io.Raw:
+    # do channel picking here -> we need to disallow dropping bad
+    # channels as this can result in problems
+    picks = mne.pick_types(raw_er.info, exclude=[], **pick_dict)
+    raw_er.pick(picks=picks)
     if preproc_info.maxwell is not None:
         if isinstance(data, mne.epochs.Epochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
@@ -59,6 +67,8 @@ def preproc_empty_room(
         raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
         raw_er = run_maxwell(raw_er, **preproc_info.maxwell)
 
+    picks = mne.pick_types(raw_er.info, **pick_dict)
+    raw_er.pick(picks=picks)
     # Add filtering here -> i.e. check if deviation between empty and real data and then filter
     if np.logical_and(
         np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False,
@@ -108,10 +118,15 @@ def process_empty_room(
     elif isinstance(empty_room, mne.io.Raw):
         raw_er = empty_room
 
-    picks = mne.pick_types(raw_er.info, **pick_dict)
-    raw_er.pick(picks=picks)
-    raw_er = preproc_empty_room(raw_er=raw_er, data=data, preproc_info=preproc_info, icas=icas, ica_ids=ica_ids)
-    
+    raw_er = preproc_empty_room(
+        raw_er=raw_er,
+        data=data,
+        preproc_info=preproc_info,
+        icas=icas,
+        ica_ids=ica_ids,
+        pick_dict=pick_dict,
+    )
+
     if isinstance(data, mne.io.fiff.raw.Raw):
         noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
 
@@ -125,7 +140,7 @@ def process_empty_room(
     return true_rank, noise_cov
 
 
-def data2source(
+def comp_spatial_filters(
     data: mne.io.Raw | mne.Epochs,
     fwd: mne.Forward,
     pick_dict: PickDictClass,
@@ -171,11 +186,14 @@ def data2source(
 
     # if you have mixed sensor types we need a noise covariance matrix
     # per default we take this from an empty room recording
-    # importantly this should be preprocessed similarly to the actual data (except for ICA)
-    if np.logical_and(n_ch_types > 1, noise_cov is None):
-        assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
-        supply either a mne.io.raw object, a path that leads directly
-         to an empty_room recording or a folder with a bunch of empty room recordings"""
+    # importantly this should be preprocessed similarly to the actual data
+    if np.logical_and(
+        np.logical_and(n_ch_types > 1, noise_cov is None),
+        np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)),
+    ):
+        # assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
+        # supply either a mne.io.raw object, a path that leads directly
+        #  to an empty_room recording or a folder with a bunch of empty room recordings"""
         true_rank, noise_cov = process_empty_room(
             data=data,
             info=info,
@@ -187,26 +205,43 @@ def data2source(
             get_nearest=get_nearest_empty_room,
         )
 
+    elif np.logical_and(
+        np.logical_and(n_ch_types > 1, noise_cov is None),
+        np.logical_and(empty_room is None, not get_nearest_empty_room),
+    ):
+        warnings.warn("""You have multiple sensor types, but did neither specify a noise covariance
+                      matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix..
+                      ATTENTION: THIS IS NOT THE OPTIMAL WAY OF DOING THINGS!!!""")
+        noise_cov = mne.make_ad_hoc_cov(info)
+        # TODO: check in with thomas if rank should be computed on data_cov if ad-hoc cov is created
+        true_rank = mne.compute_rank(data_cov, info=info)
+
     elif n_ch_types == 1:
         # when we dont have a noise cov we just use the data cov for rank comp
         true_rank = mne.compute_rank(data_cov, info=info)
+        noise_cov = None
+
+    lcmv_settings = {
+        'reg': 0.05,
+        'noise_cov': noise_cov,
+        'pick_ori': 'max-power',
+        'weight_norm': 'nai',
+        'rank': true_rank,
+    }
 
     # build and apply filters
-    filters = mne.beamformer.make_lcmv(
-        info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori='max-power', weight_norm='nai', rank=true_rank
-    )
+    filters = mne.beamformer.make_lcmv(info, fwd, data_cov, **lcmv_settings)
 
-    if isinstance(data, mne.io.fiff.raw.Raw):
-        stc = mne.beamformer.apply_lcmv_raw(data, filters)
-
-    elif isinstance(data, mne.epochs.Epochs):
-        stc = mne.beamformer.apply_lcmv_epochs(data, filters)
-
-    return stc, filters
+    return filters
 
 
 def src2parc(
-    stc: mne.SourceEstimate, subject_id: str, subjects_dir: str, atlas: str = 'glasser', source: str = 'surface'
+    stc: mne.SourceEstimate,
+    subject_id: str,
+    subjects_dir: str,
+    atlas: str = 'glasser',
+    source: str = 'surface',
+    label_mode: str = 'mean_flip',
 ) -> dict:
     if atlas == 'dk':
         vol_atlas = 'aparc+aseg'
@@ -231,7 +266,7 @@ def src2parc(
         lh = [label.hemi == 'lh' for label in labels_mne]
 
         parc = {'lh': lh, 'rh': rh, 'parc': surf_atlas, 'names_order_mne': names_order_mne}
-        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='mean_flip')})
+        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode=label_mode)})
     elif source == 'volume':
         src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-5-src.fif'
         src = mne.read_source_spaces(src_file)

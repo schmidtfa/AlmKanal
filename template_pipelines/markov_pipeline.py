@@ -44,6 +44,10 @@ class RestingPipe(Job):
 
         ak.do_epochs(event_id=event_dict)
 
+        ak.do_spatial_filters(
+            empty_room_path=empty_room_path,
+        )
+
         # % go 2 source
         stc = ak.do_src(
             subject_id=subject_id,

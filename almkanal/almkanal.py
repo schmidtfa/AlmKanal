@@ -14,7 +14,7 @@ from almkanal.preproc_utils.ica_utils import run_ica
 # all them utility functions
 from almkanal.preproc_utils.maxwell_utils import run_maxwell
 from almkanal.src_utils.headmodel_utils import compute_headmodel, make_fwd
-from almkanal.src_utils.src_utils import data2source, src2parc
+from almkanal.src_utils.src_utils import comp_spatial_filters, src2parc
 
 
 @define
@@ -73,13 +73,18 @@ class AlmKanal:
         self,
         n_components: None | int | float = None,
         method: str = 'picard',
+        random_state: None | int = 42,
+        fit_params: dict | None = None,
+        ica_hp_freq: None | float = 1.0,
+        ica_lp_freq: None | float = None,
         resample_freq: int = 200,  # downsample to 200hz per default
         eog: bool = True,
+        eog_corr_thresh: float = 0.5,
         ecg: bool = True,
+        ecg_corr_thresh: float = 0.5,
         muscle: bool = False,
         train: bool = True,
         train_freq: int = 16,
-        threshold: float = 0.4,
         img_path: None | str = None,
         fname: None | str = None,
     ) -> None:
@@ -87,13 +92,18 @@ class AlmKanal:
         ica_info = ICAInfoDict(
             n_components=n_components,
             method=method,
+            random_state=random_state,
+            fit_params=fit_params,
+            ica_hp_freq=ica_hp_freq,
+            ica_lp_freq=ica_lp_freq,
             resample_freq=resample_freq,
             eog=eog,
+            eog_corr_thresh=eog_corr_thresh,
             ecg=ecg,
+            ecg_corr_thresh=ecg_corr_thresh,
             muscle=muscle,
             train=train,
             train_freq=train_freq,
-            ica_corr_thresh=threshold,
             img_path=img_path,
             fname=fname,
         )
@@ -252,18 +262,13 @@ class AlmKanal:
 
         self.fwd = fwd
 
-    def do_src(
+    def do_spatial_filters(
         self,
+        fwd: None | mne.Forward = None,
         data_cov: None | NDArray = None,
         noise_cov: None | NDArray = None,
         empty_room: None | str | mne.io.Raw = None,
         get_nearest_empty_room: bool = False,
-        return_parc: bool = False,
-        subject_id: None | str = None,
-        subjects_dir: None | str = None,
-        fwd: None | mne.Forward = None,
-        atlas: str = 'glasser',
-        source: str = 'surface',
     ) -> None:
         # here we want to embed the logic that, if your object has been epoched we do epoched2src else raw2src
         if np.logical_and(self.fwd is not None, fwd is not None):
@@ -275,7 +280,7 @@ class AlmKanal:
         if self.fwd is not None:
             data = self.raw if self.raw is not None else self.epoched
 
-            stc, self.filters = data2source(
+            self.filters = comp_spatial_filters(
                 data=data,
                 fwd=self.fwd,
                 pick_dict=self.pick_dict,
@@ -287,26 +292,48 @@ class AlmKanal:
                 empty_room=empty_room,
                 get_nearest_empty_room=get_nearest_empty_room,
             )
-
-            if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):
-                assert isinstance(
-                    subject_id, str
-                ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
-                assert isinstance(
-                    subjects_dir, str
-                ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
-                stc = src2parc(stc, subject_id=subject_id, subjects_dir=subjects_dir, atlas=atlas, source=source)
-
         else:
-            raise ValueError('The pipeline needs a forward model to be able to go to source.')
+            raise ValueError('The pipeline needs a forward model to be able to compute spatial filters.')
+
+    def do_src(
+        self,
+        return_parc: bool = False,
+        label_mode: str = 'mean_flip',
+        subject_id: None | str = None,
+        subjects_dir: None | str = None,
+        atlas: str = 'glasser',
+        source: str = 'surface',
+    ) -> None:
+        if self.filters is None:
+            raise ValueError('You need to compute spatial filters before you are able to go to source.')
+
+        data = self.raw if self.raw is not None else self.epoched
+
+        if isinstance(data, mne.io.fiff.raw.Raw):
+            stc = mne.beamformer.apply_lcmv_raw(data, self.filters)
+
+        elif isinstance(data, mne.epochs.Epochs):
+            stc = mne.beamformer.apply_lcmv_epochs(data, self.filters)
+
+        if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):
+            assert isinstance(
+                subject_id, str
+            ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
+            assert isinstance(
+                subjects_dir, str
+            ), 'You need to set the correct name for the `subject_id` and `subjects_dir` if you want to parcels.'
+            stc = src2parc(
+                stc,
+                subject_id=subject_id,
+                subjects_dir=subjects_dir,
+                atlas=atlas,
+                source=source,
+                label_mode=label_mode,
+            )
 
         return stc
 
     def do_trf_epochs(self) -> None:
         # mne only allows epochs of equal length.
         # This should become a shorthand to split the raw file in smaller raw files based on events
-        pass
-
-    def convert2eelbrain(self) -> None:
-        # This should take the thht mixin to convert raw, epoched or stc objects into eelbrain
         pass

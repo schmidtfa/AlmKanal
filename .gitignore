@@ -39,6 +39,7 @@ dist
 test_data
 
 data_old
+local_tests
 
 .mypy_cache
 .pytest_cache
