@@ -127,13 +127,14 @@ def process_empty_room(
         pick_dict=pick_dict,
     )
 
-    if isinstance(data, mne.io.fiff.raw.Raw):
-        noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
+    # if isinstance(data, mne.io.fiff.raw.Raw):
+    noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
 
-    elif isinstance(data, mne.epochs.Epochs):
-        t_length = np.abs(data.epoched.tmax - data.epoched.tmin)
-        raw_er = mne.make_fixed_length_epochs(raw_er, duration=t_length)
-        noise_cov = mne.compute_covariance(raw_er, rank=None, method='auto')
+    #TODO: This seems unecessary think about whether i can just drop this elif
+    # elif isinstance(data, mne.epochs.Epochs):
+    #     t_length = np.abs(data.epoched.tmax - data.epoched.tmin)
+    #     raw_er = mne.make_fixed_length_epochs(raw_er, duration=t_length)
+    #     noise_cov = mne.compute_covariance(raw_er, rank=None, method='auto')
     # when using noise cov rank should be based on noise cov
     true_rank = mne.compute_rank(noise_cov, info=raw_er.info)  # inferring true rank
 
