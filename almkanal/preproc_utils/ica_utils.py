@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import mne
@@ -5,7 +6,7 @@ import numpy as np
 from pyrasa.irasa import irasa
 from pyrasa.utils.peak_utils import get_band_info
 from scipy.stats import zscore
-import warnings
+
 
 def plot_ica(
     raw: mne.io.Raw, ica: mne.preprocessing.ICA, components_dict: dict, bad_ids: list, fname: str, img_path: str
@@ -36,7 +37,7 @@ def run_ica(
     random_state: None | int = 42,
     fit_params: dict | None = None,
     resample_freq: None | int = None,
-    ica_hp_freq: None | float = 1.,
+    ica_hp_freq: None | float = 1.0,
     ica_lp_freq: None | float = None,
     eog: bool = True,
     eog_corr_thresh: float = 0.5,
@@ -47,34 +48,35 @@ def run_ica(
     muscle: bool = False,
     img_path: None | str = None,
     fname: None | str = None,
-
 ) -> tuple[mne.io.Raw, mne.preprocessing.ICA, list]:
     # we run ica on high-pass filtered data
     raw_copy = raw.copy().filter(l_freq=ica_hp_freq, h_freq=ica_lp_freq)
     if resample_freq is not None:
         raw_copy.resample(resample_freq)
-    ica = mne.preprocessing.ICA(n_components=n_components, 
-                                random_state=random_state,
-                                method=method, 
-                                fit_params=fit_params)
+    ica = mne.preprocessing.ICA(
+        n_components=n_components, random_state=random_state, method=method, fit_params=fit_params
+    )
     ica.fit(raw_copy)
 
     bads = []
     components_dict = {}
     # find which ICs match the EOG/ECG pattern using correlation
-    #check if ecg and eog channels are present in the data
+    # check if ecg and eog channels are present in the data
     ch_dict = mne.channel_indices_by_type(raw_copy.info, picks='all')
-    
+
     if eog:
         if len(ch_dict['eog']) == 0:
-            raise ValueError('No EOG channels detected. You need to set EOG channels, if you want to reject EOG components via correlation.') 
+            raise ValueError(
+                """No EOG channels detected. You need to specify EOG channels,
+                if you want to reject EOG components via correlation."""
+            )
         eog_idcs, _ = ica.find_bads_eog(raw_copy, measure='correlation', threshold=eog_corr_thresh)
         components_dict.update({'eog': eog_idcs})
         bads.append(eog_idcs)
     if ecg:
         # take ecg based on correlation
         if len(ch_dict['ecg']) == 0:
-            warnings.warn("WNo ECG channels detected. ECG channel is constructed from MEG data.")
+            warnings.warn('WNo ECG channels detected. ECG channel is constructed from MEG data.')
         ecg_epochs = mne.preprocessing.create_ecg_epochs(raw_copy)
 
         # find the ECG components,

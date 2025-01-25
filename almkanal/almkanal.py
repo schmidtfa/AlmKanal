@@ -75,7 +75,7 @@ class AlmKanal:
         method: str = 'picard',
         random_state: None | int = 42,
         fit_params: dict | None = None,
-        ica_hp_freq: None | float = 1.,
+        ica_hp_freq: None | float = 1.0,
         ica_lp_freq: None | float = None,
         resample_freq: int = 200,  # downsample to 200hz per default
         eog: bool = True,
