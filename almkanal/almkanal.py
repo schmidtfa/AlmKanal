@@ -259,7 +259,7 @@ class AlmKanal:
         empty_room: None | str | mne.io.Raw = None,
         get_nearest_empty_room: bool = False,
         return_parc: bool = False,
-        label_mode: str = 'mean-flip',
+        label_mode: str = 'mean_flip',
         subject_id: None | str = None,
         subjects_dir: None | str = None,
         fwd: None | mne.Forward = None,
