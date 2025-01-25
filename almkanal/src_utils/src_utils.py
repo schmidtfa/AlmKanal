@@ -54,6 +54,10 @@ def preproc_empty_room(
     ica_ids: None | list,
     pick_dict: PickDictClass,
 ) -> mne.io.Raw:
+    # do channel picking here -> we need to disallow dropping bad
+    # channels as this can result in problems
+    picks = mne.pick_types(raw_er.info, exclude=[], **pick_dict)
+    raw_er.pick(picks=picks)
     if preproc_info.maxwell is not None:
         if isinstance(data, mne.epochs.Epochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
@@ -63,11 +67,8 @@ def preproc_empty_room(
         raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
         raw_er = run_maxwell(raw_er, **preproc_info.maxwell)
 
-    # do channel picking here as maxwell can repair bads
-    # if done earlier pick_types may automatically drop bad chs which may not always be desired
     picks = mne.pick_types(raw_er.info, **pick_dict)
     raw_er.pick(picks=picks)
-
     # Add filtering here -> i.e. check if deviation between empty and real data and then filter
     if np.logical_and(
         np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False,
@@ -118,7 +119,12 @@ def process_empty_room(
         raw_er = empty_room
 
     raw_er = preproc_empty_room(
-        raw_er=raw_er, data=data, preproc_info=preproc_info, icas=icas, ica_ids=ica_ids, pick_dict=pick_dict
+        raw_er=raw_er,
+        data=data,
+        preproc_info=preproc_info,
+        icas=icas,
+        ica_ids=ica_ids,
+        pick_dict=pick_dict,
     )
 
     if isinstance(data, mne.io.fiff.raw.Raw):
