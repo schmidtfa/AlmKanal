@@ -20,7 +20,8 @@ def test_src(gen_mne_data_raw): #, ch_picks
     fwd = mne.read_forward_solution(fwd_fname)
     ak.pick_dict['meg'] = True
     ak.fwd = fwd
-    ak.do_src(empty_room=gen_mne_data_raw)
+    ak.do_spatial_filters(empty_room=gen_mne_data_raw)
+    ak.do_src()
 
 
 
@@ -99,6 +100,7 @@ def test_fwd(gen_mne_data_raw, source, atlas):
                     subjects_dir='./data_old/')
     
     ak.pick_dict['meg'] = 'mag'
+    ak.do_spatial_filters()
     ak.do_src(subject_id = 'sample',
               subjects_dir = './data_old/',
               source=source,

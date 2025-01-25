@@ -262,19 +262,13 @@ class AlmKanal:
 
         self.fwd = fwd
 
-    def do_src(
+    def do_spatial_filters(
         self,
+        fwd: None | mne.Forward = None,
         data_cov: None | NDArray = None,
         noise_cov: None | NDArray = None,
         empty_room: None | str | mne.io.Raw = None,
         get_nearest_empty_room: bool = False,
-        return_parc: bool = False,
-        label_mode: str = 'mean_flip',
-        subject_id: None | str = None,
-        subjects_dir: None | str = None,
-        fwd: None | mne.Forward = None,
-        atlas: str = 'glasser',
-        source: str = 'surface',
     ) -> None:
         # here we want to embed the logic that, if your object has been epoched we do epoched2src else raw2src
         if np.logical_and(self.fwd is not None, fwd is not None):
@@ -286,7 +280,7 @@ class AlmKanal:
         if self.fwd is not None:
             data = self.raw if self.raw is not None else self.epoched
 
-            stc, self.filters = data2source(
+            self.filters = data2source(
                 data=data,
                 fwd=self.fwd,
                 pick_dict=self.pick_dict,
@@ -298,6 +292,28 @@ class AlmKanal:
                 empty_room=empty_room,
                 get_nearest_empty_room=get_nearest_empty_room,
             )
+        else:
+            raise ValueError('The pipeline needs a forward model to be able to compute spatial filters.')
+
+    def do_src(
+        self,
+        return_parc: bool = False,
+        label_mode: str = 'mean_flip',
+        subject_id: None | str = None,
+        subjects_dir: None | str = None,
+        atlas: str = 'glasser',
+        source: str = 'surface',
+    ) -> None:
+        if self.filters is None:
+            raise ValueError('You need to compute spatial filters before you are able to go to source.')
+
+        data = self.raw if self.raw is not None else self.epoched
+
+        if isinstance(data, mne.io.fiff.raw.Raw):
+            stc = mne.beamformer.apply_lcmv_raw(data, self.filters)
+
+        elif isinstance(data, mne.epochs.Epochs):
+            stc = mne.beamformer.apply_lcmv_epochs(data, self.filters)
 
             if np.logical_and(return_parc, np.logical_and(subject_id is not None, subjects_dir is not None)):
                 assert isinstance(
@@ -315,16 +331,9 @@ class AlmKanal:
                     label_mode=label_mode,
                 )
 
-        else:
-            raise ValueError('The pipeline needs a forward model to be able to go to source.')
-
         return stc
 
     def do_trf_epochs(self) -> None:
         # mne only allows epochs of equal length.
         # This should become a shorthand to split the raw file in smaller raw files based on events
-        pass
-
-    def convert2eelbrain(self) -> None:
-        # This should take the thht mixin to convert raw, epoched or stc objects into eelbrain
         pass

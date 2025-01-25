@@ -12,5 +12,5 @@ def test_src(gen_mne_data_epochs):
     fwd = mne.read_forward_solution(fwd_fname)
     ak.pick_dict['meg'] = 'mag'
     ak.fwd = fwd
-
+    ak.do_spatial_filters()
     ak.do_src()

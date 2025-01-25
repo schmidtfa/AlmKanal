@@ -211,13 +211,7 @@ def data2source(
         info, fwd, data_cov, reg=0.05, noise_cov=noise_cov, pick_ori='max-power', weight_norm='nai', rank=true_rank
     )
 
-    if isinstance(data, mne.io.fiff.raw.Raw):
-        stc = mne.beamformer.apply_lcmv_raw(data, filters)
-
-    elif isinstance(data, mne.epochs.Epochs):
-        stc = mne.beamformer.apply_lcmv_epochs(data, filters)
-
-    return stc, filters
+    return filters
 
 
 def src2parc(
