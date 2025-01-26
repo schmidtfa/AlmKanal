@@ -96,8 +96,16 @@ def test_epoching(gen_mne_data_raw):
 @pytest.mark.parametrize('source, atlas', SOURCE, scope='session')
 def test_fwd(gen_mne_data_raw, source, atlas):
     ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_fwd_model(subject_id='sample',
-                    subjects_dir='./data_old/')
+    if source == 'surface':
+        ak.do_fwd_model(subject_id='sample',
+                        subjects_dir='./data_old/',
+                        source=source)
+    # else:
+    #     data_path = mne.datasets.sample.data_path()
+    #     meg_path = data_path / 'MEG' / 'sample'
+    #     fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
+    #     fwd = mne.read_forward_solution(fwd_fname)
+    #     ak.fwd = fwd
     
     ak.pick_dict['meg'] = 'mag'
     ak.do_spatial_filters()
@@ -111,8 +119,12 @@ def test_fwd(gen_mne_data_raw, source, atlas):
 @pytest.mark.parametrize('source, atlas', SOURCE, scope='session')
 def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     ak = AlmKanal(raw=gen_mne_data_raw)
+
+
     ak.do_fwd_model(subject_id='sample',
-                    subjects_dir='./data_old/')
+                    subjects_dir='./data_old/',
+                    source=source)
+
     
     ak.pick_dict['meg'] = True
     ak.do_spatial_filters()
