@@ -11,7 +11,28 @@ from scipy.stats import zscore
 def plot_ica(
     raw: mne.io.Raw, ica: mne.preprocessing.ICA, components_dict: dict, bad_ids: list, fname: str, img_path: str
 ) -> None:
-    """Function to plot the ICA components"""
+    """
+    Plot the identified ICA components and save the figutr in a dedicated folder.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        The raw MEG data used during ICA fitting.
+    ica : mne.preprocessing.ICA
+        The ICA object containing the decomposition results.
+    components_dict : dict
+        Dictionary of identified artifact components categorized by type (e.g., EOG, ECG).
+    bad_ids : list
+        List of component indices marked as artifacts.
+    fname : str
+        Base filename for saving the plot.
+    img_path : str
+        Directory path to save the ICA plot.
+
+    Returns
+    -------
+    None
+    """
 
     if len(bad_ids) > 0:
         titles = {}
@@ -49,6 +70,56 @@ def run_ica(
     img_path: None | str = None,
     fname: None | str = None,
 ) -> tuple[mne.io.Raw, mne.preprocessing.ICA, list]:
+    """
+    Run ICA on raw MEG data to identify and remove artifacts (EOG, ECG, train).
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        The raw MEG data to process.
+    n_components : None | int | float, optional
+        Number of ICA components to compute. Defaults to None.
+    method : str, optional
+        ICA method to use (default is 'picard').
+    random_state : None | int, optional
+        Random seed for reproducibility. Defaults to 42.
+    fit_params : dict | None, optional
+        Additional fitting parameters for ICA. Defaults to None.
+    resample_freq : None | int, optional
+        Resampling frequency before ICA. Defaults to None.
+    ica_hp_freq : None | float, optional
+        High-pass filter frequency for ICA preprocessing. Defaults to 1.0 Hz.
+    ica_lp_freq : None | float, optional
+        Low-pass filter frequency for ICA preprocessing. Defaults to None.
+    eog : bool, optional
+        Whether to identify and remove EOG artifacts. Defaults to True.
+    eog_corr_thresh : float, optional
+        Correlation threshold for EOG artifact detection. Defaults to 0.5.
+    ecg : bool, optional
+        Whether to identify and remove ECG artifacts. Defaults to True.
+    ecg_corr_thresh : float, optional
+        Correlation threshold for ECG artifact detection. Defaults to 0.5.
+    train : bool, optional
+        Whether to identify and remove train artifacts. Defaults to True.
+    train_freq : int, optional
+        Frequency to use for train artifact detection. Defaults to 16 Hz.
+    muscle : bool, optional
+        Placeholder for muscle artifact rejection (not implemented). Defaults to False.
+    img_path : None | str, optional
+        Directory path to save ICA plots. Defaults to None.
+    fname : None | str, optional
+        Filename for ICA plots. Defaults to None.
+
+    Returns
+    -------
+    raw : mne.io.Raw
+        Preprocessed MEG data with ICA-applied artifact removal.
+    ica : mne.preprocessing.ICA
+        ICA object containing decomposition results.
+    bad_ids : list
+        List of identified and excluded component indices.
+    """
+
     # we run ica on high-pass filtered data
     raw_copy = raw.copy().filter(l_freq=ica_hp_freq, h_freq=ica_lp_freq)
     if resample_freq is not None:
@@ -122,9 +193,29 @@ def find_train_ica(
     sd: float = 2,
 ) -> list:
     """
-    This function extracts independent components based on narrowband spectral peaks.
-    We use this mainly to detect an artifact in our MEG data caused, by a nearby train station.
-    The artifact is a narrowband 16.666Hz oscillation.
+    Detect ICA components associated with train artifacts in MEG data.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        The raw MEG data used during ICA fitting.
+    ica : mne.preprocessing.ICA
+        The ICA object containing the decomposition results.
+    train_freq : int
+        The target frequency of the train artifact (e.g., 16 Hz).
+    duration : int, optional
+        Window duration (in seconds) for PSD computation. Defaults to 4.
+    overlap : float, optional
+        Overlap ratio for PSD computation windows. Defaults to 0.5.
+    hmax : float, optional
+        Maximum up/downsampling factor for IRASA. Defaults to 2.
+    sd : float, optional
+        Standard deviation threshold for peak power detection. Defaults to 2.
+
+    Returns
+    -------
+    list
+        List of ICA component indices associated with train artifacts.
     """
 
     # we add a small value to the hmax to be absolutely sure i am not going into filters

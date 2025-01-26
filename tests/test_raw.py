@@ -112,7 +112,8 @@ def test_fwd(gen_mne_data_raw, source, atlas):
 def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     ak = AlmKanal(raw=gen_mne_data_raw)
     ak.do_fwd_model(subject_id='sample',
-                    subjects_dir='./data_old/')
+                    subjects_dir='./data_old/',
+                    source=source)
     
     ak.pick_dict['meg'] = True
     ak.do_spatial_filters()

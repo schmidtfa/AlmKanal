@@ -32,6 +32,35 @@ class AlmKanal:
     _initialized: bool = field(default=False, init=False)  # Internal flag for initialization
     _data_check_disabled: bool = field(default=False, init=False)  # Disable data check temporarily
 
+    """
+    AlmKanal: A high-level interface for MEG data processing and analysis.
+
+    This class can be used as a pipeline builder for preprocessing MEG data leveraging MNE-Python's functionality.
+
+    Attributes
+    ----------
+    raw : mne.io.Raw | None
+        The raw MEG data.
+    epoched : mne.Epochs | None
+        The epoched MEG data.
+    pick_dict : PickDictClass
+        Dictionary specifying channel selection criteria.
+    events : np.ndarray | None
+        Event markers extracted from the raw data.
+    fwd : mne.Forward | None
+        The forward model for source reconstruction.
+    ica : mne.preprocessing.ICA | None
+        ICA object(s) for artifact removal.
+    ica_ids : list | None
+        Indices of ICA components identified as artifacts.
+    filters : mne.beamformer.Beamformer | None
+        Spatial filters for source reconstruction.
+    stim : np.ndarray | None
+        TRF-related stimulus information.
+    info : InfoClass
+        Configuration and preprocessing metadata.
+    """
+
     # TODO: Use attrs validators -> checks whenver a field is set
     # Check that we only have either raw or epoched data when we initalize the method
     def __attrs_post_init__(self) -> None:
@@ -54,6 +83,27 @@ class AlmKanal:
         mw_cross_talk_file: str | None = None,
         mw_st_duration: int | None = None,
     ) -> None:
+        """
+        Apply Maxwell filtering to the raw MEG data.
+
+        Parameters
+        ----------
+        mw_coord_frame : str, optional
+            Coordinate frame for Maxwell filtering ('head' or 'meg'). Defaults to 'head'.
+        mw_destination : str | None, optional
+            Destination coordinate frame for alignment. Defaults to None.
+        mw_calibration_file : str | None, optional
+            Path to the calibration file. Defaults to None.
+        mw_cross_talk_file : str | None, optional
+            Path to the cross-talk file. Defaults to None.
+        mw_st_duration : int | None, optional
+            Duration (in seconds) for tSSS (temporal Signal Space Separation). Defaults to None.
+
+        Returns
+        -------
+        None
+        """
+
         # this should do maxwell filtering
         # should only be possible on raw data and only if no other preprocessing apart from filtering was done
         if self.info.maxwell is None:
@@ -88,6 +138,50 @@ class AlmKanal:
         img_path: None | str = None,
         fname: None | str = None,
     ) -> None:
+        """
+        Perform ICA to identify and remove peripheral physiological signals like
+        EOG and ECG as well as an artifact caused by our local train in Salzburg.
+
+        Parameters
+        ----------
+        n_components : int | float | None, optional
+            Number of ICA components to compute. Defaults to None.
+        method : str, optional
+            ICA method to use ('picard', etc.). Defaults to 'picard'.
+        random_state : int | None, optional
+            Random seed for reproducibility. Defaults to 42.
+        fit_params : dict | None, optional
+            Additional fitting parameters for ICA. Defaults to None.
+        ica_hp_freq : float | None, optional
+            High-pass filter frequency for ICA preprocessing. Defaults to 1.0 Hz.
+        ica_lp_freq : float | None, optional
+            Low-pass filter frequency for ICA preprocessing. Defaults to None.
+        resample_freq : int, optional
+            Downsampling frequency before ICA. Defaults to 200 Hz.
+        eog : bool, optional
+            Whether to detect and remove EOG artifacts. Defaults to True.
+        eog_corr_thresh : float, optional
+            Correlation threshold for EOG artifact detection. Defaults to 0.5.
+        ecg : bool, optional
+            Whether to detect and remove ECG artifacts. Defaults to True.
+        ecg_corr_thresh : float, optional
+            Correlation threshold for ECG artifact detection. Defaults to 0.5.
+        muscle : bool, optional
+            Placeholder for future muscle artifact detection. Defaults to False.
+        train : bool, optional
+            Whether to detect and remove train-related artifacts. Defaults to True.
+        train_freq : int, optional
+            Frequency for train artifact detection. Defaults to 16 Hz.
+        img_path : str | None, optional
+            Path to save ICA plots. Defaults to None.
+        fname : str | None, optional
+            Filename for ICA plots. Defaults to None.
+
+        Returns
+        -------
+        None
+        """
+
         # this should do an ica
         ica_info = ICAInfoDict(
             n_components=n_components,
@@ -140,6 +234,37 @@ class AlmKanal:
         initial_event: bool = False,
         verbose: bool | str | int | None = None,
     ) -> None:
+        """
+        Extract events from the raw MEG data.
+
+        Parameters
+        ----------
+        stim_channel : str | None, optional
+            Name of the stimulus channel. Defaults to None.
+        output : str, optional
+            Type of output ('onset', etc.). Defaults to 'onset'.
+        consecutive : bool | str, optional
+            Whether to consider consecutive events ('increasing', etc.). Defaults to 'increasing'.
+        min_duration : float, optional
+            Minimum duration of events. Defaults to 0.0.
+        shortest_event : int, optional
+            Minimum number of samples for an event. Defaults to 2.
+        mask : int | None, optional
+            Binary mask for event detection. Defaults to None.
+        uint_cast : bool, optional
+            Whether to cast to unsigned integer. Defaults to False.
+        mask_type : str, optional
+            Type of masking ('and', etc.). Defaults to 'and'.
+        initial_event : bool, optional
+            Whether to include initial events. Defaults to False.
+        verbose : bool | str | int | None, optional
+            Verbosity level. Defaults to None.
+
+        Returns
+        -------
+        None
+        """
+
         # this should build events based on information stored in the raw file
         events = mne.find_events(
             self.raw,
@@ -177,6 +302,53 @@ class AlmKanal:
         event_repeated: str = 'error',
         verbose: bool | str | int | None = None,
     ) -> None:
+        """
+        Create epochs from raw MEG data and events.
+
+        Parameters
+        ----------
+        tmin : float
+            Start time before the event (in seconds).
+        tmax : float
+            End time after the event (in seconds).
+        event_id : dict | None, optional
+            Dictionary mapping event IDs to event labels. Defaults to None.
+        baseline : tuple | None, optional
+            Baseline correction period. Defaults to None.
+        preload : bool, optional
+            Whether to preload the data into memory. Defaults to True.
+        picks : str | ArrayLike | None, optional
+            Channels to include in the epochs. Defaults to None.
+        reject : dict | None, optional
+            Rejection criteria. Defaults to None.
+        flat : dict | None, optional
+            Flatness criteria. Defaults to None.
+        proj : bool | str, optional
+            Whether to apply projection. Defaults to True.
+        decim : int, optional
+            Decimation factor for downsampling. Defaults to 1.
+        reject_tmin : float | None, optional
+            Start of rejection window. Defaults to None.
+        reject_tmax : float | None, optional
+            End of rejection window. Defaults to None.
+        detrend : int | None, optional
+            Detrending mode. Defaults to None.
+        on_missing : str, optional
+            Behavior for missing events ('raise', etc.). Defaults to 'raise'.
+        reject_by_annotation : bool, optional
+            Whether to reject epochs based on annotations. Defaults to True.
+        metadata : pd.DataFrame | None, optional
+            Additional metadata for epochs. Defaults to None.
+        event_repeated : str, optional
+            Behavior for repeated events ('error', etc.). Defaults to 'error'.
+        verbose : bool | str | int | None, optional
+            Verbosity level. Defaults to None.
+
+        Returns
+        -------
+        None
+        """
+
         # this should take raw and events and epoch the data
         if np.logical_and(self.raw is not None, self.events is not None):
             epoched = mne.Epochs(
@@ -217,6 +389,27 @@ class AlmKanal:
         template_mri: bool = True,
         redo_hdm: bool = True,
     ) -> None:
+        """
+        Generate a forward model for source reconstruction.
+
+        Parameters
+        ----------
+        subject_id : str
+            Subject identifier.
+        subjects_dir : str
+            Path to the FreeSurfer subjects directory.
+        source : str, optional
+            Type of source space ('surface' or 'volume'). Defaults to 'surface'.
+        template_mri : bool, optional
+            Whether to use a template MRI. Defaults to True.
+        redo_hdm : bool, optional
+            Whether to recompute the head model. Defaults to True.
+
+        Returns
+        -------
+        None
+        """
+
         # This should generate a fwd model
         if self.raw is not None:
             cur_info = self.raw.info
@@ -270,6 +463,27 @@ class AlmKanal:
         empty_room: None | str | mne.io.Raw = None,
         get_nearest_empty_room: bool = False,
     ) -> None:
+        """
+        Compute spatial filters for source projection using LCMV beamformers.
+
+        Parameters
+        ----------
+        fwd : mne.Forward | None, optional
+            The forward model. Defaults to None.
+        data_cov : NDArray | None, optional
+            Data covariance matrix. Defaults to None.
+        noise_cov : NDArray | None, optional
+            Noise covariance matrix. Defaults to None.
+        empty_room : str | mne.io.Raw | None, optional
+            Path to or preloaded empty room recording. Defaults to None.
+        get_nearest_empty_room : bool, optional
+            Whether to find the nearest empty room recording. Defaults to False.
+
+        Returns
+        -------
+        None
+        """
+
         # here we want to embed the logic that, if your object has been epoched we do epoched2src else raw2src
         if np.logical_and(self.fwd is not None, fwd is not None):
             raise ValueError('You cannot set fwd as you already have a fwd model in the Almkanal.')
@@ -304,6 +518,30 @@ class AlmKanal:
         atlas: str = 'glasser',
         source: str = 'surface',
     ) -> None:
+        """
+        Perform source reconstruction and optional parcellation.
+
+        Parameters
+        ----------
+        return_parc : bool, optional
+            Whether to return parcellated source data. Defaults to False.
+        label_mode : str, optional
+            Mode for extracting label time courses ('mean_flip', etc.). Defaults to 'mean_flip'.
+        subject_id : str | None, optional
+            Subject identifier for parcellation. Required if `return_parc` is True.
+        subjects_dir : str | None, optional
+            Path to FreeSurfer subjects directory. Required if `return_parc` is True.
+        atlas : str, optional
+            Atlas for parcellation ('glasser', 'dk', etc.). Defaults to 'glasser'.
+        source : str, optional
+            Source space type ('surface' or 'volume'). Defaults to 'surface'.
+
+        Returns
+        -------
+        mne.SourceEstimate | dict
+            Source time courses or parcellated data.
+        """
+
         if self.filters is None:
             raise ValueError('You need to compute spatial filters before you are able to go to source.')
 

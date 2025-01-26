@@ -18,9 +18,27 @@ def compute_headmodel(
     savefig: bool = True,
 ) -> mne.transforms.Transform:
     """
-    base_data_path: The path to the data directory where freesurfer and the headmodels are going to be stored.
-                    The folder in which the data is saved is dependent on this.
+    Compute a head model for MEG data by coregistering it to an MRI.
 
+    Parameters
+    ----------
+    info : mne.Info
+        The MEG data information structure.
+    subject_id : str
+        Subject identifier for the head model.
+    subjects_dir : str
+        Path to the directory containing subject-specific data (e.g., FreeSurfer and head models).
+    pick_dict : PickDictClass
+        Dictionary specifying channels to include in the head model.
+    template_mri : bool, optional
+        Whether to use a template MRI ('fsaverage'). Defaults to True.
+    savefig : bool, optional
+        Whether to save diagnostic figures of the coregistration process. Defaults to True.
+
+    Returns
+    -------
+    mne.transforms.Transform
+        The transformation matrix for aligning MEG and MRI coordinate systems.
     """
 
     mri_path = Path(subjects_dir) / 'freesurfer'  # os.path.join(subjects_dir, 'freesurfer')
@@ -73,6 +91,25 @@ def compute_headmodel(
 
 
 def plot_head_model(coreg: mne.transforms.Transform, info: mne.Info, subject_id: str, out_folder: Path) -> None:
+    """
+    Plot the head model coregistration, including sensor and digitization points.
+
+    Parameters
+    ----------
+    coreg : mne.transforms.Transform
+        The coregistration transform matrix aligning MEG and MRI coordinate systems.
+    info : mne.Info
+        The MEG data information structure.
+    subject_id : str
+        Subject identifier for labeling the plots.
+    out_folder : Path
+        Path to the directory where the coregistration plot will be saved.
+
+    Returns
+    -------
+    None
+    """
+
     head_mri_t = mne.transforms._get_trans(coreg.trans, 'head', 'mri')[0]
     coord_frame = 'head'
     to_cf_t = mne.transforms._get_transforms_to_coord_frame(info, head_mri_t, coord_frame=coord_frame)
@@ -148,6 +185,30 @@ def plot_head_model(coreg: mne.transforms.Transform, info: mne.Info, subject_id:
 def make_fwd(
     info: mne.Info, source: str, fname_trans: str, subjects_dir: str, subject_id: str, template_mri: bool = False
 ) -> mne.Forward:
+    """
+    Generate a forward model for MEG data.
+
+    Parameters
+    ----------
+    info : mne.Info
+        The MEG data information structure.
+    source : str
+        Type of source space ('volume' or 'surface').
+    fname_trans : str
+        Path to the transformation file aligning MEG and MRI coordinate systems.
+    subjects_dir : str
+        Path to the directory containing subject-specific data (e.g., FreeSurfer).
+    subject_id : str
+        Subject identifier for the forward model.
+    template_mri : bool, optional
+        Whether to use a template MRI ('fsaverage'). Defaults to False.
+
+    Returns
+    -------
+    mne.Forward
+        The computed forward model.
+    """
+
     ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
     fpath_add_on = '_from_template' if template_mri else ''
 

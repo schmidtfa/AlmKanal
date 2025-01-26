@@ -16,8 +16,22 @@ from almkanal.preproc_utils.maxwell_utils import run_maxwell
 # %%
 def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
     """
-    This function finds the empty room file with the closest date to the current measurement.
-    The file is used for the noise covariance estimation.
+    Find the empty room recording closest in date to the current measurement.
+
+    This function locates the empty room file, which is used for noise covariance estimation,
+    with a date nearest to the current MEG measurement.
+
+    Parameters
+    ----------
+    info : mne.Info
+        The MEG data information structure, including measurement date.
+    empty_room_dir : str
+        Directory containing the empty room recordings.
+
+    Returns
+    -------
+    Path
+        Path to the nearest empty room file.
     """
 
     all_empty_room_dates = np.array([datetime.strptime(date, '%y%m%d') for date in os.listdir(empty_room_dir)])
@@ -39,9 +53,7 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
         elif np.logical_and('68' in os.listdir(cur_empty_path)[0], 'sss' not in os.listdir(cur_empty_path)[0].lower()):
             break
 
-    fname_empty_room = (
-        Path(cur_empty_path) / os.listdir(cur_empty_path)[0]
-    )  # os.path.join(cur_empty_path, os.listdir(cur_empty_path)[0])
+    fname_empty_room = Path(cur_empty_path) / os.listdir(cur_empty_path)[0]
 
     return fname_empty_room
 
@@ -54,6 +66,30 @@ def preproc_empty_room(
     ica_ids: None | list,
     pick_dict: PickDictClass,
 ) -> mne.io.Raw:
+    """
+    Preprocess an empty room recording to match the preprocessing of the original MEG data.
+
+    Parameters
+    ----------
+    raw_er : mne.io.Raw
+        The raw empty room MEG data.
+    data : mne.io.Raw | mne.Epochs
+        The original MEG data or epochs for comparison and preprocessing alignment.
+    preproc_info : InfoClass
+        Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
+    icas : None | list, optional
+        List of ICA objects to apply to the empty room data. Defaults to None.
+    ica_ids : None | list, optional
+        List of ICA component indices to exclude for each ICA object. Defaults to None.
+    pick_dict : PickDictClass
+        Dictionary specifying channel selection criteria.
+
+    Returns
+    -------
+    mne.io.Raw
+        The preprocessed empty room MEG data.
+    """
+
     # do channel picking here -> we need to disallow dropping bad
     # channels as this can result in problems
     picks = mne.pick_types(raw_er.info, exclude=[], **pick_dict)
@@ -110,6 +146,35 @@ def process_empty_room(
     empty_room: str | mne.io.Raw,
     get_nearest: bool = False,
 ) -> tuple[NDArray, NDArray]:
+    """
+    Process the empty room MEG data for noise covariance estimation.
+
+    Parameters
+    ----------
+    data : mne.io.Raw | mne.Epochs
+        The original MEG data or epochs for alignment with the empty room data.
+    info : mne.Info
+        The MEG data information structure, including measurement metadata.
+    pick_dict : PickDictClass
+        Dictionary specifying channel selection criteria.
+    icas : None | list, optional
+        List of ICA objects to apply to the empty room data. Defaults to None.
+    ica_ids : None | list, optional
+        List of ICA component indices to exclude for each ICA object. Defaults to None.
+    preproc_info : InfoClass
+        Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
+    empty_room : str | mne.io.Raw
+        Path to the empty room recording or preloaded empty room raw data.
+    get_nearest : bool, optional
+        If True, finds the nearest empty room recording based on the measurement date. Defaults to False.
+
+    Returns
+    -------
+    tuple[NDArray, NDArray]
+        - `true_rank`: The true rank of the noise covariance matrix.
+        - `noise_cov`: The computed noise covariance matrix.
+    """
+
     if np.logical_and(get_nearest, isinstance(empty_room, str)):
         fname_empty_room = get_nearest_empty_room(info, empty_room_dir=empty_room)
         raw_er = mne.io.read_raw(fname_empty_room, preload=True)
@@ -130,7 +195,7 @@ def process_empty_room(
     # if isinstance(data, mne.io.fiff.raw.Raw):
     noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
 
-    #TODO: This seems unecessary think about whether i can just drop this elif
+    # TODO: This seems unecessary think about whether i can just drop this elif
     # elif isinstance(data, mne.epochs.Epochs):
     #     t_length = np.abs(data.epoched.tmax - data.epoched.tmin)
     #     raw_er = mne.make_fixed_length_epochs(raw_er, duration=t_length)
@@ -153,7 +218,37 @@ def comp_spatial_filters(
     empty_room: None | str | mne.io.Raw = None,
     get_nearest_empty_room: bool = False,
 ) -> tuple[mne.SourceEstimate, mne.beamformer.Beamformer]:
-    """This function does source reconstruction using lcmv beamformers based on raw data."""
+    """
+    Compute spatial filters for source reconstruction using LCMV beamformers.
+
+    Parameters
+    ----------
+    data : mne.io.Raw | mne.Epochs
+        MEG data for source reconstruction.
+    fwd : mne.Forward
+        The forward model.
+    pick_dict : PickDictClass
+        Dictionary specifying channel selection criteria.
+    preproc_info : InfoClass
+        Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
+    icas : None | list, optional
+        List of ICA objects to apply to the data, if needed. Defaults to None.
+    ica_ids : None | list, optional
+        List of ICA component indices to exclude for each ICA object. Defaults to None.
+    data_cov : None | NDArray, optional
+        Data covariance matrix. If None, it is computed automatically. Defaults to None.
+    noise_cov : None | NDArray, optional
+        Noise covariance matrix. If None, it is computed from the empty room recording or ad-hoc. Defaults to None.
+    empty_room : None | str | mne.io.Raw, optional
+        Path to the empty room recording or preloaded empty room raw data. Defaults to None.
+    get_nearest_empty_room : bool, optional
+        Whether to find the nearest empty room recording for noise covariance. Defaults to False.
+
+    Returns
+    -------
+    mne.beamformer.Beamformer
+        LCMV spatial filters for source projection.
+    """
 
     # %Compute covariance matrices
     # data covariance based on the actual recording
@@ -244,6 +339,31 @@ def src2parc(
     source: str = 'surface',
     label_mode: str = 'mean_flip',
 ) -> dict:
+    """
+    Parcellate source data into predefined brain regions using an atlas.
+
+    Parameters
+    ----------
+    stc : mne.SourceEstimate
+        Source estimate object containing the source data to parcellate.
+    subject_id : str
+        Subject identifier for the source data.
+    subjects_dir : str
+        Path to the directory containing FreeSurfer subject data.
+    atlas : str, optional
+        Atlas to use for parcellation ('glasser', 'dk', or 'destrieux'). Defaults to 'glasser'.
+    source : str, optional
+        Source space type ('surface' or 'volume'). Defaults to 'surface'.
+    label_mode : str, optional
+        Mode for extracting label time courses ('mean', 'mean_flip', etc.). Defaults to 'mean_flip'.
+
+    Returns
+    -------
+    dict
+        Dictionary containing parcellation information, including labels, hemisphere assignments,
+        and extracted time courses for each region.
+    """
+
     if atlas == 'dk':
         vol_atlas = 'aparc+aseg'
         surf_atlas = 'aparc'
