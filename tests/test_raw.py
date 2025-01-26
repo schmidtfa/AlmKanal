@@ -1,6 +1,6 @@
 from almkanal.almkanal import AlmKanal
 import pytest
-from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE
+from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE, SOURCE2
 import mne
 
 #@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
@@ -109,12 +109,20 @@ def test_fwd(gen_mne_data_raw, source, atlas):
               return_parc=True,)
     
 
-@pytest.mark.parametrize('source, atlas', SOURCE, scope='session')
+@pytest.mark.parametrize('source, atlas', SOURCE2, scope='session')
 def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_fwd_model(subject_id='sample',
-                    subjects_dir='./data_old/',
-                    source=source)
+
+    if source == 'surface':
+        ak.do_fwd_model(subject_id='sample',
+                        subjects_dir='./data_old/',
+                        source=source)
+    else:
+        data_path = mne.datasets.sample.data_path()
+        meg_path = data_path / 'MEG' / 'sample'
+        fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
+        fwd = mne.read_forward_solution(fwd_fname)
+        ak.fwd = fwd
     
     ak.pick_dict['meg'] = True
     ak.do_spatial_filters()
