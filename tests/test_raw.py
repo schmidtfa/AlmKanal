@@ -97,6 +97,7 @@ def test_epoching(gen_mne_data_raw):
 def test_fwd(gen_mne_data_raw, source, atlas):
     ak = AlmKanal(raw=gen_mne_data_raw)
     ak.do_fwd_model(subject_id='sample',
+                    source=source,
                     subjects_dir='./data_old/')
     
     ak.pick_dict['meg'] = 'mag'
