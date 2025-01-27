@@ -225,6 +225,30 @@ class AlmKanal:
         eog: None | str | list = None,
         emg: None | str | list = None,
     ) -> mne.io.Raw:
+        
+        """
+        Preprocess physiological signals (ECG, EOG, RESP, EMG) in an MNE raw object.
+
+        This method extracts specified physiological channels, preprocesses them using `neurokit2`,
+        and returns a new raw object containing the cleaned physiological data along with stimulus channels.
+
+        Parameters
+        ----------
+        ecg : str | list | None, optional
+            Name(s) of the ECG channel(s) to preprocess. Defaults to None.
+        resp : str | list | None, optional
+            Name(s) of the respiratory channel(s) to preprocess. Defaults to None.
+        eog : str | list | None, optional
+            Name(s) of the EOG channel(s) to preprocess. Defaults to None.
+        emg : str | list | None, optional
+            Name(s) of the EMG channel(s) to preprocess. Defaults to None.
+
+        Returns
+        -------
+        mne.io.Raw
+            A new raw object containing the preprocessed physiological signals and stimulus channels.
+        """
+
         if self.raw is None:
             raise ValueError("""This method requires raw data.
                               It will return mne.io.Raw object containing your

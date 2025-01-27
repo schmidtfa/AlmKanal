@@ -10,8 +10,31 @@ def run_bio_preproc(
     eog: None | str | list = None,
     emg: None | str | list = None,
 ) -> mne.io.Raw:
-    """This function takes a raw mne file and returns a raw object containing preprocessed
-    physiological information."""
+    """
+    Preprocess physiological signals (ECG, EOG, RESP, EMG) in an MNE raw object.
+
+    This function extracts specified physiological channels, preprocesses them using `neurokit2`,
+    and returns a new raw object containing the cleaned physiological data along with stimulus channels.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        The raw MNE object containing physiological and stimulus channels.
+    ecg : str | list | None, optional
+        Name(s) of the ECG channel(s) to preprocess. Defaults to None.
+    resp : str | list | None, optional
+        Name(s) of the respiratory channel(s) to preprocess. Defaults to None.
+    eog : str | list | None, optional
+        Name(s) of the EOG channel(s) to preprocess. Defaults to None.
+    emg : str | list | None, optional
+        Name(s) of the EMG channel(s) to preprocess. Defaults to None.
+
+    Returns
+    -------
+    mne.io.Raw
+        A new raw object containing the preprocessed physiological signals and stimulus channels.
+    """
+
 
     bio_chs = {
         'ecg': ecg,

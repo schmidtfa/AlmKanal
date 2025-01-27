@@ -86,7 +86,7 @@ def test_epoching(gen_mne_data_raw):
 
     ak.do_epochs(tmin=-0.2, tmax=0.5, event_id=event_dict)
 
-@pytest.mark.parametrize('source, atlas', SOURCE_VOL, scope='session')
+@pytest.mark.parametrize('source, atlas', SOURCE_SURF, scope='session')
 def test_fwd(gen_mne_data_raw, source, atlas):
     raw, data_path = gen_mne_data_raw
 
@@ -106,17 +106,23 @@ def test_fwd(gen_mne_data_raw, source, atlas):
               return_parc=True,)
     
 
-def test_src(gen_mne_data_raw): #, ch_picks
-    raw, data_path = gen_mne_data_raw
+def test_src(): #, ch_picks
+    
+    data_path = mne.datasets.sample.data_path()
+
+    meg_path = data_path / 'MEG' / 'sample'
+    raw_fname = meg_path / 'sample_audvis_raw.fif'
+    raw = mne.io.read_raw_fif(raw_fname, preload=True)#.crop(tmin=0, tmax=60)
+
+    raw = raw.pick(picks=['meg', 'eog', 'stim'])
 
     ak = AlmKanal(raw=raw.copy())
     meg_path = data_path / 'MEG' / 'sample'
 
-
     ak.do_maxwell()
     # % you can always use common mne methods like filtering that modify
     # the raw and epoched objects in place
-    #ak.raw.filter(l_freq=0.1, h_freq=100)
+    ak.raw.filter(l_freq=0.1, h_freq=10)
     #  one shot call to ica
     ak.do_ica()
 
@@ -125,10 +131,10 @@ def test_src(gen_mne_data_raw): #, ch_picks
     ak.pick_dict['meg'] = True
     ak.fwd = fwd
     ak.do_spatial_filters(empty_room=raw.copy())
-    ak.do_src()
+    ak.do_src(source='volume')
     
 
-@pytest.mark.parametrize('source, atlas', SOURCE_SURF, scope='session')
+@pytest.mark.parametrize('source, atlas', SOURCE_VOL, scope='session')
 def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     raw, data_path = gen_mne_data_raw
 
