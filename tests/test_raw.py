@@ -2,7 +2,6 @@ from almkanal.almkanal import AlmKanal
 import pytest
 from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE_SURF, SOURCE_VOL
 import mne
-from neurodsp.sim import s
 
 #@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
 
