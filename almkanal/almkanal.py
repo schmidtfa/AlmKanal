@@ -9,6 +9,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from almkanal.data_utils.check_data import check_raw_epoch
 from almkanal.data_utils.data_classes import ICAInfoDict, InfoClass, PickDictClass
+from almkanal.preproc_utils.bio_utils import run_bio_preproc
 from almkanal.preproc_utils.ica_utils import run_ica
 
 # all them utility functions
@@ -132,7 +133,6 @@ class AlmKanal:
         eog_corr_thresh: float = 0.5,
         ecg: bool = True,
         ecg_corr_thresh: float = 0.5,
-        muscle: bool = False,
         train: bool = True,
         train_freq: int = 16,
         img_path: None | str = None,
@@ -166,8 +166,6 @@ class AlmKanal:
             Whether to detect and remove ECG artifacts. Defaults to True.
         ecg_corr_thresh : float, optional
             Correlation threshold for ECG artifact detection. Defaults to 0.5.
-        muscle : bool, optional
-            Placeholder for future muscle artifact detection. Defaults to False.
         train : bool, optional
             Whether to detect and remove train-related artifacts. Defaults to True.
         train_freq : int, optional
@@ -195,7 +193,6 @@ class AlmKanal:
             eog_corr_thresh=eog_corr_thresh,
             ecg=ecg,
             ecg_corr_thresh=ecg_corr_thresh,
-            muscle=muscle,
             train=train,
             train_freq=train_freq,
             img_path=img_path,
@@ -220,6 +217,49 @@ class AlmKanal:
             self.ica.append(ica)
             assert isinstance(self.ica_ids, list)
             self.ica_ids.append(ica_ids)
+
+    def do_bio_process(
+        self,
+        ecg: None | str | list = None,
+        resp: None | str | list = None,
+        eog: None | str | list = None,
+        emg: None | str | list = None,
+    ) -> mne.io.Raw:
+        """
+        Preprocess physiological signals (ECG, EOG, RESP, EMG) in an MNE raw object.
+
+        This method extracts specified physiological channels, preprocesses them using `neurokit2`,
+        and returns a new raw object containing the cleaned physiological data along with stimulus channels.
+
+        Parameters
+        ----------
+        ecg : str | list | None, optional
+            Name(s) of the ECG channel(s) to preprocess. Defaults to None.
+        resp : str | list | None, optional
+            Name(s) of the respiratory channel(s) to preprocess. Defaults to None.
+        eog : str | list | None, optional
+            Name(s) of the EOG channel(s) to preprocess. Defaults to None.
+        emg : str | list | None, optional
+            Name(s) of the EMG channel(s) to preprocess. Defaults to None.
+
+        Returns
+        -------
+        mne.io.Raw
+            A new raw object containing the preprocessed physiological signals and stimulus channels.
+        """
+
+        if self.raw is None:
+            raise ValueError("""This method requires raw data.
+                              It will return mne.io.Raw object containing your
+                              trigger channels so you can epoch the data later""")
+
+        return run_bio_preproc(
+            raw=self.raw,
+            ecg=ecg,
+            resp=resp,
+            eog=eog,
+            emg=emg,
+        )
 
     def do_events(
         self,

@@ -11,7 +11,9 @@ def gen_mne_data_raw():
 
     raw = raw.pick(picks=['meg', 'eog', 'stim'])
 
-    yield raw
+    raw.resample(sfreq=100)
+
+    yield raw, data_path
 
 @pytest.fixture(scope='session')
 def gen_mne_data_epochs():
@@ -46,6 +48,8 @@ def gen_mne_data_epochs():
         preload=True,
         verbose=False,
     )
+
+    epochs.resample(sfreq=10)
 
     yield epochs
 

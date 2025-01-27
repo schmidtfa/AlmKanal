@@ -106,9 +106,11 @@ def preproc_empty_room(
     picks = mne.pick_types(raw_er.info, **pick_dict)
     raw_er.pick(picks=picks)
     # Add filtering here -> i.e. check if deviation between empty and real data and then filter
-    if np.logical_and(
-        np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False,
-        (np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01),) is False,
+    if bool(
+        np.logical_and(
+            np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False,
+            (np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01),) is False,
+        )
     ):
         raw_er.filter(l_freq=data.info['highpass'], h_freq=data.info['lowpass'])
     elif np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False:
@@ -413,7 +415,9 @@ def src2parc(
             'sctx_logical': sctx_logical,
             'sctx_labels': sctx_labels,
         }
-        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='auto')})
+        parc.update(
+            {'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='auto')}
+        )  # NOTE: This needs to be auto
 
     else:
         raise ValueError('the only valid options for source are `surface` and `volume`.')

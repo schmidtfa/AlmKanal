@@ -27,7 +27,6 @@ class ICAInfoDict(TypedDict):
     eog_corr_thresh: float
     ecg: bool
     ecg_corr_thresh: float
-    muscle: bool
     train: bool
     train_freq: int
     img_path: None | str
