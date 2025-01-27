@@ -413,7 +413,9 @@ def src2parc(
             'sctx_logical': sctx_logical,
             'sctx_labels': sctx_labels,
         }
-        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='auto')}) #NOTE: This needs to be auto
+        parc.update(
+            {'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='auto')}
+        )  # NOTE: This needs to be auto
 
     else:
         raise ValueError('the only valid options for source are `surface` and `volume`.')
