@@ -14,8 +14,13 @@ ICA_NCOMPS = [10, 20]
 MW_DESTINATION = [None, (0, 0, .4)]
 
 #Source options
-SOURCE = [('surface', 'glasser'), 
-          #('volume', 'dk'),
+SOURCE_SURF = [('surface', 'glasser'), 
+
+          ]
+
+
+SOURCE_VOL = [
+          ('volume', 'dk'),
           ]
 
 #SOURCE2 = [('surface', 'glasser')]
