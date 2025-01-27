@@ -116,14 +116,14 @@ def test_src(gen_mne_data_raw): #, ch_picks
     # %% you can always use common mne methods like filtering that modify
     # the raw and epoched objects in place
     #ak.raw.filter(l_freq=0.1, h_freq=100)
-    # %% one shot call to ica
+    #  one shot call to ica
     ak.do_ica()
 
     fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
     fwd = mne.read_forward_solution(fwd_fname)
     ak.pick_dict['meg'] = True
     ak.fwd = fwd
-    ak.do_spatial_filters(empty_room=raw)
+    ak.do_spatial_filters(empty_room=raw.copy())
     ak.do_src()
     
 

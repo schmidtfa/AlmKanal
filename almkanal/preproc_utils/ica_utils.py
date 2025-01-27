@@ -66,7 +66,6 @@ def run_ica(
     ecg_corr_thresh: float = 0.5,
     train: bool = True,
     train_freq: int = 16,
-    muscle: bool = False,
     img_path: None | str = None,
     fname: None | str = None,
 ) -> tuple[mne.io.Raw, mne.preprocessing.ICA, list]:
@@ -103,8 +102,6 @@ def run_ica(
         Whether to identify and remove train artifacts. Defaults to True.
     train_freq : int, optional
         Frequency to use for train artifact detection. Defaults to 16 Hz.
-    muscle : bool, optional
-        Placeholder for muscle artifact rejection (not implemented). Defaults to False.
     img_path : None | str, optional
         Directory path to save ICA plots. Defaults to None.
     fname : None | str, optional
@@ -154,9 +151,7 @@ def run_ica(
         ecg_idcs, _ = ica.find_bads_ecg(ecg_epochs, measure='correlation', threshold=ecg_corr_thresh)
         components_dict.update({'ecg': ecg_idcs})
         bads.append(ecg_idcs)
-    # remove muscle based on slope increase between 9-100hz
-    if muscle:
-        raise NotImplementedError('muscle rejection via ICA not yet implemented')
+
     # remove train based
     if train:
         train_idcs = find_train_ica(raw_copy, ica, train_freq)

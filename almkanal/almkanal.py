@@ -132,7 +132,6 @@ class AlmKanal:
         eog_corr_thresh: float = 0.5,
         ecg: bool = True,
         ecg_corr_thresh: float = 0.5,
-        muscle: bool = False,
         train: bool = True,
         train_freq: int = 16,
         img_path: None | str = None,
@@ -166,8 +165,6 @@ class AlmKanal:
             Whether to detect and remove ECG artifacts. Defaults to True.
         ecg_corr_thresh : float, optional
             Correlation threshold for ECG artifact detection. Defaults to 0.5.
-        muscle : bool, optional
-            Placeholder for future muscle artifact detection. Defaults to False.
         train : bool, optional
             Whether to detect and remove train-related artifacts. Defaults to True.
         train_freq : int, optional
@@ -195,7 +192,6 @@ class AlmKanal:
             eog_corr_thresh=eog_corr_thresh,
             ecg=ecg,
             ecg_corr_thresh=ecg_corr_thresh,
-            muscle=muscle,
             train=train,
             train_freq=train_freq,
             img_path=img_path,
