@@ -35,7 +35,6 @@ def run_bio_preproc(
         A new raw object containing the preprocessed physiological signals and stimulus channels.
     """
 
-
     bio_chs = {
         'ecg': ecg,
         'resp': resp,

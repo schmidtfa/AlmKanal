@@ -106,10 +106,12 @@ def preproc_empty_room(
     picks = mne.pick_types(raw_er.info, **pick_dict)
     raw_er.pick(picks=picks)
     # Add filtering here -> i.e. check if deviation between empty and real data and then filter
-    if bool(np.logical_and(
-        np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False,
-        (np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01),) is False,
-    )):
+    if bool(
+        np.logical_and(
+            np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False,
+            (np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01),) is False,
+        )
+    ):
         raw_er.filter(l_freq=data.info['highpass'], h_freq=data.info['lowpass'])
     elif np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False:
         raw_er.filter(

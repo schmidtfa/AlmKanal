@@ -225,7 +225,6 @@ class AlmKanal:
         eog: None | str | list = None,
         emg: None | str | list = None,
     ) -> mne.io.Raw:
-        
         """
         Preprocess physiological signals (ECG, EOG, RESP, EMG) in an MNE raw object.
 
