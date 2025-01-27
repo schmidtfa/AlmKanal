@@ -2,6 +2,7 @@ from almkanal.almkanal import AlmKanal
 import pytest
 from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE_SURF, SOURCE_VOL
 import mne
+from neurodsp.sim import s
 
 #@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
 
@@ -24,12 +25,13 @@ def test_ica(gen_mne_data_raw, train, eog, ecg):
     raw, data_path = gen_mne_data_raw
 
     ak = AlmKanal(raw=raw)
+        
     ak.do_ica(n_components=10,
-              train=train,
-              eog=eog,
-              ecg=ecg,
-              resample_freq=100,
-              )
+                train=train,
+                eog=eog,
+                ecg=ecg,
+                resample_freq=100,
+                )
     
 
 def test_double_ica(gen_mne_data_raw):
@@ -113,7 +115,7 @@ def test_src(gen_mne_data_raw): #, ch_picks
 
 
     ak.do_maxwell()
-    # %% you can always use common mne methods like filtering that modify
+    # % you can always use common mne methods like filtering that modify
     # the raw and epoched objects in place
     #ak.raw.filter(l_freq=0.1, h_freq=100)
     #  one shot call to ica
@@ -148,5 +150,11 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
               return_parc=True,)
     
 
+def test_bio(gen_mne_data_raw):
+
+    raw, _ = gen_mne_data_raw
+    ak = AlmKanal(raw=raw)
+
+    ak.do_bio_process(eog='EOG 061')
 
 

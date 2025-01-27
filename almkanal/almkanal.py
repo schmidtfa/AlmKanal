@@ -9,6 +9,7 @@ from numpy.typing import ArrayLike, NDArray
 
 from almkanal.data_utils.check_data import check_raw_epoch
 from almkanal.data_utils.data_classes import ICAInfoDict, InfoClass, PickDictClass
+from almkanal.preproc_utils.bio_utils import run_bio_preproc
 from almkanal.preproc_utils.ica_utils import run_ica
 
 # all them utility functions
@@ -216,6 +217,26 @@ class AlmKanal:
             self.ica.append(ica)
             assert isinstance(self.ica_ids, list)
             self.ica_ids.append(ica_ids)
+
+    def do_bio_process(
+        self,
+        ecg: None | str | list = None,
+        resp: None | str | list = None,
+        eog: None | str | list = None,
+        emg: None | str | list = None,
+    ) -> mne.io.Raw:
+        if self.raw is None:
+            raise ValueError("""This method requires raw data.
+                              It will return mne.io.Raw object containing your
+                              trigger channels so you can epoch the data later""")
+
+        return run_bio_preproc(
+            raw=self.raw,
+            ecg=ecg,
+            resp=resp,
+            eog=eog,
+            emg=emg,
+        )
 
     def do_events(
         self,
