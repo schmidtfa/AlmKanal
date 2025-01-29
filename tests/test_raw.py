@@ -122,7 +122,7 @@ def test_src(): #, ch_picks
     ak.do_maxwell()
     # % you can always use common mne methods like filtering that modify
     # the raw and epoched objects in place
-    ak.raw.filter(l_freq=0.1, h_freq=10)
+    ak.raw.filter(l_freq=0.1, h_freq=100)
     #  one shot call to ica
     ak.do_ica()
 
