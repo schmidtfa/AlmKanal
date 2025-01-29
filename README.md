@@ -17,8 +17,15 @@ The only thing you need to know to get started is some MNE Python and one or two
 Or you just use one of our template pipelines directly (link) :)
 
 
-Currently you can install the AlmKanal package only directly from github. You just need to add the following to your pixi.toml or use pip.
+Currently you can install the AlmKanal package only directly from github. You just need to add the following to your pixi.toml.
 
+```
 [pypi-dependencies]
 almkanal = { git = "https://github.com/schmidtfa/AlmKanal.git"}
+```
 
+or use pip
+
+```
+pip install "git+https://github.com/schmidtfa/AlmKanal.git"
+```
