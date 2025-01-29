@@ -19,7 +19,7 @@ classifiers = [
 
 keywords = ['preprocessing', 'M/EEG', 'MNE Python', 'source analysis']
 requires-python = ">=3.11"
-dependencies = ["mne>=1.8,<1.9", "pyrasa>=1.0.0,<2",  "attrs", "neurokit2"]
+dependencies = ["mne>=1.8,<1.10", "pyrasa>=1.0.0,<2",  "attrs", "neurokit2"]
 
 [tool.pixi.system-requirements]
 linux = "4.18"
