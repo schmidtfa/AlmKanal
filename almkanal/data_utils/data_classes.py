@@ -25,6 +25,7 @@ class ICAInfoDict(TypedDict):
     resample_freq: None | int
     eog: bool
     eog_corr_thresh: float
+    surrogate_eog_chs: None | dict
     ecg: bool
     ecg_corr_thresh: float
     train: bool

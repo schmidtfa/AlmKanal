@@ -8,6 +8,66 @@ from pyrasa.utils.peak_utils import get_band_info
 from scipy.stats import zscore
 
 
+def eog_ica_from_meg(
+    raw: mne.io.Raw,
+    ica: mne.preprocessing.ICA,
+    left_eog_chs: list = ['MEG0121', 'MEG0311'],
+    right_eog_chs: list = ['MEG1211', 'MEG1411'],
+    threshold: float = 0.5,
+    tol: float = 0.2,
+) -> list:
+    """
+    Detect eye related activity in MEG data using ICA component correlation and dipolar pattern analysis.
+
+    This function identifies ICA components corresponding to eye related activity by computing the correlation
+    between ICA components and user-specified left/right MEG channels. A component is considered
+    eye related if it surpasses the correlation threshold and exhibits a dipolar pattern across
+    left and right surrogate EOG channels.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        The raw MEG data used for ICA decomposition.
+    ica : mne.preprocessing.ICA
+        The fitted ICA object containing independent components.
+    left_eog_chs : list, optional
+        List of MEG channels representing left-side eye movements. Defaults to ['MEG0121', 'MEG0311'].
+    right_eog_chs : list, optional
+        List of MEG channels representing right-side eye movements. Defaults to ['MEG1211', 'MEG1411'].
+    threshold : float, optional
+        Correlation threshold for detecting EOG-related ICA components. Defaults to 0.5.
+    tol: float, optional
+        Difference in correlation between left and right channels. Should be below threshold for a clear blink pattern.
+
+    Returns
+    -------
+    list
+        Indices of ICA components identified as eye related activity.
+    """
+
+    eog_list = left_eog_chs + right_eog_chs
+    eog_indices, eog_scores = ica.find_bads_eog(raw, ch_name=eog_list, measure='correlation', threshold=threshold)
+
+    left_scores = np.mean([eog_scores[ix] for ix, _ in enumerate(left_eog_chs)], axis=0)
+    right_scores = np.mean([eog_scores[ix + len(left_eog_chs)] for ix, _ in enumerate(left_eog_chs)], axis=0)
+
+    for eog_ix in eog_indices:
+        if np.logical_or(
+            np.logical_and(left_scores[eog_ix] > 0, right_scores[eog_ix] < 0),
+            np.logical_and(left_scores[eog_ix] < 0, right_scores[eog_ix] > 0),
+        ):
+            if np.isclose(np.abs(left_scores[eog_ix]), np.abs(right_scores[eog_ix]), atol=tol):
+                print('Dipolar pattern on candidate EOG component detected. The Component is considered valid')
+
+            else:
+                eog_indices.remove(eog_ix)
+
+        else:
+            eog_indices.remove(eog_ix)
+
+    return eog_indices
+
+
 def plot_ica(
     raw: mne.io.Raw, ica: mne.preprocessing.ICA, components_dict: dict, bad_ids: list, fname: str, img_path: str
 ) -> None:
@@ -43,10 +103,10 @@ def plot_ica(
         fig = ica.plot_components(picks=bad_ids, ch_type='mag', inst=raw, title=titles, show=False)
         plot_file_name = f'{fname}_ICA_summary_plot.png'
         # if the directory doesn't exist, create it
-        if not Path.exists(Path(img_path) / 'ica_pngs'):
-            Path.mkdir(Path(img_path) / 'ica_pngs')
+        if not Path.exists(Path(img_path)):
+            Path.mkdir(Path(img_path))
 
-        fig.savefig(Path(img_path) / 'ica_pngs' / plot_file_name)
+        fig.savefig(Path(img_path) / plot_file_name)
     else:
         print('Error: No Components detected using the current settings. So no plots will be generated.')
 
@@ -62,6 +122,7 @@ def run_ica(
     ica_lp_freq: None | float = None,
     eog: bool = True,
     eog_corr_thresh: float = 0.5,
+    surrogate_eog_chs: None | dict = None,
     ecg: bool = True,
     ecg_corr_thresh: float = 0.5,
     train: bool = True,
@@ -133,22 +194,36 @@ def run_ica(
     ch_dict = mne.channel_indices_by_type(raw_copy.info, picks='all')
 
     if eog:
-        if len(ch_dict['eog']) == 0:
+        if np.logical_and(len(ch_dict['eog']) == 0, (len(ch_dict['mag']) + len(ch_dict['grad'])) > 0):
+            if surrogate_eog_chs is not None:
+                eog_idcs = eog_ica_from_meg(raw_copy, ica=ica, threshold=eog_corr_thresh, **surrogate_eog_chs)
+                warnings.warn("""No EOG channels detected switching to an experimental method detecting EOG
+                            related activity via correlation with user specified MEG channels.
+                            Please plot the EOG components to verify that they are sensible!!!""")
+            else:
+                raise ValueError('You need to specify a dictionary of left and right surrogate EOG channels.')
+
+        elif np.logical_and(len(ch_dict['eog']) == 0, (len(ch_dict['mag']) + len(ch_dict['grad'])) == 0):
             raise ValueError(
                 """No EOG channels detected. You need to specify EOG channels,
-                if you want to reject EOG components via correlation."""
+                if you want to reject EOG components via correlation.
+                The EOG detection method using surrogate channels only works for MEG data."""
             )
-        eog_idcs, _ = ica.find_bads_eog(raw_copy, measure='correlation', threshold=eog_corr_thresh)
+        else:
+            eog_idcs, _ = ica.find_bads_eog(raw_copy, measure='correlation', threshold=eog_corr_thresh)
+
         components_dict.update({'eog': eog_idcs})
         bads.append(eog_idcs)
     if ecg:
         # take ecg based on correlation
         if len(ch_dict['ecg']) == 0:
-            warnings.warn('WNo ECG channels detected. ECG channel is constructed from MEG data.')
-        ecg_epochs = mne.preprocessing.create_ecg_epochs(raw_copy)
+            warnings.warn('No ECG channels detected. ECG channel is constructed from MEG data.')
 
+        ecg_epochs = mne.preprocessing.create_ecg_epochs(raw_copy)
         # find the ECG components,
-        ecg_idcs, _ = ica.find_bads_ecg(ecg_epochs, measure='correlation', threshold=ecg_corr_thresh)
+        ecg_idcs, _ = ica.find_bads_ecg(
+            ecg_epochs, method='correlation', measure='correlation', threshold=ecg_corr_thresh
+        )
         components_dict.update({'ecg': ecg_idcs})
         bads.append(ecg_idcs)
 

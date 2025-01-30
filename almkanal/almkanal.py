@@ -131,6 +131,7 @@ class AlmKanal:
         resample_freq: int = 200,  # downsample to 200hz per default
         eog: bool = True,
         eog_corr_thresh: float = 0.5,
+        surrogate_eog_chs: None | dict = None,
         ecg: bool = True,
         ecg_corr_thresh: float = 0.5,
         train: bool = True,
@@ -191,6 +192,7 @@ class AlmKanal:
             resample_freq=resample_freq,
             eog=eog,
             eog_corr_thresh=eog_corr_thresh,
+            surrogate_eog_chs=surrogate_eog_chs,
             ecg=ecg,
             ecg_corr_thresh=ecg_corr_thresh,
             train=train,
