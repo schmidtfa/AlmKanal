@@ -29,9 +29,28 @@ def test_ica(gen_mne_data_raw, train, eog, ecg):
                 train=train,
                 eog=eog,
                 ecg=ecg,
+                emg=True,
                 resample_freq=100,
                 )
     
+
+def test_ica_eog(gen_mne_data_raw):
+
+    raw, data_path = gen_mne_data_raw
+
+    ak = AlmKanal(raw=raw)
+    raw = raw.pick(picks=['meg'])    
+    ak.do_ica(n_components=10,
+                train=False,
+                eog=True,
+                surrogate_eog_chs = {'left_eog_chs': ['MEG 0121','MEG 0311'],
+                                     'right_eog_chs': ['MEG 1211' ,'MEG 1411'],},
+                ecg=True,
+                emg=True,
+                resample_freq=100,
+                )
+
+
 
 def test_double_ica(gen_mne_data_raw):
 
