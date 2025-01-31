@@ -111,7 +111,7 @@ def plot_ica(
         print('Error: No Components detected using the current settings. So no plots will be generated.')
 
 
-def run_ica(
+def run_ica(  # noqa: C901
     raw: mne.io.Raw,
     n_components: None | int | float = None,
     method: str = 'picard',
@@ -121,12 +121,15 @@ def run_ica(
     ica_hp_freq: None | float = 1.0,
     ica_lp_freq: None | float = None,
     eog: bool = True,
-    eog_corr_thresh: float = 0.5,
     surrogate_eog_chs: None | dict = None,
+    eog_corr_thresh: float = 0.5,
     ecg: bool = True,
     ecg_corr_thresh: float = 0.5,
+    emg: bool = False,
+    emg_thresh: float = 0.5,
     train: bool = True,
     train_freq: int = 16,
+    train_thresh: float = 2,
     img_path: None | str = None,
     fname: None | str = None,
 ) -> tuple[mne.io.Raw, mne.preprocessing.ICA, list]:
@@ -226,10 +229,14 @@ def run_ica(
         )
         components_dict.update({'ecg': ecg_idcs})
         bads.append(ecg_idcs)
+    if emg:
+        emg_idcs, _ = ica.find_bads_muscle(raw_copy, threshold=emg_thresh)
+        components_dict.update({'emg': emg_idcs})
+        bads.append(emg_idcs)
 
     # remove train based
     if train:
-        train_idcs = find_train_ica(raw_copy, ica, train_freq)
+        train_idcs = find_train_ica(raw_copy, ica, train_freq, sd=train_thresh)
         components_dict.update({'train': train_idcs})
         bads.append(train_idcs)
 
