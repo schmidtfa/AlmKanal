@@ -25,10 +25,14 @@ class ICAInfoDict(TypedDict):
     resample_freq: None | int
     eog: bool
     eog_corr_thresh: float
+    surrogate_eog_chs: None | dict
     ecg: bool
     ecg_corr_thresh: float
+    emg: bool
+    emg_thresh: float
     train: bool
     train_freq: int
+    train_thresh: float
     img_path: None | str
     fname: None | str
 

@@ -130,11 +130,15 @@ class AlmKanal:
         ica_lp_freq: None | float = None,
         resample_freq: int = 200,  # downsample to 200hz per default
         eog: bool = True,
+        surrogate_eog_chs: None | dict = None,
         eog_corr_thresh: float = 0.5,
         ecg: bool = True,
         ecg_corr_thresh: float = 0.5,
+        emg: bool = False,
+        emg_thresh: float = 0.5,
         train: bool = True,
         train_freq: int = 16,
+        train_thresh: float = 2.0,
         img_path: None | str = None,
         fname: None | str = None,
     ) -> None:
@@ -166,6 +170,10 @@ class AlmKanal:
             Whether to detect and remove ECG artifacts. Defaults to True.
         ecg_corr_thresh : float, optional
             Correlation threshold for ECG artifact detection. Defaults to 0.5.
+        emg : bool,
+            Whether to detect and remove EMG artifacts. Defaults to False.
+        emg_thresh:
+            Value above which a component should be marked as muscle-related, relative to a typical muscle component.
         train : bool, optional
             Whether to detect and remove train-related artifacts. Defaults to True.
         train_freq : int, optional
@@ -191,10 +199,14 @@ class AlmKanal:
             resample_freq=resample_freq,
             eog=eog,
             eog_corr_thresh=eog_corr_thresh,
+            surrogate_eog_chs=surrogate_eog_chs,
             ecg=ecg,
             ecg_corr_thresh=ecg_corr_thresh,
+            emg=emg,
+            emg_thresh=emg_thresh,
             train=train,
             train_freq=train_freq,
+            train_thresh=train_thresh,
             img_path=img_path,
             fname=fname,
         )
