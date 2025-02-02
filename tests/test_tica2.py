@@ -6,9 +6,10 @@ import pytest
 def test_ica_eog(gen_mne_data_raw):
 
     raw, data_path = gen_mne_data_raw
+    raw = raw.pick(picks=['meg', 'stim']).copy()  
 
     ak = AlmKanal(raw=raw)
-    raw = raw.pick(picks=['meg', 'stim'])   
+     
     ak.do_ica(n_components=50,
                 train=False,
                 eog=True,
