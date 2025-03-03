@@ -1,8 +1,8 @@
 import mne
+from attrs import define
 from numpy.typing import ArrayLike
-from attrs import define, field
+
 from almkanal.almkanal import AlmKanalStep
-from typing import TYPE_CHECKING
 
 
 def run_maxwell(
@@ -60,9 +60,7 @@ def run_maxwell(
 
 @define
 class Maxwell(AlmKanalStep):
-    
-    
-    must_be_before: tuple = ("ICA",)
+    must_be_before: tuple = ('ICA',)
     must_be_later: tuple = ()
 
     mw_coord_frame: str = 'head'
@@ -71,10 +69,11 @@ class Maxwell(AlmKanalStep):
     mw_cross_talk_file: str | None = None
     mw_st_duration: int | None = None
 
-    def run(self,
-            data: mne.io.BaseRaw,
-            info: dict,
-        ) -> dict:
+    def run(
+        self,
+        data: mne.io.BaseRaw,
+        info: dict,
+    ) -> dict:
         """
         Apply Maxwell filtering to the raw MEG data.
 
@@ -109,11 +108,7 @@ class Maxwell(AlmKanalStep):
 
         raw_max = run_maxwell(raw=data, **maxwell_settings)
 
-        return {"data": raw_max, "maxwell_info": maxwell_settings}
+        return {'data': raw_max, 'maxwell_info': maxwell_settings}
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
-       
-        report.add_raw(data, 
-                        butterfly=False, 
-                        psd=True, 
-                        title='raw_maxfiltered')
+        report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')

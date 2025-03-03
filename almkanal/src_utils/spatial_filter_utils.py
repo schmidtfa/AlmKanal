@@ -4,16 +4,16 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 
-from attrs import define
-
 import mne
 import numpy as np
+from attrs import define
 from mne._fiff.pick import _contains_ch_type
 from numpy.typing import NDArray
 
+from almkanal import AlmKanalStep
 from almkanal.data_utils.data_classes import InfoClass, PickDictClass
 from almkanal.preproc_utils.maxwell_utils import run_maxwell
-from almkanal import AlmKanalStep
+
 
 # %%
 def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
@@ -220,7 +220,7 @@ def comp_spatial_filters(
     data_cov: None | NDArray = None,
     noise_cov: None | NDArray = None,
     empty_room: None | str | mne.io.Raw = None,
-    get_nearest_empty_room: bool = False,
+    nearest_empty_room: bool = False,
 ) -> mne.beamformer.Beamformer:
     """
     Compute spatial filters for source reconstruction using LCMV beamformers.
@@ -245,7 +245,7 @@ def comp_spatial_filters(
         Noise covariance matrix. If None, it is computed from the empty room recording or ad-hoc. Defaults to None.
     empty_room : None | str | mne.io.Raw, optional
         Path to the empty room recording or preloaded empty room raw data. Defaults to None.
-    get_nearest_empty_room : bool, optional
+    nearest_empty_room : bool, optional
         Whether to find the nearest empty room recording for noise covariance. Defaults to False.
 
     Returns
@@ -302,12 +302,12 @@ def comp_spatial_filters(
             icas=icas,
             ica_ids=ica_ids,
             empty_room=empty_room,
-            get_nearest=get_nearest_empty_room,
+            get_nearest=nearest_empty_room,
         )
 
     elif np.logical_and(
         np.logical_and(n_ch_types > 1, noise_cov is None),
-        np.logical_and(empty_room is None, not get_nearest_empty_room),
+        np.logical_and(empty_room is None, not nearest_empty_room),
     ):
         warnings.warn("""You have multiple sensor types, but did neither specify a noise covariance
                       matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix..
@@ -335,25 +335,24 @@ def comp_spatial_filters(
     return filters, lcmv_settings, noise_cov, data_cov
 
 
-
 @define
 class SpatialFilter(AlmKanalStep):
-
     fwd: mne.Forward = None
     pick_dict: dict | None = None
     ica: None | mne.preprocessing.ICA = None
-    ica_ids: None | list = None 
+    ica_ids: None | list = None
     data_cov: None | NDArray = None
     noise_cov: None | NDArray = None
     empty_room: None | str | mne.io.Raw = None
-    get_nearest_empty_room: bool = False
+    nearest_empty_room: bool = False
 
-    must_be_before: tuple = ("SourceReconstruction",)
-    must_be_later: tuple = ("ICA", "ForwardModel",)
+    must_be_before: tuple = ('SourceReconstruction',)
+    must_be_later: tuple = (
+        'ICA',
+        'ForwardModel',
+    )
 
-    def run(self,
-        data,
-        info) -> mne.beamformer.Beamformer:
+    def run(self, data, info) -> mne.beamformer.Beamformer:
         """
         Compute spatial filters for source projection using LCMV beamformers.
 
@@ -378,9 +377,9 @@ class SpatialFilter(AlmKanalStep):
         if self.fwd is None:
             self.fwd = info['ForwardModel']['fwd_info']['fwd']
 
-        if np.logical_and('ICA' in info.keys(), self.ica == None):
-            self.ica = info['ICA']["ica_info"]["ica"]
-            self.ica_ids = info['ICA']["ica_info"]["component_ids"]
+        if np.logical_and('ICA' in info, self.ica is None):
+            self.ica = info['ICA']['ica_info']['ica']
+            self.ica_ids = info['ICA']['ica_info']['component_ids']
 
         filters, lcmv_settings, noise_cov, data_cov = comp_spatial_filters(
             data=data,
@@ -392,37 +391,28 @@ class SpatialFilter(AlmKanalStep):
             noise_cov=self.noise_cov,
             preproc_info=data.info,
             empty_room=self.empty_room,
-            get_nearest_empty_room=get_nearest_empty_room,
+            nearest_empty_room=self.nearest_empty_room,
         )
-        return {'data': data, 'spatial_filter_info': {'filters': filters,
-                                                      'lcmv_settings': lcmv_settings,
-                                                      'data_cov': data_cov,
-                                                      'noise_cov': noise_cov,},
-                                                      }
+        return {
+            'data': data,
+            'spatial_filter_info': {
+                'filters': filters,
+                'lcmv_settings': lcmv_settings,
+                'data_cov': data_cov,
+                'noise_cov': noise_cov,
+            },
+        }
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
-       
-        report.add_covariance(info['SpatialFilter']['spatial_filter_info']["data_cov"],
-                              info=data.info, 
-                              title='Data Covariance Matrix',
-                              );
-        if info['SpatialFilter']['spatial_filter_info']["noise_cov"] is not None:
-            report.add_covariance(info['SpatialFilter']['spatial_filter_info']["noise_cov"], 
-                                info=data.info,
-                                title='Noise Covariance Matrix',
-                                );
+        report.add_covariance(
+            info['SpatialFilter']['spatial_filter_info']['data_cov'],
+            info=data.info,
+            title='Data Covariance Matrix',
+        )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        if info['SpatialFilter']['spatial_filter_info']['noise_cov'] is not None:  # shouldnt be an ad-hoc noise cov
+            report.add_covariance(
+                info['SpatialFilter']['spatial_filter_info']['noise_cov']._as_square(),
+                info=data.info,
+                title='Noise Covariance Matrix',
+            )

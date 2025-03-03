@@ -1,15 +1,14 @@
 import warnings
-from pathlib import Path
 
 import mne
 import numpy as np
+from attrs import define
 from pyrasa.irasa import irasa
 from pyrasa.utils.peak_utils import get_band_info
 from scipy.stats import zscore
-from attrs import define
+
 from almkanal.almkanal import AlmKanalStep
 from almkanal.data_utils.data_classes import ICAInfoDict
-from typing import TYPE_CHECKING
 
 
 def eog_ica_from_meg(
@@ -283,9 +282,8 @@ def find_train_ica(
 
 @define
 class ICA(AlmKanalStep):
-
     must_be_before: tuple = ()
-    must_be_later: tuple = ("Maxwell",)
+    must_be_later: tuple = ('Maxwell',)
 
     n_components: None | int | float = None
     method: str = 'picard'
@@ -307,11 +305,11 @@ class ICA(AlmKanalStep):
     img_path: None | str = None
     fname: None | str = None
 
-
-    def run(self,
-            data: mne.io.Raw,
-            info: dict,
-            ) -> mne.io.BaseRaw:
+    def run(
+        self,
+        data: mne.io.Raw,
+        info: dict,
+    ) -> mne.io.BaseRaw:
         """
         Perform ICA to identify and remove peripheral physiological signals like
         EOG and ECG as well as an artifact caused by our local train in Salzburg.
@@ -381,23 +379,29 @@ class ICA(AlmKanalStep):
 
         raw, ica, components_dict, eog_scores, ecg_scores = run_ica(data, **ica_info)
 
+        return {
+            'data': raw,
+            'ica_info': {
+                'ica': ica,
+                'component_ids': list(components_dict.values()),
+                'components_dict': components_dict,
+                'eog_scores': eog_scores,
+                'ecg_scores': ecg_scores,
+            },
+        }
 
-        return {"data": raw, 
-                "ica_info" : {"ica": ica,
-                         "components_dict": components_dict,
-                         "eog_scores": eog_scores,
-                         'ecg_scores': ecg_scores}}
-
-        
     def reports(self, data, report: mne.Report, info):
-            titles = {}
-            for key, vals in info['ICA']['ica_info']['components_dict'].items():
-                for val in vals:
-                    titles.update({int(val): f'{key}'})
+        titles = {}
+        for key, vals in info['ICA']['ica_info']['components_dict'].items():
+            for val in vals:
+                titles.update({int(val): f'{key}'})
 
-            report.add_ica(info['ICA']['ica_info']['ica'], inst=data, title='ICA', 
-                                ecg_scores=info['ICA']['ica_info']['ecg_scores'],
-                                eog_scores=info['ICA']['ica_info']['eog_scores'],
-                                picks=list(titles.keys()), 
-                                tags=list(titles.values()));
-    
+        report.add_ica(
+            info['ICA']['ica_info']['ica'],
+            inst=data,
+            title='ICA',
+            ecg_scores=info['ICA']['ica_info']['ecg_scores'],
+            eog_scores=info['ICA']['ica_info']['eog_scores'],
+            picks=list(titles.keys()),
+            tags=list(titles.values()),
+        )

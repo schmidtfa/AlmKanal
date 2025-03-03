@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import mne
 import numpy as np
-from pathlib import Path
+from attrs import define
+
+from almkanal import AlmKanalStep
 
 
 def src2parc(
@@ -93,3 +97,92 @@ def src2parc(
         raise ValueError('the only valid options for source are `surface` and `volume`.')
 
     return parc
+
+
+@define
+class SourceReconstruction(AlmKanalStep):
+    filters: None | mne.beamformer.Beamformer = None
+    return_parc: bool = False
+    label_mode: str = 'pca_flip'
+    subject_id: None | str = None
+    subjects_dir: None | str = None
+    atlas: str = 'glasser'
+    source: str = 'surface'
+
+    def run(
+        self,
+        data: mne.io.BaseRaw | mne.BaseEpochs,
+        info: dict,
+    ) -> dict | mne.SourceEstimate | mne.VolSourceEstimate:
+        """
+        Perform source reconstruction and optional parcellation.
+
+        Parameters
+        ----------
+        return_parc : bool, optional
+            Whether to return parcellated source data. Defaults to False.
+        label_mode : str, optional
+            Mode for extracting label time courses ('mean_flip', etc.). Defaults to 'mean_flip'.
+        subject_id : str | None, optional
+            Subject identifier for parcellation. Required if `return_parc` is True.
+        subjects_dir : str | None, optional
+            Path to FreeSurfer subjects directory. Required if `return_parc` is True.
+        atlas : str, optional
+            Atlas for parcellation ('glasser', 'dk', etc.). Defaults to 'glasser'.
+        source : str, optional
+            Source space type ('surface' or 'volume'). Defaults to 'surface'.
+
+        Returns
+        -------
+        dict | mne.SourceEstimate | dict | mne.VolSourceEstimate
+            Source time courses or parcellated data.
+        """
+
+        if self.filters is None:
+            self.filters = info['SpatialFilter']['spatial_filter_info']['filters']
+
+        if isinstance(data, mne.io.BaseRaw):
+            stc = mne.beamformer.apply_lcmv_raw(data, self.filters)
+
+        elif isinstance(data, mne.BaseEpochs):
+            stc = mne.beamformer.apply_lcmv_epochs(data, self.filters)
+
+        if self.return_parc:
+            if np.logical_and(self.subject_id is None, 'ForwardModel' in info):
+                self.subject_id = info['ForwardModel']['fwd_info']['subject_id_freesurfer']
+
+            elif np.logical_and(self.subject_id is None, 'ForwardModel' not in info):
+                assert isinstance(
+                    self.subject_id, str
+                ), 'You need to set the correct name for the `subject_id` if you want to get parcels.'
+
+            if np.logical_and(self.subjects_dir is None, 'ForwardModel' in info):
+                self.subjects_dir = info['ForwardModel']['fwd_info']['subjects_dir']
+
+            elif np.logical_and(self.subjects_dir is None, 'ForwardModel' not in info):
+                assert isinstance(
+                    self.subject_id, str
+                ), 'You need to set the correct name for the `subjects_dir` if you want to get parcels.'
+
+            stc = src2parc(
+                stc,
+                subject_id=self.subject_id,
+                subjects_dir=self.subjects_dir,
+                atlas=self.atlas,
+                source=self.source,
+                label_mode=self.label_mode,
+            )
+
+        return {
+            'data': stc,
+            'stc_info': {
+                'subject_id': self.subject_id,
+                'subjects_dir': self.subjects_dir,
+                'label_mode': self.label_mode,
+                'atlas': self.atlas,
+                'source': self.source,
+            },
+        }
+
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
+        pass

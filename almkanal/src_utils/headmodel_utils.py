@@ -4,11 +4,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
+from attrs import define
 from mne.coreg import Coregistration
 
-from almkanal.data_utils.data_classes import PickDictClass
 from almkanal.almkanal import AlmKanalStep
-from attrs import define
+from almkanal.data_utils.data_classes import PickDictClass
+
 
 def compute_headmodel(
     info: mne.Info,
@@ -61,12 +62,9 @@ def compute_headmodel(
     )
 
     # %% create and save a scaled copy of mri subject fs average
-    
 
     # Dont forget this sdcales bem, atlas and source space automatically too
-    mne.coreg.scale_mri(
-        'fsaverage', subject_id, scale=coreg.scale, subjects_dir=mri_path, annot=True, overwrite=True
-    )
+    mne.coreg.scale_mri('fsaverage', subject_id, scale=coreg.scale, subjects_dir=mri_path, annot=True, overwrite=True)
 
     if out_folder.is_dir() is False:
         out_folder.mkdir(parents=True)
@@ -83,11 +81,12 @@ def compute_headmodel(
     return coreg.trans, fig
 
 
-
-def plot_head_model(coreg: mne.transforms.Transform, 
-                    info: mne.Info, 
-                    subject_id: str, 
-                    subjects_dir: str,) -> None:
+def plot_head_model(  # noqa PLR0912, PLR0915
+    coreg: mne.transforms.Transform,
+    info: mne.Info,
+    subject_id: str,
+    subjects_dir: str,
+) -> None:
     """
     Plot the head model coregistration, including sensor and digitization points.
 
@@ -120,7 +119,7 @@ def plot_head_model(coreg: mne.transforms.Transform,
     head_shape_points = mne.transforms.apply_trans(to_cf_t['head'], head_shape_points)
 
     # also adjust the bem
-    bem_path = Path(subjects_dir) / subject_id / "bem" / f"{subject_id}-head.fif" #inner_skull-bem
+    bem_path = Path(subjects_dir) / subject_id / 'bem' / f'{subject_id}-head.fif'  # inner_skull-bem
     bem_surfaces = mne.read_bem_surfaces(bem_path)
     bem_subsample = 1
     for bem in bem_surfaces:
@@ -204,29 +203,20 @@ def plot_head_model(coreg: mne.transforms.Transform,
     for bem in bem_surfaces:
         verts = bem['rr'][::bem_subsample]
         if first:
-            ax4.scatter(verts[:, 0], verts[:, 1], verts[:, 2],
-                        s=1, c='gray', alpha=0.5, label='BEM')
+            ax4.scatter(verts[:, 0], verts[:, 1], verts[:, 2], s=1, c='gray', alpha=0.5, label='BEM')
             first = False
         else:
-            ax4.scatter(verts[:, 0], verts[:, 1], verts[:, 2],
-                        s=1, c='gray', alpha=0.5)
+            ax4.scatter(verts[:, 0], verts[:, 1], verts[:, 2], s=1, c='gray', alpha=0.5)
     ax4.set_title('3D View')
     ax4.grid(False)  # Remove grid
     ax4.axis('off')  # Remove axis
 
     plt.tight_layout()
-    # save
-    #plt.savefig(Path(out_folder) / (subject_id + '_coreg.png'), dpi=300)
     return fig
 
 
 def make_fwd(
-    info: mne.Info, 
-    source: str, 
-    fname_trans: str, 
-    subjects_dir: str, 
-    subject_id: str, 
-    template_mri: bool = False
+    info: mne.Info, source: str, fname_trans: str, subjects_dir: str, subject_id: str, template_mri: bool = False
 ) -> mne.Forward:
     """
     Generate a forward model for MEG data.
@@ -253,17 +243,17 @@ def make_fwd(
     """
 
     ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
-    #fpath_add_on = '_from_template' if template_mri else ''
+    # fpath_add_on = '_from_template' if template_mri else ''
 
     # fs_path = os.path.join(subjects_dir, 'freesurfer', f'{subject_id}{fpath_add_on}')
-    fs_path = Path(subjects_dir) / 'freesurfer' / f'{subject_id}'#{fpath_add_on}'
-    bem_file = f'{fs_path}/bem/{subject_id}-5120-5120-5120-bem.fif' #{fpath_add_on}
+    fs_path = Path(subjects_dir) / 'freesurfer' / f'{subject_id}'  # {fpath_add_on}'
+    bem_file = f'{fs_path}/bem/{subject_id}-5120-5120-5120-bem.fif'  # {fpath_add_on}
 
     if source == 'volume':
-        src_file = f'{fs_path}/bem/{subject_id}-vol-5-src.fif' #{fpath_add_on}
+        src_file = f'{fs_path}/bem/{subject_id}-vol-5-src.fif'  # {fpath_add_on}
 
     elif source == 'surface':
-        src_file = f'{fs_path}/bem/{subject_id}-ico-4-src.fif' #{fpath_add_on}
+        src_file = f'{fs_path}/bem/{subject_id}-ico-4-src.fif'  # {fpath_add_on}
 
     # if isinstance(fname_trans, str):
     #     fname_trans = os.path.join(fname_trans, subject_id, subject_id + '-trans.fif')
@@ -274,27 +264,24 @@ def make_fwd(
     return fwd
 
 
-
-
 @define
 class ForwardModel(AlmKanalStep):
-
     subject_id: str
     subjects_dir: str
     pick_dict: dict
 
-    must_be_before: tuple = ("SpatialFilter", "SourceReconstruction")
+    must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
     must_be_later: tuple = ()
 
     source: str = 'surface'
     template_mri: bool = True
     redo_hdm: bool = True
 
-
-    def run(self, 
-            data: mne.io.BaseRaw | mne.BaseEpochs,
-            info,) -> dict:
-        
+    def run(
+        self,
+        data: mne.io.BaseRaw | mne.BaseEpochs,
+        info,
+    ) -> dict:
         """
         Generate a forward model for source reconstruction.
 
@@ -342,13 +329,11 @@ class ForwardModel(AlmKanalStep):
                 pick_dict=self.pick_dict,
                 template_mri=self.template_mri,
             )
-            
+
         else:
             trans = Path(self.subjects_dir) / 'headmodels' / self.subject_id / (self.subject_id + '-trans.fif')
-            fig = plot_head_model(trans, data.info, 
-                            subject_id=new_source_identifier, 
-                            subjects_dir=freesurfer_dir);
-            
+            fig = plot_head_model(trans, data.info, subject_id=new_source_identifier, subjects_dir=freesurfer_dir)
+
         fwd = make_fwd(
             data.info,
             source=self.source,
@@ -358,14 +343,21 @@ class ForwardModel(AlmKanalStep):
             template_mri=self.template_mri,
         )
 
-        return {'data': data, "fwd_info": {"coreg_fig": fig,
-                                           "fwd": fwd}}
+        return {
+            'data': data,
+            'fwd_info': {
+                'coreg_fig': fig,
+                'fwd': fwd,
+                'subject_id_freesurfer': new_source_identifier,
+                'subject_dir': self.subjects_dir,
+            },
+        }
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
-       
-
-        report.add_figure(fig=info['ForwardModel']['fwd_info']["coreg_fig"], 
-                          title='Coregistration',
-                          image_format="PNG",
-                          caption="",);
-        report.add_forward(info['ForwardModel']["fwd_info"]["fwd"], title='ForwardModel');
+        report.add_figure(
+            fig=info['ForwardModel']['fwd_info']['coreg_fig'],
+            title='Coregistration',
+            image_format='PNG',
+            caption='',
+        )
+        report.add_forward(info['ForwardModel']['fwd_info']['fwd'], title='ForwardModel')
