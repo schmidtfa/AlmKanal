@@ -5,7 +5,7 @@ from pathlib import Path
 import mne
 
 # Adjust the import path if needed
-from almkanal.src_utils.src_utils import get_nearest_empty_room
+from almkanal.src_utils.spatial_filter_utils import get_nearest_empty_room
 
 @pytest.fixture
 def setup_empty_room_dir(tmp_path):

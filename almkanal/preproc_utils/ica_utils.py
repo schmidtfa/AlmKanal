@@ -6,6 +6,10 @@ import numpy as np
 from pyrasa.irasa import irasa
 from pyrasa.utils.peak_utils import get_band_info
 from scipy.stats import zscore
+from attrs import define
+from almkanal.almkanal import AlmKanalStep
+from almkanal.data_utils.data_classes import ICAInfoDict
+from typing import TYPE_CHECKING
 
 
 def eog_ica_from_meg(
@@ -68,49 +72,6 @@ def eog_ica_from_meg(
     return eog_indices
 
 
-def plot_ica(
-    raw: mne.io.Raw, ica: mne.preprocessing.ICA, components_dict: dict, bad_ids: list, fname: str, img_path: str
-) -> None:
-    """
-    Plot the identified ICA components and save the figutr in a dedicated folder.
-
-    Parameters
-    ----------
-    raw : mne.io.Raw
-        The raw MEG data used during ICA fitting.
-    ica : mne.preprocessing.ICA
-        The ICA object containing the decomposition results.
-    components_dict : dict
-        Dictionary of identified artifact components categorized by type (e.g., EOG, ECG).
-    bad_ids : list
-        List of component indices marked as artifacts.
-    fname : str
-        Base filename for saving the plot.
-    img_path : str
-        Directory path to save the ICA plot.
-
-    Returns
-    -------
-    None
-    """
-
-    if len(bad_ids) > 0:
-        titles = {}
-        for key, vals in components_dict.items():
-            for val in vals:
-                titles.update({int(val): f'IC {key}'})
-        # save the ica figures
-        fig = ica.plot_components(picks=bad_ids, ch_type='mag', inst=raw, title=titles, show=False)
-        plot_file_name = f'{fname}_ICA_summary_plot.png'
-        # if the directory doesn't exist, create it
-        if not Path.exists(Path(img_path)):
-            Path.mkdir(Path(img_path))
-
-        fig.savefig(Path(img_path) / plot_file_name)
-    else:
-        print('Error: No Components detected using the current settings. So no plots will be generated.')
-
-
 def run_ica(  # noqa: C901
     raw: mne.io.Raw,
     n_components: None | int | float = None,
@@ -130,8 +91,6 @@ def run_ica(  # noqa: C901
     train: bool = True,
     train_freq: int = 16,
     train_thresh: float = 2,
-    img_path: None | str = None,
-    fname: None | str = None,
 ) -> tuple[mne.io.Raw, mne.preprocessing.ICA, list]:
     """
     Run ICA on raw MEG data to identify and remove artifacts (EOG, ECG, train).
@@ -166,10 +125,6 @@ def run_ica(  # noqa: C901
         Whether to identify and remove train artifacts. Defaults to True.
     train_freq : int, optional
         Frequency to use for train artifact detection. Defaults to 16 Hz.
-    img_path : None | str, optional
-        Directory path to save ICA plots. Defaults to None.
-    fname : None | str, optional
-        Filename for ICA plots. Defaults to None.
 
     Returns
     -------
@@ -213,7 +168,7 @@ def run_ica(  # noqa: C901
                 The EOG detection method using surrogate channels only works for MEG data."""
             )
         else:
-            eog_idcs, _ = ica.find_bads_eog(raw_copy, measure='correlation', threshold=eog_corr_thresh)
+            eog_idcs, eog_scores = ica.find_bads_eog(raw_copy, measure='correlation', threshold=eog_corr_thresh)
 
         components_dict.update({'eog': eog_idcs})
         bads.append(eog_idcs)
@@ -224,7 +179,7 @@ def run_ica(  # noqa: C901
 
         ecg_epochs = mne.preprocessing.create_ecg_epochs(raw_copy)
         # find the ECG components,
-        ecg_idcs, _ = ica.find_bads_ecg(
+        ecg_idcs, ecg_scores = ica.find_bads_ecg(
             ecg_epochs, method='correlation', measure='correlation', threshold=ecg_corr_thresh
         )
         components_dict.update({'ecg': ecg_idcs})
@@ -244,20 +199,10 @@ def run_ica(  # noqa: C901
 
     raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
 
-    # plot data if wanted
-    if np.logical_and(img_path is not None, fname is not None):
-        assert isinstance(
-            fname, str
-        ), 'You need to specify both a filename (fname) and image path (img_path) to save your ica plots'
-        assert isinstance(
-            img_path, str
-        ), 'You need to specify both a filename (fname) and image path (img_path) to save your ica plots'
-        plot_ica(raw, ica, components_dict, bad_ids, fname, img_path)
-
     # % drop physiological components
     ica.apply(raw, exclude=bad_ids)
 
-    return raw, ica, bad_ids
+    return raw, ica, components_dict, eog_scores, ecg_scores
 
 
 def find_train_ica(
@@ -334,3 +279,125 @@ def find_train_ica(
         bad_ics = [int(val) for val in np.concatenate(bad_ics)]
 
     return bad_ics
+
+
+@define
+class ICA(AlmKanalStep):
+
+    must_be_before: tuple = ()
+    must_be_later: tuple = ("Maxwell",)
+
+    n_components: None | int | float = None
+    method: str = 'picard'
+    random_state: None | int = 42
+    fit_params: dict | None = None
+    ica_hp_freq: None | float = 1.0
+    ica_lp_freq: None | float = None
+    resample_freq: int = 200  # downsample to 200hz per default
+    eog: bool = True
+    surrogate_eog_chs: None | dict = None
+    eog_corr_thresh: float = 0.5
+    ecg: bool = True
+    ecg_corr_thresh: float = 0.5
+    emg: bool = False
+    emg_thresh: float = 0.5
+    train: bool = True
+    train_freq: int = 16
+    train_thresh: float = 2.0
+    img_path: None | str = None
+    fname: None | str = None
+
+
+    def run(self,
+            data: mne.io.Raw,
+            info: dict,
+            ) -> mne.io.BaseRaw:
+        """
+        Perform ICA to identify and remove peripheral physiological signals like
+        EOG and ECG as well as an artifact caused by our local train in Salzburg.
+
+        Parameters
+        ----------
+        n_components : int | float | None, optional
+            Number of ICA components to compute. Defaults to None.
+        method : str, optional
+            ICA method to use ('picard', etc.). Defaults to 'picard'.
+        random_state : int | None, optional
+            Random seed for reproducibility. Defaults to 42.
+        fit_params : dict | None, optional
+            Additional fitting parameters for ICA. Defaults to None.
+        ica_hp_freq : float | None, optional
+            High-pass filter frequency for ICA preprocessing. Defaults to 1.0 Hz.
+        ica_lp_freq : float | None, optional
+            Low-pass filter frequency for ICA preprocessing. Defaults to None.
+        resample_freq : int, optional
+            Downsampling frequency before ICA. Defaults to 200 Hz.
+        eog : bool, optional
+            Whether to detect and remove EOG artifacts. Defaults to True.
+        eog_corr_thresh : float, optional
+            Correlation threshold for EOG artifact detection. Defaults to 0.5.
+        ecg : bool, optional
+            Whether to detect and remove ECG artifacts. Defaults to True.
+        ecg_corr_thresh : float, optional
+            Correlation threshold for ECG artifact detection. Defaults to 0.5.
+        emg : bool,
+            Whether to detect and remove EMG artifacts. Defaults to False.
+        emg_thresh:
+            Value above which a component should be marked as muscle-related, relative to a typical muscle component.
+        train : bool, optional
+            Whether to detect and remove train-related artifacts. Defaults to True.
+        train_freq : int, optional
+            Frequency for train artifact detection. Defaults to 16 Hz.
+        img_path : str | None, optional
+            Path to save ICA plots. Defaults to None.
+        fname : str | None, optional
+            Filename for ICA plots. Defaults to None.
+
+        Returns
+        -------
+        None
+        """
+
+        # this should do an ica
+        ica_info = ICAInfoDict(
+            n_components=self.n_components,
+            method=self.method,
+            random_state=self.random_state,
+            fit_params=self.fit_params,
+            ica_hp_freq=self.ica_hp_freq,
+            ica_lp_freq=self.ica_lp_freq,
+            resample_freq=self.resample_freq,
+            eog=self.eog,
+            eog_corr_thresh=self.eog_corr_thresh,
+            surrogate_eog_chs=self.surrogate_eog_chs,
+            ecg=self.ecg,
+            ecg_corr_thresh=self.ecg_corr_thresh,
+            emg=self.emg,
+            emg_thresh=self.emg_thresh,
+            train=self.train,
+            train_freq=self.train_freq,
+            train_thresh=self.train_thresh,
+        )
+
+        raw, ica, components_dict, eog_scores, ecg_scores = run_ica(data, **ica_info)
+
+
+        return {"data": raw, 
+                "ica_info" : {"ica": ica,
+                         "components_dict": components_dict,
+                         "eog_scores": eog_scores,
+                         'ecg_scores': ecg_scores}}
+
+        
+    def reports(self, data, report: mne.Report, info):
+            titles = {}
+            for key, vals in info['ICA']['ica_info']['components_dict'].items():
+                for val in vals:
+                    titles.update({int(val): f'{key}'})
+
+            report.add_ica(info['ICA']['ica_info']['ica'], inst=data, title='ICA', 
+                                ecg_scores=info['ICA']['ica_info']['ecg_scores'],
+                                eog_scores=info['ICA']['ica_info']['eog_scores'],
+                                picks=list(titles.keys()), 
+                                tags=list(titles.values()));
+    

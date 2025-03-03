@@ -1,5 +1,5 @@
 import mne
-from almkanal.almkanal import AlmKanal
+from almkanal.almkanal_functions import AlmKanal
 
 
 def test_src(gen_mne_data_epochs): 

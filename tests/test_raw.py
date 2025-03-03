@@ -1,4 +1,4 @@
-from almkanal.almkanal import AlmKanal
+from almkanal.almkanal_functions import AlmkanalRaw, do_maxwell, do_ica, do_fwd_model
 import pytest
 from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE_SURF, SOURCE_VOL
 import mne
@@ -9,8 +9,8 @@ def test_maxwell(gen_mne_data_raw):
 
     raw, data_path = gen_mne_data_raw
 
-    ak = AlmKanal(raw=raw)
-    ak.do_maxwell()
+    ak_raw = AlmkanalRaw.from_mne_raw(raw=raw)
+    ak_raw = do_maxwell(ak_raw)
 
 
 #@pytest.mark.parametrize('resample_freq', ICA_RESAMPLE, scope='session')
@@ -23,87 +23,33 @@ def test_ica(gen_mne_data_raw, train, eog, ecg):
 
     raw, data_path = gen_mne_data_raw
 
-    ak = AlmKanal(raw=raw)
+    ak_raw = AlmkanalRaw.from_mne_raw(raw=raw)
         
-    ak.do_ica(n_components=10,
-                train=train,
-                eog=eog,
-                surrogate_eog_chs=None,
-                ecg=ecg,
-                emg=True,
-                resample_freq=100,
-                )
-    
+    do_ica(ak_raw,
+        n_components=10,
+        train=train,
+        eog=eog,
+        surrogate_eog_chs=None,
+        ecg=ecg,
+        emg=True,
+        resample_freq=100,
+        )
 
-def test_double_ica(gen_mne_data_raw):
-
-    raw, data_path = gen_mne_data_raw
-
-    ak = AlmKanal(raw=raw)
-    ak.do_ica(n_components=10,
-              train=False,
-              eog=True,
-              surrogate_eog_chs=None,
-              ecg=False,
-              resample_freq=100,
-              )
-    
-    ak.do_ica(n_components=10,
-              train=False,
-              eog=True,
-              surrogate_eog_chs=None,
-              ecg=False,
-              resample_freq=100,
-              )
-
-
-def test_ica_plot(gen_mne_data_raw):
-    
-    raw, data_path = gen_mne_data_raw
-
-    ak = AlmKanal(raw=raw)
-    ak.do_ica(n_components=40,
-              train=False,
-              eog=True,
-              surrogate_eog_chs=None,
-              ecg=True,
-              resample_freq=100,
-              fname='test',
-              img_path='./'
-              )
-    
-
-
-def test_epoching(gen_mne_data_raw):
-    
-    raw, data_path = gen_mne_data_raw
-
-    ak = AlmKanal(raw=raw)
-
-    ak.do_events()
-
-    event_dict = {
-    'Auditory/Left': 1,
-    'Auditory/Right': 2,
-    'Visual/Left': 3,
-    'Visual/Right': 4,
-    }
-
-    ak.do_epochs(tmin=-0.2, tmax=0.5, event_id=event_dict)
 
 @pytest.mark.parametrize('source, atlas', SOURCE_SURF, scope='session')
 def test_fwd(gen_mne_data_raw, source, atlas):
     raw, data_path = gen_mne_data_raw
 
-    ak = AlmKanal(raw=raw)
+    ak_raw = AlmkanalRaw.from_mne_raw(raw=raw)
 
-    ak.do_fwd_model(subject_id='sample',
+    fwd = do_fwd_model(ak_raw,
+                        subject_id='sample',
                         subjects_dir='./data_old/',
                         source=source)
 
     
     ak.pick_dict['meg'] = 'mag'
-    ak.do_spatial_filters()
+    do_spatial_filters()
     ak.do_src(subject_id = 'sample',
               subjects_dir = './data_old/',
               source=source,

@@ -42,9 +42,12 @@ def run_bio_preproc(
         'emg': emg,
     }
 
-    mne_ch_sel = [key for key, val in bio_chs.items() if val is not None]
+    mne_ch_sel = {key: val for key, val in bio_chs.items() if val is not None}
+    
+    for ch, ch_val in mne_ch_sel.items():
+        raw.set_channel_types({ch_val: ch})
 
-    bio_raw = raw.copy().pick(mne_ch_sel + ['stim'])
+    bio_raw = raw.copy().pick(list(mne_ch_sel.keys()) + ['stim'])
     bio_df = bio_raw.to_data_frame()
 
     bio_clean = nk.bio_process(
