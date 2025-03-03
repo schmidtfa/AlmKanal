@@ -4,6 +4,8 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 
+from attrs import define
+
 import mne
 import numpy as np
 from mne._fiff.pick import _contains_ch_type
@@ -11,7 +13,7 @@ from numpy.typing import NDArray
 
 from almkanal.data_utils.data_classes import InfoClass, PickDictClass
 from almkanal.preproc_utils.maxwell_utils import run_maxwell
-
+from almkanal import AlmKanalStep
 
 # %%
 def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
@@ -219,7 +221,7 @@ def comp_spatial_filters(
     noise_cov: None | NDArray = None,
     empty_room: None | str | mne.io.Raw = None,
     get_nearest_empty_room: bool = False,
-) -> tuple[mne.SourceEstimate, mne.beamformer.Beamformer]:
+) -> mne.beamformer.Beamformer:
     """
     Compute spatial filters for source reconstruction using LCMV beamformers.
 
@@ -275,9 +277,9 @@ def comp_spatial_filters(
     n_ch_types = np.sum([_contains_ch_type(data.info, ch_type) for ch_type in ['mag', 'grad', 'eeg']])
 
     # compute a data covariance matrix
-    if np.logical_and(data_cov is None, isinstance(data, mne.io.fiff.raw.Raw)):
+    if np.logical_and(data_cov is None, isinstance(data, mne.io.BaseRaw)):
         data_cov = mne.compute_raw_covariance(data, rank=None, method='auto')
-    elif np.logical_and(data_cov is None, isinstance(data, mne.epochs.Epochs)):
+    elif np.logical_and(data_cov is None, isinstance(data, mne.BaseEpochs)):
         data_cov = mne.compute_covariance(data, rank=None, method='auto')
     else:
         print('Data covariance matrix not computed as it was supplied by the analyst.')
@@ -287,7 +289,7 @@ def comp_spatial_filters(
     # importantly this should be preprocessed similarly to the actual data
     if np.logical_and(
         np.logical_and(n_ch_types > 1, noise_cov is None),
-        np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)),
+        np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.BaseRaw)),
     ):
         # assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
         # supply either a mne.io.raw object, a path that leads directly
@@ -327,99 +329,100 @@ def comp_spatial_filters(
         'rank': true_rank,
     }
 
-    # build and apply filters
     filters = mne.beamformer.make_lcmv(info, fwd, data_cov, **lcmv_settings)
 
-    return filters
+    # build and apply filters
+    return filters, lcmv_settings, noise_cov, data_cov
 
 
-def src2parc(
-    stc: mne.SourceEstimate,
-    subject_id: str,
-    subjects_dir: str,
-    atlas: str = 'glasser',
-    source: str = 'surface',
-    label_mode: str = 'mean_flip',
-) -> dict:
-    """
-    Parcellate source data into predefined brain regions using an atlas.
 
-    Parameters
-    ----------
-    stc : mne.SourceEstimate
-        Source estimate object containing the source data to parcellate.
-    subject_id : str
-        Subject identifier for the source data.
-    subjects_dir : str
-        Path to the directory containing FreeSurfer subject data.
-    atlas : str, optional
-        Atlas to use for parcellation ('glasser', 'dk', or 'destrieux'). Defaults to 'glasser'.
-    source : str, optional
-        Source space type ('surface' or 'volume'). Defaults to 'surface'.
-    label_mode : str, optional
-        Mode for extracting label time courses ('mean', 'mean_flip', etc.). Defaults to 'mean_flip'.
+@define
+class SpatialFilter(AlmKanalStep):
 
-    Returns
-    -------
-    dict
-        Dictionary containing parcellation information, including labels, hemisphere assignments,
-        and extracted time courses for each region.
-    """
+    fwd: mne.Forward = None
+    pick_dict: dict | None = None
+    ica: None | mne.preprocessing.ICA = None
+    ica_ids: None | list = None 
+    data_cov: None | NDArray = None
+    noise_cov: None | NDArray = None
+    empty_room: None | str | mne.io.Raw = None
+    get_nearest_empty_room: bool = False
 
-    if atlas == 'dk':
-        vol_atlas = 'aparc+aseg'
-        surf_atlas = 'aparc'
-    elif atlas == 'destrieux':
-        vol_atlas = 'aparc.a2009s+aseg'
-        surf_atlas = 'aparc.a2009s'
-    elif atlas == 'glasser':
-        if source == 'volume':
-            raise ValueError('No volumetric model for the glasser atlas available')
-        surf_atlas = 'HCPMMP1'
+    must_be_before: tuple = ("SourceReconstruction",)
+    must_be_later: tuple = ("ICA", "ForwardModel",)
 
-    fs_dir = Path(subjects_dir) / 'freesurfer'
-    # mean flip time series costs significantly less memory than averaging the irasa'd spectra
-    if source == 'surface':
-        src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-ico-4-src.fif'
-        src = mne.read_source_spaces(src_file)
-        labels_mne = mne.read_labels_from_annot(f'{subject_id}_from_template', parc=surf_atlas, subjects_dir=fs_dir)
-        names_order_mne = np.array([label.name[:-3] for label in labels_mne])
+    def run(self,
+        data,
+        info) -> mne.beamformer.Beamformer:
+        """
+        Compute spatial filters for source projection using LCMV beamformers.
 
-        rh = [label.hemi == 'rh' for label in labels_mne]
-        lh = [label.hemi == 'lh' for label in labels_mne]
+        Parameters
+        ----------
+        fwd : mne.Forward | None, optional
+            The forward model. Defaults to None.
+        data_cov : NDArray | None, optional
+            Data covariance matrix. Defaults to None.
+        noise_cov : NDArray | None, optional
+            Noise covariance matrix. Defaults to None.
+        empty_room : str | mne.io.Raw | None, optional
+            Path to or preloaded empty room recording. Defaults to None.
+        get_nearest_empty_room : bool, optional
+            Whether to find the nearest empty room recording. Defaults to False.
 
-        parc = {'lh': lh, 'rh': rh, 'parc': surf_atlas, 'names_order_mne': names_order_mne}
-        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode=label_mode)})
-    elif source == 'volume':
-        src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-5-src.fif'
-        src = mne.read_source_spaces(src_file)
-        labels_mne = (
-            fs_dir / f'{subject_id}_from_template' / 'mri' / (vol_atlas + '.mgz')
-        )  # os.path.join(fs_dir, f'{subject_id}_from_template', 'mri/' + vol_atlas + '.mgz')
-        label_names = mne.get_volume_labels_from_aseg(labels_mne)
+        Returns
+        -------
+        None
+        """
 
-        ctx_logical = 'ctx' in label_names  # [True if 'ctx' in label else False for label in label_names]
-        sctx_logical = not ctx_logical  # [True if not f else False for f in ctx_logical]
+        if self.fwd is None:
+            self.fwd = info['ForwardModel']['fwd_info']['fwd']
 
-        ctx_labels = np.array([label[4:] for label in label_names if 'ctx' in label])
-        sctx_labels = list(np.array(label_names)[sctx_logical])
-        rh = ctx_labels[:2] == 'rh'  # [True if label[:2] == 'rh' else False for label in ctx_labels]
-        lh = ctx_labels[:2] == 'lh'  # [True if label[:2] == 'lh' else False for label in ctx_labels]
+        if np.logical_and('ICA' in info.keys(), self.ica == None):
+            self.ica = info['ICA']["ica_info"]["ica"]
+            self.ica_ids = info['ICA']["ica_info"]["component_ids"]
 
-        parc = {
-            'lh': lh,
-            'rh': rh,
-            'parc': vol_atlas + '.mgz',
-            'ctx_labels': ctx_labels,
-            'ctx_logical': ctx_logical,
-            'sctx_logical': sctx_logical,
-            'sctx_labels': sctx_labels,
-        }
-        parc.update(
-            {'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='auto')}
-        )  # NOTE: This needs to be auto
+        filters, lcmv_settings, noise_cov, data_cov = comp_spatial_filters(
+            data=data,
+            fwd=self.fwd,
+            pick_dict=self.pick_dict,
+            icas=self.ica,
+            ica_ids=self.ica_ids,
+            data_cov=self.data_cov,
+            noise_cov=self.noise_cov,
+            preproc_info=data.info,
+            empty_room=self.empty_room,
+            get_nearest_empty_room=get_nearest_empty_room,
+        )
+        return {'data': data, 'spatial_filter_info': {'filters': filters,
+                                                      'lcmv_settings': lcmv_settings,
+                                                      'data_cov': data_cov,
+                                                      'noise_cov': noise_cov,},
+                                                      }
 
-    else:
-        raise ValueError('the only valid options for source are `surface` and `volume`.')
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
+       
+        report.add_covariance(info['SpatialFilter']['spatial_filter_info']["data_cov"],
+                              info=data.info, 
+                              title='Data Covariance Matrix',
+                              );
+        if info['SpatialFilter']['spatial_filter_info']["noise_cov"] is not None:
+            report.add_covariance(info['SpatialFilter']['spatial_filter_info']["noise_cov"], 
+                                info=data.info,
+                                title='Noise Covariance Matrix',
+                                );
 
-    return parc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
