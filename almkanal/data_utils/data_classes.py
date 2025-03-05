@@ -33,8 +33,6 @@ class ICAInfoDict(TypedDict):
     train: bool
     train_freq: int
     train_thresh: float
-    img_path: None | str
-    fname: None | str
 
 
 @define
