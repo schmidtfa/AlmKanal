@@ -83,9 +83,10 @@ class Resample(AlmKanalStep):
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
         if self.sfreq > data.info['lowpass'] // 2:
+            lowpass = data.info['lowpass']
             raise ValueError(
                 'You need to apply an anti-aliasing filter before downsampling the data.'
-                f' Currently you lowpass the data at {data.info['lowpass']}Hz. '
+                f' Currently you lowpass the data at {lowpass}Hz. '
                 'Note: I am aware that the resampling method in MNE does that automatically, '
                 'but I am not a big fan of that approach hence the error message.'
             )
