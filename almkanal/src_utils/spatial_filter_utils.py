@@ -143,11 +143,10 @@ def preproc_empty_room(
         raw_er.resample(data.info['sfreq'])
 
     if 'ICA' in preproc_info:
-
         component_ids = np.concatenate(preproc_info['ICA']['ica_info']['component_ids'])
         if len(component_ids) == 0:
             component_ids = None
-        
+
         preproc_info['ICA']['ica_info']['ica'].apply(raw_er, exclude=component_ids)
 
     return raw_er

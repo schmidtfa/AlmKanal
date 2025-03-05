@@ -20,7 +20,7 @@ class Filter(AlmKanalStep):
     fir_design = 'firwin'
     skip_by_annotation = ('edge', 'bad_acq_skip')
     pad = 'reflect_limited'
-    
+
     must_be_before: tuple = ()
     must_be_after: tuple = ()
 
