@@ -71,7 +71,7 @@ def eog_ica_from_meg(
     return eog_indices
 
 
-def run_ica(  # noqa: C901
+def run_ica(  # noqa: C901, PLR0912
     raw: mne.io.Raw,
     n_components: None | int | float = None,
     method: str = 'picard',
@@ -90,7 +90,7 @@ def run_ica(  # noqa: C901
     train: bool = True,
     train_freq: int = 16,
     train_thresh: float = 2,
-) -> tuple[mne.io.Raw, mne.preprocessing.ICA, list]:
+) -> tuple[mne.io.Raw, mne.preprocessing.ICA, dict, list, list]:
     """
     Run ICA on raw MEG data to identify and remove artifacts (EOG, ECG, train).
 
@@ -171,6 +171,8 @@ def run_ica(  # noqa: C901
 
         components_dict.update({'eog': eog_idcs})
         bads.append(eog_idcs)
+    else:
+        eog_scores = None
     if ecg:
         # take ecg based on correlation
         if len(ch_dict['ecg']) == 0:
@@ -183,6 +185,8 @@ def run_ica(  # noqa: C901
         )
         components_dict.update({'ecg': ecg_idcs})
         bads.append(ecg_idcs)
+    else:
+        ecg_scores = None
     if emg:
         emg_idcs, _ = ica.find_bads_muscle(raw_copy, threshold=emg_thresh)
         components_dict.update({'emg': emg_idcs})
@@ -283,7 +287,7 @@ def find_train_ica(
 @define
 class ICA(AlmKanalStep):
     must_be_before: tuple = ()
-    must_be_later: tuple = ('Maxwell',)
+    must_be_after: tuple = ('Maxwell',)
 
     n_components: None | int | float = None
     method: str = 'picard'
@@ -390,18 +394,19 @@ class ICA(AlmKanalStep):
             },
         }
 
-    def reports(self, data, report: mne.Report, info):
-        titles = {}
-        for key, vals in info['ICA']['ica_info']['components_dict'].items():
-            for val in vals:
-                titles.update({int(val): f'{key}'})
+    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
+        if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
+            titles = {}
+            for key, vals in info['ICA']['ica_info']['components_dict'].items():
+                for val in vals:
+                    titles.update({int(val): f'{key}'})
 
-        report.add_ica(
-            info['ICA']['ica_info']['ica'],
-            inst=data,
-            title='ICA',
-            ecg_scores=info['ICA']['ica_info']['ecg_scores'],
-            eog_scores=info['ICA']['ica_info']['eog_scores'],
-            picks=list(titles.keys()),
-            tags=list(titles.values()),
-        )
+            report.add_ica(
+                info['ICA']['ica_info']['ica'],
+                inst=data,
+                title='ICA',
+                ecg_scores=info['ICA']['ica_info']['ecg_scores'],
+                eog_scores=info['ICA']['ica_info']['eog_scores'],
+                picks=list(titles.keys()),
+                tags=list(titles.values()),
+            )

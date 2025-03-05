@@ -1,6 +1,7 @@
 import pickle
 from pathlib import Path
 
+import matplotlib
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
@@ -8,14 +9,13 @@ from attrs import define
 from mne.coreg import Coregistration
 
 from almkanal.almkanal import AlmKanalStep
-from almkanal.data_utils.data_classes import PickDictClass
 
 
 def compute_headmodel(
     info: mne.Info,
     subject_id: str,
     subjects_dir: str,
-    pick_dict: PickDictClass,
+    pick_dict: dict | None,  # PickDictClass,
     template_mri: bool = True,
 ) -> mne.transforms.Transform:
     """
@@ -44,7 +44,8 @@ def compute_headmodel(
     out_folder = Path(subjects_dir) / 'headmodels' / subject_id  # os.path.join(subjects_dir, 'headmodels', subject_id)
     trans = 'fsaverage'
 
-    info = mne.pick_info(info, mne.pick_types(info, **pick_dict))
+    if pick_dict is not None:
+        info = mne.pick_info(info, mne.pick_types(info, **pick_dict))
 
     # %% do the coregistration
     coreg = Coregistration(info, trans, mri_path)
@@ -85,8 +86,8 @@ def plot_head_model(  # noqa PLR0912, PLR0915
     coreg: mne.transforms.Transform,
     info: mne.Info,
     subject_id: str,
-    subjects_dir: str,
-) -> None:
+    subjects_dir: str | Path,
+) -> matplotlib.figure.Figure:
     """
     Plot the head model coregistration, including sensor and digitization points.
 
@@ -121,7 +122,7 @@ def plot_head_model(  # noqa PLR0912, PLR0915
     # also adjust the bem
     bem_path = Path(subjects_dir) / subject_id / 'bem' / f'{subject_id}-head.fif'  # inner_skull-bem
     bem_surfaces = mne.read_bem_surfaces(bem_path)
-    bem_subsample = 1
+
     for bem in bem_surfaces:
         bem['rr'] = mne.transforms.apply_trans(to_cf_t['mri'], bem['rr'])
 
@@ -135,12 +136,11 @@ def plot_head_model(  # noqa PLR0912, PLR0915
     ax1.scatter(head_shape_points[:, 0], head_shape_points[:, 1], s=10, c='b', label='Head Shape')
     first = True
     for bem in bem_surfaces:
-        verts = bem['rr'][::bem_subsample]
         if first:
-            ax1.scatter(verts[:, 0], verts[:, 1], s=1, c='gray', alpha=0.5, label='BEM')
+            ax1.scatter(bem['rr'][:, 0], bem['rr'][:, 1], s=1, c='gray', alpha=0.5, label='BEM')
             first = False
         else:
-            ax1.scatter(verts[:, 0], verts[:, 1], s=1, c='gray', alpha=0.5)
+            ax1.scatter(bem['rr'][:, 0], bem['rr'][:, 1], s=1, c='gray', alpha=0.5)
     ax1.set_title('Axial View')
     ax1.set_xlabel('Distance (m)')
     ax1.set_ylabel('Distance (m)')
@@ -152,12 +152,11 @@ def plot_head_model(  # noqa PLR0912, PLR0915
     ax2.scatter(head_shape_points[:, 0], head_shape_points[:, 2], s=10, c='b')
     first = True
     for bem in bem_surfaces:
-        verts = bem['rr'][::bem_subsample]
         if first:
-            ax2.scatter(verts[:, 0], verts[:, 2], s=1, c='gray', alpha=0.5, label='BEM')
+            ax2.scatter(bem['rr'][:, 0], bem['rr'][:, 2], s=1, c='gray', alpha=0.5, label='BEM')
             first = False
         else:
-            ax2.scatter(verts[:, 0], verts[:, 2], s=1, c='gray', alpha=0.5)
+            ax2.scatter(bem['rr'][:, 0], bem['rr'][:, 2], s=1, c='gray', alpha=0.5)
     ax2.set_title('Coronal View')
     ax2.set_xlabel('Distance (m)')
     ax2.set_ylabel('Distance (m)')
@@ -168,12 +167,11 @@ def plot_head_model(  # noqa PLR0912, PLR0915
     ax3.scatter(head_shape_points[:, 1], head_shape_points[:, 2], s=10, c='b')
     first = True
     for bem in bem_surfaces:
-        verts = bem['rr'][::bem_subsample]
         if first:
-            ax3.scatter(verts[:, 1], verts[:, 2], s=1, c='gray', alpha=0.5, label='BEM')
+            ax3.scatter(bem['rr'][:, 1], bem['rr'][:, 2], s=1, c='gray', alpha=0.5, label='BEM')
             first = False
         else:
-            ax3.scatter(verts[:, 1], verts[:, 2], s=1, c='gray', alpha=0.5)
+            ax3.scatter(bem['rr'][:, 1], bem['rr'][:, 2], s=1, c='gray', alpha=0.5)
     ax3.set_title('Sagittal View')
     ax3.set_xlabel('Distance (m)')
     ax3.set_ylabel('Distance (m)')
@@ -201,12 +199,11 @@ def plot_head_model(  # noqa PLR0912, PLR0915
     )  # type: ignore
     first = True
     for bem in bem_surfaces:
-        verts = bem['rr'][::bem_subsample]
         if first:
-            ax4.scatter(verts[:, 0], verts[:, 1], verts[:, 2], s=1, c='gray', alpha=0.5, label='BEM')
+            ax4.scatter(bem['rr'][:, 0], bem['rr'][:, 1], bem['rr'][:, 2], s=1, c='gray', alpha=0.5, label='BEM')  # type: ignore
             first = False
         else:
-            ax4.scatter(verts[:, 0], verts[:, 1], verts[:, 2], s=1, c='gray', alpha=0.5)
+            ax4.scatter(bem['rr'][:, 0], bem['rr'][:, 1], bem['rr'][:, 2], s=1, c='gray', alpha=0.5)  # type: ignore
     ax4.set_title('3D View')
     ax4.grid(False)  # Remove grid
     ax4.axis('off')  # Remove axis
@@ -268,10 +265,16 @@ def make_fwd(
 class ForwardModel(AlmKanalStep):
     subject_id: str
     subjects_dir: str
-    pick_dict: dict
+    pick_dict: dict | None = None
 
-    must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
-    must_be_later: tuple = ()
+    must_be_before: tuple = (
+        'SpatialFilter',
+        'SourceReconstruction',
+    )
+    must_be_after: tuple = (
+        'Maxwell',
+        'ICA',
+    )
 
     source: str = 'surface'
     template_mri: bool = True
@@ -280,7 +283,7 @@ class ForwardModel(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw | mne.BaseEpochs,
-        info,
+        info: dict,
     ) -> dict:
         """
         Generate a forward model for source reconstruction.
@@ -302,6 +305,9 @@ class ForwardModel(AlmKanalStep):
         -------
         mne.Forward
         """
+        if self.pick_dict is None and info['Picks'] is not None:
+            self.pick_dict = info['Picks']
+
         new_source_identifier = self.subject_id + '_from_template' if self.template_mri else self.subject_id
 
         # fetch fsaverage if subjects_dir and fsaverage is not yet there
@@ -353,7 +359,7 @@ class ForwardModel(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
         report.add_figure(
             fig=info['ForwardModel']['fwd_info']['coreg_fig'],
             title='Coregistration',

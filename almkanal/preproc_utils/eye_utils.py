@@ -7,17 +7,17 @@ from scipy.constants import pi
 # TODO: Write function for MEG channel
 # TODO: TRF cleaner -> fit trf on blinks & saccades -> subtract prediction from eyedata
 def clean_pixx_eye_data(  # noqa PLR0915
-    eye_data,
-    gaze_lims={'x': 6, 'y': 6},
-    filter_settings={'pupil_diameter': (None, 30), 'xy_movements': (0.1, 40)},
-    annotate_bads=True,
-    trigger_ch_name='STI101',
-    tpixx_fs=2000,
-    distance=82,
-    screen_width=63,
-    screen_rect=[0, 0, 1920, 1080],
-    verbose=False,
-):
+    eye_data: np.ndarray,
+    gaze_lims: dict = {'x': 6, 'y': 6},
+    filter_settings: dict = {'pupil_diameter': (None, 30), 'xy_movements': (0.1, 40)},
+    annotate_bads: bool = True,
+    trigger_ch_name: str = 'STI101',
+    tpixx_fs: int = 2000,
+    distance: int | float = 82,
+    screen_width: int | float = 63,
+    screen_rect: list = [0, 0, 1920, 1080],
+    verbose: bool = False,
+) -> mne.io.BaseRaw:
     """Preprocess eyetracking data recorded using a TRACKPixx3.
 
     NOTE: Default settings are based upon the recording setup in the meg lab at the university of salzburg
@@ -96,7 +96,7 @@ def clean_pixx_eye_data(  # noqa PLR0915
 
     df[df == nan_value] = np.nan  # bad values
 
-    def movmean(x, w):
+    def movmean(x: pd.Series, w: int) -> np.ndarray:
         return np.convolve(x, np.ones(w), 'same') / w
 
     t_exc = 0.1  # gaze

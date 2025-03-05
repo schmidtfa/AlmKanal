@@ -9,8 +9,8 @@ from almkanal import AlmKanalStep
 
 def src2parc(
     stc: mne.SourceEstimate,
-    subject_id: str,
-    subjects_dir: str,
+    subject_id: str | None,
+    subjects_dir: Path | str,
     atlas: str = 'glasser',
     source: str = 'surface',
     label_mode: str = 'mean_flip',
@@ -104,10 +104,18 @@ class SourceReconstruction(AlmKanalStep):
     filters: None | mne.beamformer.Beamformer = None
     return_parc: bool = False
     label_mode: str = 'pca_flip'
-    subject_id: None | str = None
-    subjects_dir: None | str = None
+    subject_id: str | None = None
+    subjects_dir: Path | str | None = None
     atlas: str = 'glasser'
     source: str = 'surface'
+
+    must_be_before: tuple = ()
+    must_be_after: tuple = (
+        'Maxwell',
+        'ICA',
+        'ForwardModel',
+        'SpatialFilter',
+    )
 
     def run(
         self,
@@ -149,7 +157,7 @@ class SourceReconstruction(AlmKanalStep):
 
         if self.return_parc:
             if np.logical_and(self.subject_id is None, 'ForwardModel' in info):
-                self.subject_id = info['ForwardModel']['fwd_info']['subject_id_freesurfer']
+                self.subject_id: str = info['ForwardModel']['fwd_info']['subject_id_freesurfer']
 
             elif np.logical_and(self.subject_id is None, 'ForwardModel' not in info):
                 assert isinstance(
@@ -157,12 +165,16 @@ class SourceReconstruction(AlmKanalStep):
                 ), 'You need to set the correct name for the `subject_id` if you want to get parcels.'
 
             if np.logical_and(self.subjects_dir is None, 'ForwardModel' in info):
-                self.subjects_dir = info['ForwardModel']['fwd_info']['subjects_dir']
+                self.subjects_dir: str = info['ForwardModel']['fwd_info']['subjects_dir']
 
             elif np.logical_and(self.subjects_dir is None, 'ForwardModel' not in info):
                 assert isinstance(
                     self.subject_id, str
                 ), 'You need to set the correct name for the `subjects_dir` if you want to get parcels.'
+
+            # handle case if subjects_dir is still None
+            if self.subjects_dir is None:
+                raise ValueError('You need to set the correct name for the `subjects_dir` if you want to get parcels.')
 
             stc = src2parc(
                 stc,
@@ -184,5 +196,5 @@ class SourceReconstruction(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
         pass

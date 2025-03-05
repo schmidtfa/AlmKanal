@@ -1,19 +1,17 @@
 # %%
-
 import mne
 from attrs import define, field
 
+
 # %%
-
-
 @define
 class AlmKanalStep:
     """This is the base class for all almkanal steps."""
 
     must_be_before: tuple = field(default=None, init=False)
-    must_be_later: tuple = field(default=None, init=False)
+    must_be_after: tuple = field(default=None, init=False)
 
-    def _check_dependencies(self, steps: list['AlmKanalStep']):
+    def _check_dependencies(self, steps: list['AlmKanalStep']) -> None:
         pre: list[AlmKanalStep] = []
         post: list[AlmKanalStep] = []
 
@@ -43,7 +41,7 @@ class AlmKanalStep:
                 )
 
         # For each dependency in must_be_later, check only if it is present somewhere.
-        for dep_name in self.must_be_later or ():
+        for dep_name in self.must_be_after or ():
             if any(step.__class__.__name__ == dep_name for step in steps) and not any(
                 step.__class__.__name__ == dep_name for step in pre
             ):
@@ -55,10 +53,10 @@ class AlmKanalStep:
                     f'Current pipeline order: {[step.__class__.__name__ for step in steps]}'
                 )
 
-    def check_can_run(self, steps: list['AlmKanalStep']):
+    def check_can_run(self, steps: list['AlmKanalStep']) -> None:
         self._check_dependencies(steps)
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict):
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
         """Apply the processing step to the given data.
 
         Child classes must implement this method.
@@ -82,13 +80,16 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
 
     Parameters:
     data (mne.io.Raw or mne.Epochs): The M/EEG data to process.
+    pick_params: A dictionary of parameters for channel/type picking via mne.pick_types.
+                   For example: {"meg": True, "eeg": False, "stim": False}
     steps (list of callables): A list of functions that accept and return an M/EEG data object.
     """
 
     steps: list[AlmKanalStep] = field()
+    pick_params: dict = field(default=None)
     info: dict = field(init=False)
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         # Validate ordering constraints for each step.
 
         for step in self.steps:
@@ -103,16 +104,23 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:
         """Applies each preprocessing step in sequence and returns the processed data, along with a report."""
+
+        # Apply channel/type picking if parameters are provided.
+        if self.pick_params is not None:
+            # Use mne.pick_types to get channel indices.
+            picks = mne.pick_types(data.info, **self.pick_params)
+            data.pick(picks)
+
         report = mne.Report(title='Pipeline Report')
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='raw_data')
         elif isinstance(data, mne.BaseEpochs):
-            report.add_epochs(data, title='raw_data', verbose=False)
+            report.add_epochs(data, title='raw_data', psd=False)
         else:
             raise ValueError('Input data must be an instance of mne.io.BaseRaw or mne.BaseEpochs')
 
         current_data = data
-        context = {}  # Shared context dictionary for passing extra info between steps.
+        context: dict = {'Picks': self.pick_params}  # Shared context dictionary for passing extra info between steps.
         for step in self.steps:
             result = step.run(current_data, context)
             if not isinstance(result, dict) or 'data' not in result:
@@ -130,9 +138,3 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
     def __call__(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:
         """Enables the pipeline instance to be called like a function."""
         return self.run(data)
-
-
-@define
-class SourceReconstruction:
-    def run(self):
-        pass

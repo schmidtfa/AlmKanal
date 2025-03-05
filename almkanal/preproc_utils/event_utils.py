@@ -1,76 +1,89 @@
 import mne
-from numpy.typing import ArrayLike, NDArray
+from attrs import define
+
+from almkanal import AlmKanalStep
 
 
-def get_events_from_sti(data_raw: mne.io.Raw, sti_ch: None | str = 'STI101') -> NDArray:
-    """
-    Extract events from the stimulus channel in MEG data.
+@define
+class Events(AlmKanalStep):
+    stim_channel: None | str = None
+    output: str = 'onset'
+    consecutive: bool | str = 'increasing'
+    min_duration: float = 0.0
+    shortest_event: int = 2
+    mask: int | None = None
+    uint_cast: bool = False
+    mask_type: str = 'and'
+    initial_event: bool = False
+    verbose: bool | str | int | None = None
 
-    Parameters
-    ----------
-    data_raw : mne.io.Raw
-        The raw MEG data containing the stimulus channel.
-    sti_ch : None | str, optional
-        Name of the stimulus channel. Defaults to 'STI101'.
+    def run(
+        self,
+        data: mne.io.BaseRaw,
+        info: dict,
+    ) -> dict:
+        """
+        Extract events from the raw MEG data.
 
-    Returns
-    -------
-    NDArray
-        Array of events extracted from the stimulus channel.
-    """
+        Parameters
+        ----------
+        stim_channel : str | None, optional
+            Name of the stimulus channel. Defaults to None.
+        output : str, optional
+            Type of output ('onset', etc.). Defaults to 'onset'.
+        consecutive : bool | str, optional
+            Whether to consider consecutive events ('increasing', etc.). Defaults to 'increasing'.
+        min_duration : float, optional
+            Minimum duration of events. Defaults to 0.0.
+        shortest_event : int, optional
+            Minimum number of samples for an event. Defaults to 2.
+        mask : int | None, optional
+            Binary mask for event detection. Defaults to None.
+        uint_cast : bool, optional
+            Whether to cast to unsigned integer. Defaults to False.
+        mask_type : str, optional
+            Type of masking ('and', etc.). Defaults to 'and'.
+        initial_event : bool, optional
+            Whether to include initial events. Defaults to False.
+        verbose : bool | str | int | None, optional
+            Verbosity level. Defaults to None.
 
-    trigger_min_duration = 9e-3
-    events = mne.find_events(
-        data_raw, stim_channel=sti_ch, output='onset', min_duration=trigger_min_duration, initial_event=True
-    )
+        Returns
+        -------
+        None
+        """
 
-    return events
+        # this should build events based on information stored in the raw file
+        events = mne.find_events(
+            data,
+            stim_channel=self.stim_channel,  #'STI101',
+            output=self.output,
+            consecutive=self.consecutive,
+            min_duration=self.min_duration,
+            shortest_event=self.shortest_event,
+            mask=self.mask,
+            uint_cast=self.uint_cast,
+            mask_type=self.mask_type,
+            initial_event=self.initial_event,
+            verbose=self.verbose,
+        )
 
+        return {
+            'data': data,
+            'event_info': {
+                'events': events,
+                'stim_channel': self.stim_channel,
+                'output': self.output,
+                'consecutive': self.consecutive,
+                'min_duration': self.min_duration,
+                'shortest_event': self.shortest_event,
+                'mask': self.mask,
+                'uint_cast': self.uint_cast,
+                'mask_type': self.mask_type,
+                'initial_event': self.initial_event,
+            },
+        }
 
-def gen_epochs(
-    raw: mne.io.Raw,
-    event_dict: dict | None,
-    epoch_settings: dict,
-    events: None | ArrayLike = None,
-    sti_ch: None | str = 'STI101',
-) -> mne.Epochs:
-    """
-    Generate epoched data based on events and an event dictionary.
-
-    Parameters
-    ----------
-    raw : mne.io.Raw
-        The raw MEG data to epoch.
-    event_dict : dict | None
-        Dictionary mapping event IDs to event labels.
-    epoch_settings : dict
-        Settings for epoch specification (e.g., tmin, tmax, baseline).
-    events : None | ArrayLike, optional
-        Predefined events array. If None, events are extracted from the stimulus channel. Defaults to None.
-    sti_ch : None | str, optional
-        Name of the stimulus channel for event extraction. Defaults to 'STI101'.
-
-    Returns
-    -------
-    mne.Epochs
-        The generated epochs object.
-    """
-
-    if events is None:
-        events = get_events_from_sti(raw, sti_ch=sti_ch)
-
-    epochs = mne.Epochs(raw, events=events, event_id=event_dict, **epoch_settings)
-
-    return epochs
-
-
-# def gen_trf_epochs(raw, stim, event_dict, events=None, sti_ch='STI101'):
-#     """
-#     This function takes a stimulus file, related M/EEG data and generates "TRF Epochs" i.e.
-#     epochs where each is allowed to be of differing length.
-#     """
-
-#     if events is None:
-#         events = get_events_from_sti(raw, sti_ch=sti_ch)
-
-#     return trf_epochs
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+        events = info['Events']['event_info']['events']
+        report.add_events(events=events, sfreq=data.info['sfreq'], title='events')

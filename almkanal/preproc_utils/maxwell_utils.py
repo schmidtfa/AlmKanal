@@ -60,14 +60,14 @@ def run_maxwell(
 
 @define
 class Maxwell(AlmKanalStep):
-    must_be_before: tuple = ('ICA',)
-    must_be_later: tuple = ()
+    must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ()
 
     mw_coord_frame: str = 'head'
-    mw_destination: str | None = None
-    mw_calibration_file: str | None = None
-    mw_cross_talk_file: str | None = None
-    mw_st_duration: int | None = None
+    mw_destination: None | ArrayLike = None
+    mw_calibration_file: None | str = None
+    mw_cross_talk_file: None | str = None
+    mw_st_duration: float | None = None
 
     def run(
         self,
@@ -98,17 +98,25 @@ class Maxwell(AlmKanalStep):
         # this should do maxwell filtering
         # should only be possible on raw data and only if no other preprocessing apart from filtering was done
 
-        maxwell_settings = {
-            'coord_frame': self.mw_coord_frame,
-            'destination': self.mw_destination,
-            'calibration_file': self.mw_calibration_file,
-            'cross_talk_file': self.mw_cross_talk_file,
-            'st_duration': self.mw_st_duration,
+        raw_max = run_maxwell(
+            raw=data,
+            coord_frame=self.mw_coord_frame,
+            destination=self.mw_destination,
+            calibration_file=self.mw_calibration_file,
+            cross_talk_file=self.mw_cross_talk_file,
+            st_duration=self.mw_st_duration,
+        )
+
+        return {
+            'data': raw_max,
+            'maxwell_info': {
+                'coord_frame': self.mw_coord_frame,
+                'destination': self.mw_destination,
+                'calibration_file': self.mw_calibration_file,
+                'cross_talk_file': self.mw_cross_talk_file,
+                'st_duration': self.mw_st_duration,
+            },
         }
 
-        raw_max = run_maxwell(raw=data, **maxwell_settings)
-
-        return {'data': raw_max, 'maxwell_info': maxwell_settings}
-
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')

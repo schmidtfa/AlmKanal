@@ -1,27 +1,35 @@
 # %%
 import mne
 
-from almkanal import ICA, AlmKanal, ForwardModel, Maxwell, PhysioCleaner, SourceReconstruction, SpatialFilter
+from almkanal import (
+    ICA,
+    AlmKanal,
+    Epochs,
+    Events,
+    Maxwell,
+)
 
 # %%
 data_path = mne.datasets.sample.data_path()
 meg_path = data_path / 'MEG' / 'sample'
 raw_fname = meg_path / 'sample_audvis_raw.fif'
 raw = mne.io.read_raw_fif(raw_fname, preload=True)
+# raw = raw.pick(picks=['meg', 'eog', 'stim'])
 
 # %%
 pick_dict = {
     'meg': True,
-    'eog': False,
+    'eog': True,
     'ecg': False,
     'eeg': False,
-    'stim': False,
+    'stim': True,
 }
 
 # Build the pipeline with our dummy functions.
 ak = AlmKanal(
+    pick_params=pick_dict,
     steps=[
-        Maxwell(),
+        # Maxwell(),
         ICA(
             n_components=50,
             train=False,
@@ -34,27 +42,32 @@ ak = AlmKanal(
             emg=True,
             resample_freq=100,
         ),
-        ForwardModel(subject_id='sample', subjects_dir='./data_old', pick_dict=pick_dict, redo_hdm=False),
-        SpatialFilter(pick_dict=pick_dict),
-        SourceReconstruction(),
-    ]
+        Events(),
+        Epochs(
+            tmin=-0.2,
+            tmax=0.6,
+        ),
+        # ForwardModel(subject_id='sample', subjects_dir='./data_old', pick_dict=pick_dict, redo_hdm=False),
+        # SpatialFilter(pick_dict=pick_dict),
+        # SourceReconstruction(),
+    ],
 )
 
-ak_physio = AlmKanal(
-    steps=[
-        PhysioCleaner(eog='EOG 061'),
-    ]
-)
+# ak_physio = AlmKanal(
+#     steps=[
+#         PhysioCleaner(eog='EOG 061'),
+#     ]
+# )
 
-# %%
-proc_data, report = ak_physio.run(raw)
+# # %%
+# proc_data, report = ak_physio.run(raw)
 
 # %%
 proc_data, report = ak.run(raw)
 
 # %%
 # make objects callable ->
-report.save('report_raw.html', overwrite=True)
+report.save('report_raw2.html', overwrite=True)
 
 # %%
 Maxwell().run(raw, info={})

@@ -11,7 +11,6 @@ from mne._fiff.pick import _contains_ch_type
 from numpy.typing import NDArray
 
 from almkanal import AlmKanalStep
-from almkanal.data_utils.data_classes import InfoClass, PickDictClass
 from almkanal.preproc_utils.maxwell_utils import run_maxwell
 
 
@@ -20,53 +19,71 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
     """
     Find the empty room recording closest in date to the current measurement.
 
-    This function locates the empty room file, which is used for noise covariance estimation,
-    with a date nearest to the current MEG measurement.
+    This function looks for subdirectories (named as dates in '%y%m%d' format) in the given
+    empty_room_dir. It then selects the directory with a date nearest to the measurement date
+    (from info['meas_date']) and returns the path to its first file that meets the criteria.
 
     Parameters
     ----------
     info : mne.Info
         The MEG data information structure, including measurement date.
     empty_room_dir : str
-        Directory containing the empty room recordings.
+        Directory containing subdirectories named with dates of empty room recordings.
 
     Returns
     -------
     Path
         Path to the nearest empty room file.
+
+    Raises
+    ------
+    ValueError
+        If no valid empty room recording is found.
     """
+    # Build list of valid dates from directory names
+    valid_dates = []
+    for entry in os.listdir(empty_room_dir):
+        try:
+            valid_dates.append(datetime.strptime(entry, '%y%m%d'))
+        except ValueError:
+            continue  # Skip entries that don't match the date format
+    if not valid_dates:
+        raise ValueError(f'No valid empty room directories found in {empty_room_dir}')
 
-    all_empty_room_dates = np.array([datetime.strptime(date, '%y%m%d') for date in os.listdir(empty_room_dir)])
+    # Truncate measurement date to day resolution
+    meas_date = info['meas_date']
+    meas_date_trunc = datetime(meas_date.year, meas_date.month, meas_date.day)
 
-    cur_date = info['meas_date']
-    cur_date_truncated = datetime(cur_date.year, cur_date.month, cur_date.day)  # necessary to truncate
+    # Loop until a matching recording is found or no dates remain
+    while valid_dates:
+        # Find the date closest to the measurement date
+        nearest_date = min(valid_dates, key=lambda d: abs(d - meas_date_trunc))
+        date_str = nearest_date.strftime('%y%m%d')
+        cur_empty_dir = Path(empty_room_dir) / date_str
+        files = os.listdir(cur_empty_dir)
+        if not files:
+            valid_dates.remove(nearest_date)
+            continue
 
-    def _nearest(items: NDArray, pivot: datetime) -> datetime:
-        return min(items, key=lambda x: abs(x - pivot))
+        file_name = files[0]
+        # Skip directories with unwanted file characteristics
+        if 'supine' in file_name:
+            valid_dates.remove(nearest_date)
+            continue
+        if '68' in file_name and 'sss' not in file_name.lower():
+            return cur_empty_dir / file_name
 
-    while True:
-        nearest_date_datetime = _nearest(all_empty_room_dates, cur_date_truncated)
-        nearest_date = nearest_date_datetime.strftime('%y%m%d')
+        # Fallback: return the file if no specific condition applies
+        return cur_empty_dir / file_name
 
-        cur_empty_path = Path(empty_room_dir) / nearest_date
-
-        if 'supine' in os.listdir(cur_empty_path)[0]:
-            all_empty_room_dates = np.delete(all_empty_room_dates, all_empty_room_dates == nearest_date_datetime)
-        elif np.logical_and('68' in os.listdir(cur_empty_path)[0], 'sss' not in os.listdir(cur_empty_path)[0].lower()):
-            break
-
-    fname_empty_room = Path(cur_empty_path) / os.listdir(cur_empty_path)[0]
-
-    return fname_empty_room
+    raise ValueError('No appropriate empty room recording found.')
 
 
 def preproc_empty_room(
     raw_er: mne.io.Raw,
     data: mne.io.Raw | mne.Epochs,
-    preproc_info: InfoClass,
-    icas: None | list,
-    ica_ids: None | list,
-    pick_dict: PickDictClass,
+    preproc_info: dict,
+    picks: dict | None,
 ) -> mne.io.Raw:
     """
     Preprocess an empty room recording to match the preprocessing of the original MEG data.
@@ -77,12 +94,8 @@ def preproc_empty_room(
         The raw empty room MEG data.
     data : mne.io.Raw | mne.Epochs
         The original MEG data or epochs for comparison and preprocessing alignment.
-    preproc_info : InfoClass
+    preproc_info : dict
         Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
-    icas : None | list, optional
-        List of ICA objects to apply to the empty room data. Defaults to None.
-    ica_ids : None | list, optional
-        List of ICA component indices to exclude for each ICA object. Defaults to None.
     pick_dict : PickDictClass
         Dictionary specifying channel selection criteria.
 
@@ -94,19 +107,18 @@ def preproc_empty_room(
 
     # do channel picking here -> we need to disallow dropping bad
     # channels as this can result in problems
-    picks = mne.pick_types(raw_er.info, exclude=[], **pick_dict)
     raw_er.pick(picks=picks)
-    if preproc_info.maxwell is not None:
+    if 'Maxwell' in preproc_info:
         if isinstance(data, mne.epochs.Epochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
         elif isinstance(data, mne.io.fiff.raw.Raw):
             raw = data
 
         raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
-        raw_er = run_maxwell(raw_er, **preproc_info.maxwell)
+        raw_er = run_maxwell(raw_er, **preproc_info['Maxwell']['maxwell_info'])
 
-    picks = mne.pick_types(raw_er.info, **pick_dict)
-    raw_er.pick(picks=picks)
+    # picks = mne.pick_types(raw_er.info, **pick_dict)
+    # raw_er.pick(picks=picks)
     # Add filtering here -> i.e. check if deviation between empty and real data and then filter
     if bool(
         np.logical_and(
@@ -130,12 +142,13 @@ def preproc_empty_room(
         # adjust for small floating point differences
         raw_er.resample(data.info['sfreq'])
 
-    if preproc_info.ica is not None:
-        # we loop here, because you could have done more than one ica
-        assert isinstance(icas, list)
-        assert isinstance(ica_ids, list)
-        for ica, ica_id in zip(icas, ica_ids):
-            ica.apply(raw_er, exclude=ica_id)
+    if 'ICA' in preproc_info:
+
+        component_ids = np.concatenate(preproc_info['ICA']['ica_info']['component_ids'])
+        if len(component_ids) == 0:
+            component_ids = None
+        
+        preproc_info['ICA']['ica_info']['ica'].apply(raw_er, exclude=component_ids)
 
     return raw_er
 
@@ -143,10 +156,8 @@ def preproc_empty_room(
 def process_empty_room(
     data: mne.io.Raw | mne.Epochs,
     info: mne.Info,
-    pick_dict: PickDictClass,
-    icas: None | list,
-    ica_ids: None | list,
-    preproc_info: InfoClass,
+    picks: dict | None,
+    preproc_info: dict,
     empty_room: str | mne.io.Raw,
     get_nearest: bool = False,
 ) -> tuple[NDArray, NDArray]:
@@ -161,10 +172,6 @@ def process_empty_room(
         The MEG data information structure, including measurement metadata.
     pick_dict : PickDictClass
         Dictionary specifying channel selection criteria.
-    icas : None | list, optional
-        List of ICA objects to apply to the empty room data. Defaults to None.
-    ica_ids : None | list, optional
-        List of ICA component indices to exclude for each ICA object. Defaults to None.
     preproc_info : InfoClass
         Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
     empty_room : str | mne.io.Raw
@@ -191,9 +198,7 @@ def process_empty_room(
         raw_er=raw_er,
         data=data,
         preproc_info=preproc_info,
-        icas=icas,
-        ica_ids=ica_ids,
-        pick_dict=pick_dict,
+        picks=picks,
     )
 
     # if isinstance(data, mne.io.fiff.raw.Raw):
@@ -213,10 +218,8 @@ def process_empty_room(
 def comp_spatial_filters(
     data: mne.io.Raw | mne.Epochs,
     fwd: mne.Forward,
-    pick_dict: PickDictClass,
-    preproc_info: InfoClass,
-    icas: None | list = None,
-    ica_ids: None | list = None,
+    pick_dict: dict | None,
+    preproc_info: dict,
     data_cov: None | NDArray = None,
     noise_cov: None | NDArray = None,
     empty_room: None | str | mne.io.Raw = None,
@@ -231,14 +234,10 @@ def comp_spatial_filters(
         MEG data for source reconstruction.
     fwd : mne.Forward
         The forward model.
-    pick_dict : PickDictClass
+    pick_dict : dict
         Dictionary specifying channel selection criteria.
     preproc_info : InfoClass
         Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
-    icas : None | list, optional
-        List of ICA objects to apply to the data, if needed. Defaults to None.
-    ica_ids : None | list, optional
-        List of ICA component indices to exclude for each ICA object. Defaults to None.
     data_cov : None | NDArray, optional
         Data covariance matrix. If None, it is computed automatically. Defaults to None.
     noise_cov : None | NDArray, optional
@@ -259,18 +258,12 @@ def comp_spatial_filters(
     # noise covariance based on empyt rooms
     # select only meg channels from raw
 
-    if pick_dict['meg'] not in [True, 'mag', 'grad']:
-        raise ValueError('Source Projection with the AlmKanal pipeline currently only works with MEG data.')
+    if isinstance(pick_dict, dict):
+        picks = mne.pick_types(data.info, **pick_dict)
+        data.pick(picks=picks)
+    elif pick_dict is None:
+        picks = None
 
-    if pick_dict['eeg']:
-        pick_dict['eeg'] = False
-        warnings.warn(
-            'WARNING: Source Projection with the AlmKanal pipeline currently only works with MEG data. \
-                       Removing EEG here.'
-        )
-
-    picks = mne.pick_types(data.info, **pick_dict)
-    data.pick(picks=picks)
     info = data.info
 
     # check if multiple channel types are present after picking
@@ -297,10 +290,8 @@ def comp_spatial_filters(
         true_rank, noise_cov = process_empty_room(
             data=data,
             info=info,
-            pick_dict=pick_dict,
+            picks=picks,
             preproc_info=preproc_info,
-            icas=icas,
-            ica_ids=ica_ids,
             empty_room=empty_room,
             get_nearest=nearest_empty_room,
         )
@@ -310,8 +301,8 @@ def comp_spatial_filters(
         np.logical_and(empty_room is None, not nearest_empty_room),
     ):
         warnings.warn("""You have multiple sensor types, but did neither specify a noise covariance
-                      matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix..
-                      ATTENTION: THIS IS NOT THE OPTIMAL WAY OF DOING THINGS!!!""")
+                      matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix!""")
+
         noise_cov = mne.make_ad_hoc_cov(info)
         # TODO: check in with thomas if rank should be computed on data_cov if ad-hoc cov is created
         true_rank = mne.compute_rank(data_cov, info=info)
@@ -339,20 +330,19 @@ def comp_spatial_filters(
 class SpatialFilter(AlmKanalStep):
     fwd: mne.Forward = None
     pick_dict: dict | None = None
-    ica: None | mne.preprocessing.ICA = None
-    ica_ids: None | list = None
     data_cov: None | NDArray = None
     noise_cov: None | NDArray = None
     empty_room: None | str | mne.io.Raw = None
     nearest_empty_room: bool = False
 
     must_be_before: tuple = ('SourceReconstruction',)
-    must_be_later: tuple = (
+    must_be_after: tuple = (
+        'Maxwell',
         'ICA',
         'ForwardModel',
     )
 
-    def run(self, data, info) -> mne.beamformer.Beamformer:
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> mne.beamformer.Beamformer:
         """
         Compute spatial filters for source projection using LCMV beamformers.
 
@@ -374,22 +364,22 @@ class SpatialFilter(AlmKanalStep):
         None
         """
 
+        if self.pick_dict is None and info['Picks'] is not None:
+            self.pick_dict = info['Picks']
+
+        elif self.pick_dict is None and info['Picks'] is None:
+            raise ValueError('pick_dict must be provided for spatial filtering.')
+
         if self.fwd is None:
             self.fwd = info['ForwardModel']['fwd_info']['fwd']
-
-        if np.logical_and('ICA' in info, self.ica is None):
-            self.ica = info['ICA']['ica_info']['ica']
-            self.ica_ids = info['ICA']['ica_info']['component_ids']
 
         filters, lcmv_settings, noise_cov, data_cov = comp_spatial_filters(
             data=data,
             fwd=self.fwd,
             pick_dict=self.pick_dict,
-            icas=self.ica,
-            ica_ids=self.ica_ids,
             data_cov=self.data_cov,
             noise_cov=self.noise_cov,
-            preproc_info=data.info,
+            preproc_info=info,
             empty_room=self.empty_room,
             nearest_empty_room=self.nearest_empty_room,
         )
@@ -403,7 +393,7 @@ class SpatialFilter(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict):
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
         report.add_covariance(
             info['SpatialFilter']['spatial_filter_info']['data_cov'],
             info=data.info,
