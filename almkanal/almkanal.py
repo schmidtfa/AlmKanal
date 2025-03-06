@@ -1,4 +1,6 @@
 # %%
+from copy import deepcopy
+
 import mne
 from attrs import define, field
 
@@ -122,7 +124,7 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
         current_data = data
         context: dict = {'Picks': self.pick_params}  # Shared context dictionary for passing extra info between steps.
         for step in self.steps:
-            result = step.run(current_data, context)
+            result = step.run(current_data, deepcopy(context))
             if not isinstance(result, dict) or 'data' not in result:
                 raise ValueError(f"Step {step.__class__.__name__} must return a dictionary with a 'data' key.")
             current_data = result['data']

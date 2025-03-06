@@ -8,7 +8,8 @@ from pyrasa.utils.peak_utils import get_band_info
 from scipy.stats import zscore
 
 from almkanal.almkanal import AlmKanalStep
-#from almkanal.data_utils.data_classes import ICAInfoDict
+
+# from almkanal.data_utils.data_classes import ICAInfoDict
 
 
 def eog_ica_from_meg(
@@ -360,8 +361,8 @@ class ICA(AlmKanalStep):
         None
         """
 
-        # this should do an ica
-        ica_info = dict(
+        raw, ica, components_dict, eog_scores, ecg_scores = run_ica(
+            data,
             n_components=self.n_components,
             method=self.method,
             random_state=self.random_state,
@@ -380,8 +381,6 @@ class ICA(AlmKanalStep):
             train_freq=self.train_freq,
             train_thresh=self.train_thresh,
         )
-
-        raw, ica, components_dict, eog_scores, ecg_scores = run_ica(data, **ica_info)
 
         return {
             'data': raw,

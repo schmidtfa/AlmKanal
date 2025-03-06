@@ -10,15 +10,7 @@ from attrs import define
 from mne._fiff.pick import _contains_ch_type
 from numpy.typing import NDArray
 
-from almkanal import (AlmKanal,
-                      AlmKanalStep,
-                      Maxwell,
-                      Filter,
-                      Resample,
-                      )
-
-
-
+from almkanal import AlmKanalStep
 from almkanal.preproc_utils.maxwell_utils import run_maxwell
 
 
