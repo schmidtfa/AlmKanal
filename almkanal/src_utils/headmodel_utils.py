@@ -15,7 +15,7 @@ def compute_headmodel(
     info: mne.Info,
     subject_id: str,
     subjects_dir: str,
-    pick_dict: dict | None,  # PickDictClass,
+    pick_dict: dict | None,
     template_mri: bool = True,
 ) -> mne.transforms.Transform:
     """
@@ -29,7 +29,7 @@ def compute_headmodel(
         Subject identifier for the head model.
     subjects_dir : str
         Path to the directory containing subject-specific data (e.g., FreeSurfer and head models).
-    pick_dict : PickDictClass
+    pick_dict : dict
         Dictionary specifying channels to include in the head model.
     template_mri : bool, optional
         Whether to use a template MRI ('fsaverage'). Defaults to True.

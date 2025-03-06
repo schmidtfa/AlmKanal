@@ -88,7 +88,7 @@ class Resample(AlmKanalStep):
                 'You need to apply an anti-aliasing filter before downsampling the data.'
                 f' Currently you lowpass the data at {lowpass}Hz. '
                 'Note: I am aware that the resampling method in MNE does that automatically, '
-                'but I am not a big fan of that approach hence the error message.'
+                'but I am not a big fan of that approach as I prefer to set filters explicitely hence the error message.'
             )
 
         data.resample(
