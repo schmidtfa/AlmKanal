@@ -104,22 +104,39 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
             'steps_info': {},  # This will be updated when the pipeline is run.
         }
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:  # noqa: C901, PLR0912
         """Applies each preprocessing step in sequence and returns the processed data, along with a report."""
-
-        # Apply channel/type picking if parameters are provided.
-        if self.pick_params is not None:
-            # Use mne.pick_types to get channel indices.
-            picks = mne.pick_types(data.info, **self.pick_params)
-            data.pick(picks)
 
         report = mne.Report(title='Pipeline Report')
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='raw_data')
         elif isinstance(data, mne.BaseEpochs):
-            report.add_epochs(data, title='raw_data', psd=False)
+            report.add_epochs(data, psd=False, title='epoch_data')
+        elif isinstance(data, list):
+            if all(isinstance(block, mne.io.BaseRaw) for block in data):
+                for ix, block in enumerate(data):
+                    report.add_raw(block, butterfly=False, psd=True, title=f'raw_data_block_{ix}')
+            elif all(isinstance(block, mne.io.BaseRaw) for block in data):
+                for ix, block in enumerate(data):
+                    report.add_epochs(block, psd=False, title=f'epoch_data_block_{ix}')
         else:
-            raise ValueError('Input data must be an instance of mne.io.BaseRaw or mne.BaseEpochs')
+            raise ValueError(
+                'Input data must be an instance of mne.io.BaseRaw or mne.BaseEpochs or a list containing either'
+            )
+
+        # Apply channel/type picking if parameters are provided.
+        if self.pick_params is not None:
+            # Use mne.pick_types to get channel indices.
+            if isinstance(data, mne.io.BaseRaw | mne.BaseEpochs):
+                picks = mne.pick_types(data.info, **self.pick_params)
+                data.pick(picks)
+            elif isinstance(data, list):
+                data_list = []
+                for cur_data in data:
+                    picks = mne.pick_types(cur_data.info, **self.pick_params)
+                    cur_data.pick(picks)
+                    data_list.append(cur_data)
+                data = data_list
 
         current_data = data
         context: dict = {'Picks': self.pick_params}  # Shared context dictionary for passing extra info between steps.
