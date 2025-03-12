@@ -400,21 +400,21 @@ class ICA(AlmKanalStep):
         }
 
     def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
-        #if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
-        titles = {}
-        for key, vals in info['ICA']['ica_info']['components_dict'].items():
-            for val in vals:
-                titles.update({int(val): f'{key}'})
+        if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
+            titles = {}
+            for key, vals in info['ICA']['ica_info']['components_dict'].items():
+                for val in vals:
+                    titles.update({int(val): f'{key}'})
 
-        report.add_ica(
-            info['ICA']['ica_info']['ica'],
-            inst=data,
-            title='ICA',
-            ecg_scores=info['ICA']['ica_info']['ecg_scores'],
-            eog_scores=info['ICA']['ica_info']['eog_scores'],
-            picks=list(titles.keys()),
-            tags=list(titles.values()),
-        )
+            report.add_ica(
+                info['ICA']['ica_info']['ica'],
+                inst=data,
+                title='ICA',
+                ecg_scores=info['ICA']['ica_info']['ecg_scores'],
+                eog_scores=info['ICA']['ica_info']['eog_scores'],
+                picks=list(titles.keys()),
+                tags=list(titles.values()),
+            )
 
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='Raw (ICA)')
