@@ -173,8 +173,7 @@ def run_ica(  # noqa: C901, PLR0912
 
         components_dict.update({'eog': eog_idcs})
         bads.append(eog_idcs)
-    else:
-        eog_scores = None
+
     if ecg:
         # take ecg based on correlation
         if len(ch_dict['ecg']) == 0:
@@ -187,8 +186,7 @@ def run_ica(  # noqa: C901, PLR0912
         )
         components_dict.update({'ecg': ecg_idcs})
         bads.append(ecg_idcs)
-    else:
-        ecg_scores = None
+
     if emg:
         emg_idcs, _ = ica.find_bads_muscle(raw_copy, threshold=emg_thresh)
         components_dict.update({'emg': emg_idcs})
@@ -201,6 +199,12 @@ def run_ica(  # noqa: C901, PLR0912
         bads.append(train_idcs)
 
     bad_ids = np.concatenate(bads).astype(int).tolist() if len(bads) > 0 else []
+
+    if 'eog_scores' not in locals():
+        eog_scores = None
+    if 'ecg_scores' not in locals():
+        ecg_scores = None
+
 
     # % drop physiological components
     if not fit_only:
@@ -413,5 +417,5 @@ class ICA(AlmKanalStep):
                 tags=list(titles.values()),
             )
 
-            if isinstance(data, mne.io.BaseRaw):
-                report.add_raw(data, butterfly=False, psd=True, title='Raw (ICA)')
+        if isinstance(data, mne.io.BaseRaw):
+            report.add_raw(data, butterfly=False, psd=True, title='Raw (ICA)')
