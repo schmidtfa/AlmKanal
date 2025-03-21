@@ -213,7 +213,13 @@ def plot_head_model(  # noqa PLR0912, PLR0915
 
 
 def make_fwd(
-    info: mne.Info, source: str, fname_trans: str, subjects_dir: str, subject_id: str, template_mri: bool = False
+    info: mne.Info,
+    source: str,
+    fname_trans: str,
+    subjects_dir: str,
+    subject_id: str,
+    template_mri: bool = False,
+    spacing: str = 'oct6',
 ) -> mne.Forward:
     """
     Generate a forward model for MEG data.
@@ -240,23 +246,48 @@ def make_fwd(
     """
 
     ###### MAKE FORWARD SOLUTION AND INVERSE OPERATOR
-    # fpath_add_on = '_from_template' if template_mri else ''
+    if template_mri:
+        # fs_path = os.path.join(subjects_dir, 'freesurfer', f'{subject_id}{fpath_add_on}')
+        fs_path = Path(subjects_dir) / 'freesurfer' / f'{subject_id}'  # {fpath_add_on}'
+        bem_file = f'{fs_path}/bem/{subject_id}-5120-5120-5120-bem.fif'  # {fpath_add_on}
 
-    # fs_path = os.path.join(subjects_dir, 'freesurfer', f'{subject_id}{fpath_add_on}')
-    fs_path = Path(subjects_dir) / 'freesurfer' / f'{subject_id}'  # {fpath_add_on}'
-    bem_file = f'{fs_path}/bem/{subject_id}-5120-5120-5120-bem.fif'  # {fpath_add_on}
+        if source == 'volume':
+            src_file = f'{fs_path}/bem/{subject_id}-vol-5-src.fif'  # {fpath_add_on}
 
-    if source == 'volume':
-        src_file = f'{fs_path}/bem/{subject_id}-vol-5-src.fif'  # {fpath_add_on}
+        elif source == 'surface':
+            src_file = f'{fs_path}/bem/{subject_id}-ico-4-src.fif'  # {fpath_add_on}
 
-    elif source == 'surface':
-        src_file = f'{fs_path}/bem/{subject_id}-ico-4-src.fif'  # {fpath_add_on}
+        # if isinstance(fname_trans, str):
+        #     fname_trans = os.path.join(fname_trans, subject_id, subject_id + '-trans.fif')
 
-    # if isinstance(fname_trans, str):
-    #     fname_trans = os.path.join(fname_trans, subject_id, subject_id + '-trans.fif')
+        bem = mne.make_bem_solution(bem_file, solver='mne', verbose=True)
+        fwd = mne.make_forward_solution(info=info, trans=fname_trans, src=src_file, bem=bem)
+    else:
+        fs_path = Path(subjects_dir) / 'freesurfer'
+        model = mne.make_bem_model(
+            subject_id,
+            ico=4,
+            conductivity=(0.3,),  # when doing meg a single layer is fine
+            subjects_dir=fs_path,  # subjects_dir,
+        )
+        bem = mne.make_bem_solution(model)
 
-    bem_sol = mne.make_bem_solution(bem_file, solver='mne', verbose=True)
-    fwd = mne.make_forward_solution(info=info, trans=fname_trans, src=src_file, bem=bem_sol)
+        if source == 'surface':
+            src = mne.setup_source_space(
+                subject_id,
+                spacing=spacing,
+                surface='white',  # TODO: find out why this is the default
+                # maybe check what britta westner or ole jensen is doing
+                subjects_dir=fs_path,  # subjects_dir,
+                add_dist=True,
+            )
+
+        elif source == 'volume':
+            src = mne.setup_volume_source_space(subject_id, pos=5.0, bem=bem, subjects_dir=subjects_dir)
+
+        fwd = mne.make_forward_solution(
+            info=info, trans=fname_trans, src=src, bem=bem, meg=True, eeg=False, mindist=5.0
+        )
 
     return fwd
 
@@ -354,6 +385,7 @@ class ForwardModel(AlmKanalStep):
             'fwd_info': {
                 'coreg_fig': fig,
                 'fwd': fwd,
+                'source_type': self.source,
                 'subject_id_freesurfer': new_source_identifier,
                 'subject_dir': self.subjects_dir,
             },

@@ -12,8 +12,8 @@ def src2parc(
     fs: int,
     subject_id: str | None,
     subjects_dir: Path | str,
+    source: str | None = 'surface',
     atlas: str = 'glasser',
-    source: str = 'surface',
     label_mode: str = 'mean_flip',
 ) -> dict:
     """
@@ -71,20 +71,22 @@ def src2parc(
         labels_mne = (
             fs_dir / f'{subject_id}_from_template' / 'mri' / (vol_atlas + '.mgz')
         )  # os.path.join(fs_dir, f'{subject_id}_from_template', 'mri/' + vol_atlas + '.mgz')
+
         label_names = mne.get_volume_labels_from_aseg(labels_mne)
 
-        ctx_logical = 'ctx' in label_names  # [True if 'ctx' in label else False for label in label_names]
-        sctx_logical = not ctx_logical  # [True if not f else False for f in ctx_logical]
+        ctx_logical = ['ctx' in label for label in label_names]
+        sctx_logical = [not f for f in ctx_logical]
 
         ctx_labels = np.array([label[4:] for label in label_names if 'ctx' in label])
         sctx_labels = list(np.array(label_names)[sctx_logical])
-        rh = ctx_labels[:2] == 'rh'  # [True if label[:2] == 'rh' else False for label in ctx_labels]
-        lh = ctx_labels[:2] == 'lh'  # [True if label[:2] == 'lh' else False for label in ctx_labels]
+        rh = [label[:2] == 'rh' for label in ctx_labels]
+        lh = [label[:2] == 'lh' for label in ctx_labels]
 
         parc = {
             'lh': lh,
             'rh': rh,
             'parc': vol_atlas + '.mgz',
+            'labels_mne': label_names,
             'ctx_labels': ctx_labels,
             'ctx_logical': ctx_logical,
             'sctx_logical': sctx_logical,
@@ -109,7 +111,7 @@ class SourceReconstruction(AlmKanalStep):
     subject_id: str | None = None
     subjects_dir: Path | str | None = None
     atlas: str = 'glasser'
-    source: str = 'surface'
+    source: str | None = None
 
     must_be_before: tuple = ()
     must_be_after: tuple = (
@@ -119,7 +121,7 @@ class SourceReconstruction(AlmKanalStep):
         'SpatialFilter',
     )
 
-    def run(
+    def run(  # noqa C901
         self,
         data: mne.io.BaseRaw | mne.BaseEpochs,
         info: dict,
@@ -150,6 +152,9 @@ class SourceReconstruction(AlmKanalStep):
 
         if self.filters is None:
             self.filters = info['SpatialFilter']['spatial_filter_info']['filters']
+
+        if self.source is None:
+            self.source = info['ForwardModel']['fwd_info']['source_type']
 
         if isinstance(data, mne.io.BaseRaw):
             stc = mne.beamformer.apply_lcmv_raw(data, self.filters)

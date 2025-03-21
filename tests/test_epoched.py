@@ -19,6 +19,6 @@ def test_src(gen_mne_data_epochs):
 
     ak = AlmKanal(steps=[
                          SpatialFilter(fwd=fwd, pick_dict=pick_dict),
-                         SourceReconstruction()])
+                         SourceReconstruction(source='volume',)])
 
     ak.run(gen_mne_data_epochs)
