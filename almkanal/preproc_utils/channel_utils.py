@@ -1,13 +1,11 @@
 import mne
 import numpy as np
 from attrs import define
-from numpy.typing import ArrayLike
-from autoreject import Ransac 
+from autoreject import Ransac
 from autoreject.utils import interpolate_bads
+from numpy.typing import ArrayLike
 
 from almkanal.almkanal import AlmKanalStep
-
-
 
 
 def run_maxwell(
@@ -204,21 +202,17 @@ class MultiBlockMaxwell(AlmKanalStep):
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
 
 
-
-
-
-
 @define
-class Ransac(AlmKanalStep):
+class RANSAC(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
 
     ransac_epoch_duration: int | float = 4
-    n_resample: int = 50 
+    n_resample: int = 50
     min_channels: float = 0.25
     min_corr: float = 0.75
     unbroken_time: float = 0.4
-    n_jobs: int = 1,
+    n_jobs: int = 1
     verbose: bool = False
 
     def run(
@@ -232,9 +226,9 @@ class Ransac(AlmKanalStep):
         Parameters
         ----------
         ransac_epoch_duration : int | float = 4
-            Number indicating the length of epochs in seconds that will be generated for the 
+            Number indicating the length of epochs in seconds that will be generated for the
             continuous file to run RANSAC.
-        
+
         n_resample : int, optional
             Number of times the sensors are resampled.
 
@@ -259,24 +253,25 @@ class Ransac(AlmKanalStep):
         -------
         None
         """
-        
 
         epo4ransac = mne.make_fixed_length_epochs(data, duration=self.ransac_epoch_duration)
-        #NOTE: We only do this for eeg -> think if this is overall smart
-        #So why not use picks from autoreject.Ransac -> I am not sure hwo this will handle eg. ECG or EOG signals
+        # NOTE: We only do this for eeg -> think if this is overall smart
+        # So why not use picks from autoreject.Ransac -> I am not sure hwo this will handle eg. ECG or EOG signals
         # Idont want them to be part of the ransac eeg spiel TODO: Test this
         epo4ransac.load_data().pick_types(eeg=True, ecg=False, eog=False)
-        ransac = Ransac(ransac_epoch_duration = self.ransac_epoch_duration,
-                        n_resample = self.n_resample,
-                        min_channels = self.min_channels,
-                        min_corr = self.min_corr,
-                        unbroken_time = self.unbroken_time,
-                        n_jobs=self.n_jobs,
-                        verbose=self.verbose)
+        ransac = Ransac(
+            ransac_epoch_duration=self.ransac_epoch_duration,
+            n_resample=self.n_resample,
+            min_channels=self.min_channels,
+            min_corr=self.min_corr,
+            unbroken_time=self.unbroken_time,
+            n_jobs=self.n_jobs,
+            verbose=self.verbose,
+        )
 
         ransac.fit(epo4ransac)
         bad_chs_eeg = ransac.bad_chs_
-        print(f'RANSAC detected the following bad channels: {bad_chs_eeg}')#
+        print(f'RANSAC detected the following bad channels: {bad_chs_eeg}')
 
         data.info['bads'] = bad_chs_eeg
         raw_ransac = interpolate_bads(data, data.info['bads'])
@@ -284,12 +279,12 @@ class Ransac(AlmKanalStep):
         return {
             'data': raw_ransac,
             'ransac_info': {
-                    'ransac_epoch_duration': self.ransac_epoch_duration,
-                    'n_resample': self.n_resample,
-                    'min_channels': self.min_channels,
-                    'min_corr': self.min_corr,
-                    'unbroken_time': self.unbroken_time,
-                    'n_jobs': self.n_jobs,
+                'ransac_epoch_duration': self.ransac_epoch_duration,
+                'n_resample': self.n_resample,
+                'min_channels': self.min_channels,
+                'min_corr': self.min_corr,
+                'unbroken_time': self.unbroken_time,
+                'n_jobs': self.n_jobs,
             },
         }
 
