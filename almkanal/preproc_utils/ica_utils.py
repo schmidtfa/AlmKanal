@@ -74,6 +74,7 @@ def eog_ica_from_meg(
 
 def run_ica(  # noqa: C901, PLR0912
     raw: mne.io.Raw,
+    fit_only: bool = False,
     n_components: None | int | float = None,
     method: str = 'picard',
     random_state: None | int = 42,
@@ -172,8 +173,7 @@ def run_ica(  # noqa: C901, PLR0912
 
         components_dict.update({'eog': eog_idcs})
         bads.append(eog_idcs)
-    else:
-        eog_scores = None
+
     if ecg:
         # take ecg based on correlation
         if len(ch_dict['ecg']) == 0:
@@ -186,8 +186,7 @@ def run_ica(  # noqa: C901, PLR0912
         )
         components_dict.update({'ecg': ecg_idcs})
         bads.append(ecg_idcs)
-    else:
-        ecg_scores = None
+
     if emg:
         emg_idcs, _ = ica.find_bads_muscle(raw_copy, threshold=emg_thresh)
         components_dict.update({'emg': emg_idcs})
@@ -201,10 +200,15 @@ def run_ica(  # noqa: C901, PLR0912
 
     bad_ids = np.concatenate(bads).astype(int).tolist() if len(bads) > 0 else []
 
-    raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
+    if 'eog_scores' not in locals():
+        eog_scores = None
+    if 'ecg_scores' not in locals():
+        ecg_scores = None
 
     # % drop physiological components
-    ica.apply(raw, exclude=bad_ids)
+    if not fit_only:
+        raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
+        ica.apply(raw, exclude=bad_ids)
 
     return raw, ica, components_dict, eog_scores, ecg_scores
 
@@ -290,6 +294,7 @@ class ICA(AlmKanalStep):
     must_be_before: tuple = ()
     must_be_after: tuple = ('Maxwell',)
 
+    fit_only: bool = False
     n_components: None | int | float = None
     method: str = 'picard'
     random_state: None | int = 42
@@ -306,7 +311,7 @@ class ICA(AlmKanalStep):
     emg_thresh: float = 0.5
     train: bool = True
     train_freq: int = 16
-    train_thresh: float = 2.0
+    train_thresh: float = 3.0
     img_path: None | str = None
     fname: None | str = None
 
@@ -363,6 +368,7 @@ class ICA(AlmKanalStep):
 
         raw, ica, components_dict, eog_scores, ecg_scores = run_ica(
             data,
+            fit_only=self.fit_only,
             n_components=self.n_components,
             method=self.method,
             random_state=self.random_state,
@@ -394,12 +400,14 @@ class ICA(AlmKanalStep):
         }
 
     def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
-        if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
-            titles = {}
-            for key, vals in info['ICA']['ica_info']['components_dict'].items():
-                for val in vals:
-                    titles.update({int(val): f'{key}'})
+        # if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
+        titles = {}
+        for key, vals in info['ICA']['ica_info']['components_dict'].items():
+            for val in vals:
+                titles.update({int(val): f'{key}'})
 
+        # if info['ICA']['ica_info']['ica'] is not None:
+        try:
             report.add_ica(
                 info['ICA']['ica_info']['ica'],
                 inst=data,
@@ -409,3 +417,8 @@ class ICA(AlmKanalStep):
                 picks=list(titles.keys()),
                 tags=list(titles.values()),
             )
+
+            if isinstance(data, mne.io.BaseRaw):
+                report.add_raw(data, butterfly=False, psd=True, title='Raw (ICA)')
+        except ValueError:
+            print('No bad ICA components detected.')

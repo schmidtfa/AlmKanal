@@ -67,7 +67,12 @@ class Filter(AlmKanalStep):
             report.add_raw(data, butterfly=False, psd=True, title='Raw (filtered)')
 
         elif isinstance(data, mne.BaseEpochs):
-            report.add_epochs(data, title='Epoched (filtered)')
+            base_corr = data.copy()
+            base_corr.apply_baseline(baseline=(None, 0))
+            # report.add_epochs(base_corr, psd=False, title='EpochedResample')
+
+            evokeds = base_corr.average(by_event_type=True)
+            report.add_evokeds(evokeds, n_time_points=5)
 
 
 @define
@@ -82,7 +87,7 @@ class Resample(AlmKanalStep):
     must_be_after: tuple = ('Epochs',)
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
-        if self.sfreq > data.info['lowpass'] // 2:
+        if not self.sfreq / 2 >= data.info['lowpass']:
             lowpass = data.info['lowpass']
             raise ValueError(
                 'You need to apply an anti-aliasing filter before downsampling the data.'
@@ -96,9 +101,7 @@ class Resample(AlmKanalStep):
             sfreq=self.sfreq,
             npad=self.npad,
             window=self.window,
-            stim_picks=None,
             n_jobs=self.n_jobs,
-            events=None,
             pad=self.pad,
             method=self.method,
         )
@@ -109,9 +112,9 @@ class Resample(AlmKanalStep):
                 'sfreq': self.sfreq,
                 'npad': self.npad,
                 'window': self.window,
-                'stim_picks': None,
+                #'stim_picks': None,
                 'n_jobs': self.n_jobs,
-                'events': None,
+                #'events': None,
                 'pad': self.pad,
                 'method': self.method,
             },
@@ -119,7 +122,12 @@ class Resample(AlmKanalStep):
 
     def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
         if isinstance(data, mne.io.BaseRaw):
-            report.add_raw(data, butterfly=False, psd=True, title='RawFilter')
+            report.add_raw(data, butterfly=False, psd=True, title='RawResample')
 
         elif isinstance(data, mne.BaseEpochs):
-            report.add_epochs(data, title='EpochedFilter')
+            base_corr = data.copy()
+            base_corr.apply_baseline(baseline=(None, 0))
+            # report.add_epochs(base_corr, psd=False, title='EpochedResample')
+
+            evokeds = base_corr.average(by_event_type=True)
+            report.add_evokeds(evokeds, n_time_points=5)

@@ -142,4 +142,9 @@ class Epochs(AlmKanalStep):
         }
 
     def reports(self, data: mne.BaseEpochs, report: mne.Report, info: dict) -> None:
-        report.add_epochs(data, title='epochs')
+        base_corr = data.copy()
+        base_corr.apply_baseline(baseline=(None, 0))
+        # report.add_epochs(base_corr, psd=False, title='epochs')
+
+        evokeds = base_corr.average(by_event_type=True)
+        report.add_evokeds(evokeds, n_time_points=5)

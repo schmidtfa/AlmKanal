@@ -1,4 +1,5 @@
 import mne
+import numpy as np
 from attrs import define
 from numpy.typing import ArrayLike
 
@@ -112,6 +113,83 @@ class Maxwell(AlmKanalStep):
             'maxwell_info': {
                 'coord_frame': self.mw_coord_frame,
                 'destination': self.mw_destination,
+                'calibration_file': self.mw_calibration_file,
+                'cross_talk_file': self.mw_cross_talk_file,
+                'st_duration': self.mw_st_duration,
+            },
+        }
+
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+        report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
+
+
+@define
+class MultiBlockMaxwell(AlmKanalStep):
+    must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ()
+
+    mw_coord_frame: str = 'head'
+    mw_destination: None | ArrayLike = None
+    mw_calibration_file: None | str = None
+    mw_cross_talk_file: None | str = None
+    mw_st_duration: float | None = None
+
+    def run(
+        self,
+        data: list[mne.io.BaseRaw],
+        info: dict,
+    ) -> dict:
+        """
+        Apply Maxwell filtering to the raw MEG data.
+
+        Parameters
+        ----------
+        mw_coord_frame : str, optional
+            Coordinate frame for Maxwell filtering ('head' or 'meg'). Defaults to 'head'.
+        mw_destination : str | None, optional
+            Destination coordinate frame for alignment. Defaults to None.
+        mw_calibration_file : str | None, optional
+            Path to the calibration file. Defaults to None.
+        mw_cross_talk_file : str | None, optional
+            Path to the cross-talk file. Defaults to None.
+        mw_st_duration : int | None, optional
+            Duration (in seconds) for tSSS (temporal Signal Space Separation). Defaults to None.
+
+        Returns
+        -------
+        None
+        """
+
+        # this should do maxwell filtering
+        # should only be possible on raw data and only if no other preprocessing apart from filtering was done
+        # block_pos_l = [raw.info["dev_head_t"]['trans'][:3, 3] for raw in data]
+
+        # blocks_pos = np.array(block_pos_l)
+        # all_distances = np.sqrt(blocks_pos[:,0]**2 + blocks_pos[:,1]**2 + blocks_pos[:,2]**2)
+        # mean_distance = np.median(all_distances)
+        block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
+        trans_avg_pos = np.median(block_pos_l, axis=0)
+
+        raw_max_list = []
+        for raw in data:
+            raw_max_list.append(
+                run_maxwell(
+                    raw=raw,
+                    coord_frame=self.mw_coord_frame,
+                    destination=trans_avg_pos,
+                    calibration_file=self.mw_calibration_file,
+                    cross_talk_file=self.mw_cross_talk_file,
+                    st_duration=self.mw_st_duration,
+                )
+            )
+
+        raw_max = mne.concatenate_raws(raw_max_list)
+
+        return {
+            'data': raw_max,
+            'maxwell_info': {
+                'coord_frame': self.mw_coord_frame,
+                'destination': trans_avg_pos,
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
