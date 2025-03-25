@@ -400,6 +400,7 @@ class ICA(AlmKanalStep):
         }
 
     def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
+<<<<<<< HEAD
         # if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
         titles = {}
         for key, vals in info['ICA']['ica_info']['components_dict'].items():
@@ -408,6 +409,14 @@ class ICA(AlmKanalStep):
 
         # if info['ICA']['ica_info']['ica'] is not None:
         try:
+=======
+        if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
+            titles = {}
+            for key, vals in info['ICA']['ica_info']['components_dict'].items():
+                for val in vals:
+                    titles.update({int(val): f'{key}'})
+
+>>>>>>> 6b9b651ff2090f531decdc6b91e6eeb0fb26b1f8
             report.add_ica(
                 info['ICA']['ica_info']['ica'],
                 inst=data,
