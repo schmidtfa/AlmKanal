@@ -290,3 +290,99 @@ class RANSAC(AlmKanalStep):
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_ransac')
+
+
+@define
+class ReReference(AlmKanalStep):
+    must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ()
+
+    ref_channels = 'average'
+    projection = False
+    ch_type = 'auto'
+    forward = None
+    joint = False
+    verbose = False
+
+    def run(
+        self,
+        data: mne.io.BaseRaw,
+        info: dict,
+    ) -> dict:
+        """
+        Does ReReferencing of your EEG, Ecog, seeg or dbs channels.
+        This is essentially a wrapper around mne.io.Raw.set_eeg_reference.
+        The documentation is copied from there.
+
+        Parameters
+        ----------
+        ref_channels: list of str | str | dict
+            Can be:
+            The name(s) of the channel(s) used to construct the reference for every channel of ch_type.
+
+            'average' to apply an average reference (default)
+
+            'REST' to use the Reference Electrode Standardization Technique infinity reference [4].
+
+            A dictionary mapping names of data channels to (lists of) names of reference channels.
+            For example, {‘A1’: ‘A3’} would replace the data in channel ‘A1’ with the difference between ‘A1’ and ‘A3’.
+            To take the average of multiple channels as reference,
+            supply a list of channel names as the dictionary value, e.g. {‘A1’: [‘A2’, ‘A3’]}
+            would replace channel A1 with A1 - mean(A2, A3).
+
+            An empty list, in which case MNE will not attempt any re-referencing of the data
+
+        projection: bool
+            If ref_channels='average' this argument specifies if the average reference should be
+            computed as a projection (True) or not (False; default).
+            If projection=True, the average reference is added as a projection and is not applied to the data
+            (it can be applied afterwards with the apply_proj method).
+            If projection=False, the average reference is directly applied to the data.
+            If ref_channels is not 'average',
+            projection must be set to False (the default in this case).
+
+        ch_typelist of str | str
+            The name of the channel type to apply the reference to. Valid channel types are 'auto', 'eeg', 'ecog',
+            'seeg', 'dbs'. If 'auto', the first channel type of eeg, ecog, seeg or dbs that is found
+            (in that order) will be selected.
+
+        forwardinstance of Forward | None
+            Forward solution to use. Only used with ref_channels='REST'.
+
+        jointbool
+            How to handle list-of-str ch_type. If False (default), one projector is created per channel type.
+            If True, one projector is created across all channel types. This is only used when projection=True.
+
+        verbosebool | str | int | None
+            Control verbosity of the logging output. If None, use the default verbosity level.
+            See the logging documentation and mne.verbose() for details. Should only be passed as a keyword argument.
+
+
+        Returns
+        -------
+        None
+        """
+
+        reref = data.set_eeg_reference(
+            ref_channels=self.ref_channels,
+            projection=self.projection,
+            ch_type=self.ch_type,
+            forward=self.forward,
+            joint=self.joint,
+            verbose=self.verbose,
+        )
+
+        return {
+            'data': reref,
+            'ref_info': {
+                'ref_channels': self.ref_channels,
+                'projection': self.projection,
+                'ch_type': self.ch_type,
+                'forward': self.forward,
+                'joint': self.joint,
+                'verbose': self.verbose,
+            },
+        }
+
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+        report.add_raw(data, butterfly=False, psd=True, title='raw_reref')
