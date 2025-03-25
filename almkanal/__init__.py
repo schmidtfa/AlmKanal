@@ -7,7 +7,7 @@ from almkanal.preproc_utils.epoch_utils import Epochs
 from almkanal.preproc_utils.event_utils import Events
 from almkanal.preproc_utils.filter_utils import Filter, Resample
 from almkanal.preproc_utils.ica_utils import ICA
-from almkanal.preproc_utils.maxwell_utils import Maxwell, MultiBlockMaxwell
+from almkanal.preproc_utils.channel_utils import Maxwell, MultiBlockMaxwell, Ransac
 from almkanal.src_utils.headmodel_utils import ForwardModel
 from almkanal.src_utils.spatial_filter_utils import SpatialFilter
 from almkanal.src_utils.src_recon_utils import SourceReconstruction
@@ -19,6 +19,7 @@ __all__ = [
     'Resample',
     'Maxwell',
     'MultiBlockMaxwell',
+    'Ransac',
     'ICA',
     'PhysioCleaner',
     'Events',
