@@ -265,7 +265,8 @@ def find_train_ica(
         ic_signal,
         fs=fs,
         band=(lower, upper),
-        psd_kwargs={'nperseg': int(duration * fs), 'noverlap': int(duration * fs * overlap)},
+        nperseg=int(duration * fs), 
+        noverlap=int(duration * fs * overlap),
         hset_info=(1, hmax, 0.05),
     )
 
