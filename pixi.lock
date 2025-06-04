@@ -3830,6 +3830,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.11-7_cp311.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/pywavelets-1.8.0-py311h9f3472d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyyaml-6.0.2-py311h2dc5d0c_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyzmq-26.4.0-py311h7deb3e3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/qhull-2020.2-h434a139_5.conda
@@ -4120,6 +4121,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.11-7_cp311.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/pywavelets-1.8.0-py311ha81121a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyyaml-6.0.2-py311ha3cf9ac_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyzmq-26.4.0-py311hb21797c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/qhull-2020.2-h3c5361c_5.conda
@@ -4384,6 +4386,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.11-7_cp311.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pywavelets-1.8.0-py311h18599de_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyyaml-6.0.2-py311h4921393_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyzmq-26.4.0-py311h01f2145_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/qhull-2020.2-h420ef59_5.conda
@@ -4650,6 +4653,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.11-7_cp311.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/pywavelets-1.8.0-py311h0a17f05_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pywin32-307-py311hda3d55a_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pywin32-ctypes-0.2.3-py311h1ea47a8_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyyaml-6.0.2-py311h5082efb_2.conda
@@ -4953,6 +4957,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-7_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/pywavelets-1.8.0-py312hc0a28a1_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyyaml-6.0.2-py312h178313f_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pyzmq-26.4.0-py312hbf22597_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/qhull-2020.2-h434a139_5.conda
@@ -5243,6 +5248,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-7_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/pywavelets-1.8.0-py312h025c719_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyyaml-6.0.2-py312h3520af0_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/pyzmq-26.4.0-py312h679dbab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/qhull-2020.2-h3c5361c_5.conda
@@ -5507,6 +5513,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-7_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pywavelets-1.8.0-py312he0011b7_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyyaml-6.0.2-py312h998013c_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/pyzmq-26.4.0-py312hf4875e0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/qhull-2020.2-h420ef59_5.conda
@@ -5773,6 +5780,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/python_abi-3.12-7_cp312.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvista-0.45.2-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pyvistaqt-0.11.2-pyhdecd6ff_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/pywavelets-1.8.0-py312h1a27103_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pywin32-307-py312h275cf98_3.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pywin32-ctypes-0.2.3-py312h2e8e312_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/pyyaml-6.0.2-py312h31fea79_2.conda
@@ -6158,7 +6166,7 @@ packages:
   name: almkanal
   version: 1.0.0.dev0
   path: .
-  sha256: 3657519f61a48c30e8b2dc18128c5ff3bd7d41af8ebed707add319d439883fed
+  sha256: d0c49780e92b92fae832d9b946425d59a358eeeb059020348c849239375b31b1
   requires_dist:
   - attrs
   - ipyevents
@@ -26217,6 +26225,90 @@ packages:
   - pkg:pypi/pyvistaqt?source=conda-forge-mapping
   size: 133957
   timestamp: 1739221955649
+- kind: conda
+  name: pywavelets
+  version: 1.8.0
+  build: py311h0a17f05_0
+  subdir: win-64
+  url: https://conda.anaconda.org/conda-forge/win-64/pywavelets-1.8.0-py311h0a17f05_0.conda
+  sha256: ace33375382f6f887fb94294e47eefce410945f2d7e943bb2efc8fe9dc0e9fc9
+  md5: 1882067d90c5002364eb6eddb2ecdb48
+  depends:
+  - numpy >=1.19,<3
+  - numpy >=1.23,<3
+  - python >=3.11,<3.12.0a0
+  - python_abi 3.11.* *_cp311
+  - ucrt >=10.0.20348.0
+  - vc >=14.2,<15
+  - vc14_runtime >=14.29.30139
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/pywavelets?source=conda-forge-mapping
+  size: 3617131
+  timestamp: 1733419743595
+- kind: conda
+  name: pywavelets
+  version: 1.8.0
+  build: py311h18599de_0
+  subdir: osx-arm64
+  url: https://conda.anaconda.org/conda-forge/osx-arm64/pywavelets-1.8.0-py311h18599de_0.conda
+  sha256: 3a62bac1986e87e8500aee48a6576bcc538efa0764e7e30cfc012d7f29d5d51b
+  md5: 0893d6cf75decd75631cc188982290b1
+  depends:
+  - __osx >=11.0
+  - numpy >=1.19,<3
+  - numpy >=1.23,<3
+  - python >=3.11,<3.12.0a0
+  - python >=3.11,<3.12.0a0 *_cpython
+  - python_abi 3.11.* *_cp311
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/pywavelets?source=conda-forge-mapping
+  size: 3674764
+  timestamp: 1733419724785
+- kind: conda
+  name: pywavelets
+  version: 1.8.0
+  build: py311h9f3472d_0
+  subdir: linux-64
+  url: https://conda.anaconda.org/conda-forge/linux-64/pywavelets-1.8.0-py311h9f3472d_0.conda
+  sha256: 6bc38fb6a8b52952c64ce12c5d322e4969d6368f4131e0262676f510ef6655ed
+  md5: 17334e5c12abdf2db6b25bd4187cd3e4
+  depends:
+  - __glibc >=2.17,<3.0.a0
+  - libgcc >=13
+  - numpy >=1.19,<3
+  - numpy >=1.23,<3
+  - python >=3.11,<3.12.0a0
+  - python_abi 3.11.* *_cp311
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/pywavelets?source=conda-forge-mapping
+  size: 3754833
+  timestamp: 1733419521275
+- kind: conda
+  name: pywavelets
+  version: 1.8.0
+  build: py311ha81121a_0
+  subdir: osx-64
+  url: https://conda.anaconda.org/conda-forge/osx-64/pywavelets-1.8.0-py311ha81121a_0.conda
+  sha256: 8b405b365ff27dd2a9fb849fb6f3815eb645b4458381f88b9fab40c5793ca47f
+  md5: 73d8921496617fd71ff7a7baed16a4f7
+  depends:
+  - __osx >=10.13
+  - numpy >=1.19,<3
+  - numpy >=1.23,<3
+  - python >=3.11,<3.12.0a0
+  - python_abi 3.11.* *_cp311
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/pywavelets?source=conda-forge-mapping
+  size: 3664050
+  timestamp: 1733419460326
 - kind: conda
   name: pywavelets
   version: 1.8.0
