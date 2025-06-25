@@ -1,0 +1,5 @@
+[run]
+source = almkanal
+omit =
+    *__init__*
+    AlmKanal/tests/*
