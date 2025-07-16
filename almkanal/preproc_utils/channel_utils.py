@@ -260,7 +260,6 @@ class RANSAC(AlmKanalStep):
         # Idont want them to be part of the ransac eeg spiel TODO: Test this
         epo4ransac.load_data().pick_types(eeg=True, ecg=False, eog=False)
         ransac = Ransac(
-            ransac_epoch_duration=self.ransac_epoch_duration,
             n_resample=self.n_resample,
             min_channels=self.min_channels,
             min_corr=self.min_corr,

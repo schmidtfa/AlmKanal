@@ -1,9 +1,23 @@
-from almkanal import AlmKanal, Maxwell, ICA, ForwardModel, SpatialFilter, SourceReconstruction, PhysioCleaner
+from almkanal import (AlmKanal, Maxwell, ICA, ForwardModel, 
+                      SpatialFilter, SourceReconstruction, PhysioCleaner,
+                      RANSAC, ReReference, Filter, Resample)
 import pytest
 from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE_SURF, SOURCE_VOL
 import mne
 
 #@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
+
+def test_ransac(gen_mne_data_raw_eeg):
+
+    raw, data_path = gen_mne_data_raw_eeg
+
+    ak = AlmKanal(steps=[RANSAC(),
+                         Filter(),
+                         ReReference(),
+                         Resample(100)])
+    ak.run(raw)
+
+
 
 def test_maxwell(gen_mne_data_raw):
 
