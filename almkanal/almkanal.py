@@ -1,8 +1,11 @@
 # %%
+import json
 from copy import deepcopy
 
 import mne
 from attrs import define, field
+
+from almkanal.data_utils.info_generator import build_json
 
 
 # %%
@@ -157,3 +160,21 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
     def __call__(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:
         """Enables the pipeline instance to be called like a function."""
         return self.run(data)
+
+    def generate_json(self, path: None | str = None, max_elements: int = 50) -> dict:
+        """This functions builds a JSON file containing the main settings for the applied cleaning steps.
+        Parameters:
+         path: The path to which a json file should be saved. If left to None no file is saved.
+         max_elements: the maximum number of elements per numpy array or list to save in the json file.
+
+        return:
+         A dictionary containing all the settings used in the almkanal pipeline.
+        """
+
+        json_file = build_json(self.info, max_seq_elems=max_elements)
+
+        if path is not None:
+            with open(path, 'w', encoding='utf-8') as f:  # noqa PTH123
+                json.dump(json_file, f, indent=2, ensure_ascii=False)
+
+        return json_file
