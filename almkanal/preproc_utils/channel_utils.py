@@ -122,6 +122,18 @@ class Maxwell(AlmKanalStep):
         }
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+        maxfilter_info_txt = f"""A signal-space separation (SSS) algorithm was used to remove external magnetic
+        interference from the MEG signal (1,2).
+        Additionally the head the algorithm aligned the data to a common standard head position
+        {info['Maxwell']['maxwell_info']['destination']}.
+
+        'References:
+        1. Samu Taulu and Matti Kajola. Presentation of electromagnetic multichannel data: the signal space
+           separation method. Journal of Applied Physics, 97(12):124905, 2005. doi:10.1063/1.1935742
+        2. Samu Taulu and Juha Simola. Spatiotemporal signal space separation method for rejecting nearby interference
+           in MEG measurements. Physics in Medicine and Biology, 51(7):1759–1768, 2006. doi:10.1088/0031-9155/51/7/008.
+           """
+        report.add_html(maxfilter_info_txt, title='raw_maxfiltered_method_txt')
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
 
 
@@ -309,7 +321,7 @@ class ReReference(AlmKanalStep):
         info: dict,
     ) -> dict:
         """
-        Does ReReferencing of your EEG, Ecog, seeg or dbs channels.
+        Does ReReferencing of your EEG, ECoG or sEEG channels.
         This is essentially a wrapper around mne.io.Raw.set_eeg_reference.
         The documentation is copied from there.
 

@@ -137,3 +137,6 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     ak.run(raw)
 
 
+    ak.generate_json()
+
+

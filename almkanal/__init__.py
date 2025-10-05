@@ -21,6 +21,7 @@ __all__ = [
     'MultiBlockMaxwell',
     'ReReference',
     'RANSAC',
+    'ReReference',
     'ICA',
     'PhysioCleaner',
     'Events',
