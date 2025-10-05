@@ -11,7 +11,25 @@ def gen_mne_data_raw():
 
     raw = raw.pick(picks=['meg', 'eog', 'stim'])
 
-    yield raw
+    raw.resample(sfreq=100)
+
+    yield raw, data_path
+
+
+@pytest.fixture(scope='session')
+def gen_mne_data_raw_eeg():
+    data_path = mne.datasets.sample.data_path()
+
+    meg_path = data_path / 'MEG' / 'sample'
+    raw_fname = meg_path / 'sample_audvis_raw.fif'
+    raw = mne.io.read_raw_fif(raw_fname, preload=True)#.crop(tmin=0, tmax=60)
+
+    raw = raw.pick(picks=['eeg', 'eog', 'stim'])
+
+    raw.resample(sfreq=100)
+
+    yield raw, data_path
+
 
 @pytest.fixture(scope='session')
 def gen_mne_data_epochs():
@@ -46,6 +64,8 @@ def gen_mne_data_epochs():
         preload=True,
         verbose=False,
     )
+
+    epochs.resample(sfreq=10)
 
     yield epochs
 

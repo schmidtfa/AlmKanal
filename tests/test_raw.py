@@ -1,33 +1,30 @@
-from almkanal.almkanal import AlmKanal
+from almkanal import (AlmKanal, Maxwell, ICA, ForwardModel, 
+                      SpatialFilter, SourceReconstruction, PhysioCleaner,
+                      RANSAC, ReReference, Filter, Resample)
 import pytest
-from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE
+from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE_SURF, SOURCE_VOL
 import mne
 
 #@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
-def test_src(gen_mne_data_raw): #, ch_picks
-    data_path = mne.datasets.sample.data_path()
-    meg_path = data_path / 'MEG' / 'sample'
-    ak = AlmKanal(raw=gen_mne_data_raw)
 
-    ak.do_maxwell()
-    # %% you can always use common mne methods like filtering that modify
-    # the raw and epoched objects in place
-    ak.raw.filter(l_freq=0.1, h_freq=100)
-    # %% one shot call to ica
-    ak.do_ica()
+def test_ransac(gen_mne_data_raw_eeg):
 
-    fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
-    fwd = mne.read_forward_solution(fwd_fname)
-    ak.pick_dict['meg'] = True
-    ak.fwd = fwd
-    ak.do_src(empty_room=gen_mne_data_raw)
+    raw, data_path = gen_mne_data_raw_eeg
+
+    ak = AlmKanal(steps=[RANSAC(),
+                         Filter(),
+                         ReReference(),
+                         Resample(100)])
+    ak.run(raw)
 
 
 
 def test_maxwell(gen_mne_data_raw):
 
-    ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_maxwell()
+    raw, data_path = gen_mne_data_raw
+
+    ak = AlmKanal(steps=[Maxwell()])
+    ak.run(raw)
 
 
 #@pytest.mark.parametrize('resample_freq', ICA_RESAMPLE, scope='session')
@@ -38,77 +35,108 @@ def test_maxwell(gen_mne_data_raw):
 #@pytest.mark.parametrize('n_components', ICA_NCOMPS, scope='session')
 def test_ica(gen_mne_data_raw, train, eog, ecg):
 
-    ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_ica(n_components=10,
-              train=train,
-              eog=eog,
-              ecg=ecg,
-              resample_freq=200,
-              threshold=0.4
-              )
-    
+    raw, data_path = gen_mne_data_raw
 
-def test_double_ica(gen_mne_data_raw):
-
-    ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_ica(n_components=10,
-              train=False,
-              eog=True,
-              ecg=False,
-              resample_freq=100,
-              threshold=0.4
-              )
-    
-    ak.do_ica(n_components=10,
-              train=False,
-              eog=True,
-              ecg=False,
-              resample_freq=100,
-              threshold=0.4
-              )
+    ak = AlmKanal(steps=[ICA(n_components=10,
+                        train=train,
+                        eog=eog,
+                        surrogate_eog_chs=None,
+                        ecg=ecg,
+                        emg=True,
+                        resample_freq=100,)])
+        
+    ak.run(raw)
 
 
-def test_ica_plot(gen_mne_data_raw):
-    ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_ica(n_components=40,
-              train=False,
-              eog=True,
-              ecg=True,
-              resample_freq=100,
-              threshold=0.4,
-              fname='test',
-              img_path='./data_old/'
-              )
-    
 
+@pytest.mark.parametrize('source, atlas', SOURCE_SURF, scope='session')
+def test_fwd(gen_mne_data_raw, source, atlas):
+    raw, data_path = gen_mne_data_raw
 
-def test_epoching(gen_mne_data_raw):
-    ak = AlmKanal(raw=gen_mne_data_raw)
-
-    ak.do_events()
-
-    event_dict = {
-    'Auditory/Left': 1,
-    'Auditory/Right': 2,
-    'Visual/Left': 3,
-    'Visual/Right': 4,
+    pick_dict = {
+        'meg': 'mag',
+        'eog': False,
+        'ecg': False,
+        'eeg': False,
+        'stim': False,
     }
 
-    ak.do_epochs(tmin=-0.2, tmax=0.5, event_id=event_dict)
+    ak = AlmKanal(steps=[ForwardModel(pick_dict=pick_dict,
+                                      subject_id='sample',
+                                      subjects_dir='./data_old/',
+                                      source=source),
+                        SpatialFilter(pick_dict=pick_dict),
+                        SourceReconstruction(subject_id = 'sample',
+                                            subjects_dir = './data_old/',
+                                            source=source,
+                                            atlas=atlas,
+                                            return_parc=True,)])
 
-@pytest.mark.parametrize('source, atlas', SOURCE, scope='session')
-def test_fwd(gen_mne_data_raw, source, atlas):
-    ak = AlmKanal(raw=gen_mne_data_raw)
-    ak.do_fwd_model(subject_id='sample',
-                    subjects_dir='./data_old/')
-    
-    ak.pick_dict['meg'] = 'mag'
-    ak.do_src(subject_id = 'sample',
-              subjects_dir = './data_old/',
-              source=source,
-              atlas=atlas,
-              return_parc=True,)
+    ak.run(raw)
     
 
+def test_src(): #, ch_picks
+    
+    data_path = mne.datasets.sample.data_path()
+
+    meg_path = data_path / 'MEG' / 'sample'
+    raw_fname = meg_path / 'sample_audvis_raw.fif'
+    #fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
+
+    raw = mne.io.read_raw_fif(raw_fname, preload=True)#.crop(tmin=0, tmax=60)
+
+    #raw = raw.pick(picks=['meg', 'eog', 'stim'])
+
+    
+    #fwd = mne.read_forward_solution(fwd_fname)
+
+    pick_dict = {
+        'meg': 'mag',
+        'eog': True,
+        'ecg': False,
+        'eeg': False,
+        'stim': False,
+    }
+    
+    ak = AlmKanal(pick_params=pick_dict,
+                  steps=[Maxwell(),
+                         ICA(),
+                         ForwardModel(subject_id='sample', 
+                                      subjects_dir='./data_old', 
+                                      redo_hdm=True),
+                         SpatialFilter( empty_room=raw.copy()),
+                         SourceReconstruction(source='volume'),
+                         ])
+    
+    ak.run(raw)
+
+
+@pytest.mark.parametrize('source, atlas', SOURCE_VOL, scope='session')
+def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
+    raw, data_path = gen_mne_data_raw
+
+    pick_dict = {
+        'meg': True,
+        'eog': False,
+        'ecg': False,
+        'eeg': False,
+        'stim': False,
+    }
+
+    ak = AlmKanal(steps=[ForwardModel(
+                                pick_dict=pick_dict,
+                                subject_id='sample',
+                                subjects_dir='./data_old/',
+                                source=source),
+                 SpatialFilter(pick_dict=pick_dict),
+                 SourceReconstruction(subject_id = 'sample',
+                                        subjects_dir = './data_old/',
+                                        source=source,
+                                        atlas=atlas,
+                                        return_parc=True,)])
+    ak.run(raw)
+
+
+    ak.generate_json()
 
 
