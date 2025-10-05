@@ -19,6 +19,7 @@ __all__ = [
     'Resample',
     'Maxwell',
     'MultiBlockMaxwell',
+    'ReReference',
     'RANSAC',
     'ReReference',
     'ICA',
