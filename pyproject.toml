@@ -20,7 +20,7 @@ classifiers = [
 keywords = ['preprocessing', 'M/EEG', 'MNE Python', 'source analysis']
 requires-python = ">=3.11"
 dependencies = ["mne>=1.8", "pyrasa>=1.1.1,<2", "autoreject>=0.4.3",
-                "attrs", "neurokit2", 'ipyevents']
+                "attrs", "neurokit2", 'ipyevents', "jinja2>=3.1,<4",]
 
 [tool.pixi.system-requirements]
 linux = "4.18"
@@ -72,6 +72,7 @@ pyvistaqt = ">=0.11.2,<0.12"
 ipywidgets = ">=8.1.5,<9"
 autoreject = ">=0.4.3,<0.5"
 pywavelets = ">=1.8.0,<2"
+jinja2 = ">=3.1.6,<4"
 
 
 [tool.pixi.feature]
@@ -88,6 +89,12 @@ testpy312 = ['py312']
 source = "regex_commit"
 path = "almkanal/__version__.py"
 tag_sign = false
+
+[tool.hatch.build]
+include = ["almkanal/**"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["almkanal"]
 
 [tool.ruff]
 line-length = 120

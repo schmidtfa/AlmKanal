@@ -5481,11 +5481,12 @@ packages:
   name: almkanal
   version: 1.0.0.dev0
   path: .
-  sha256: 8f0a2818200024c7fad15d51f3edf5cfa1c4b2328ccde1ed2e5e329e45e1c867
+  sha256: 23a33f80986b8ce15d118431c6f641e1800ca98a4a35f231d461990df5717144
   requires_dist:
   - attrs
   - autoreject>=0.4.3
   - ipyevents
+  - jinja2<4,>=3.1
   - mne>=1.8
   - neurokit2
   - pyrasa<2,>=1.1.1
