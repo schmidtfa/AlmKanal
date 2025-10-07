@@ -1,0 +1,4 @@
+{# expected keys: source_type, nsource, source_ori, surf_ori, is_free_ori #}
+{% set free = (('FREE_ORI' in (s.settings.source_ori|string)) or s.settings.is_free_ori) %}
+Forward model was computed ({{ s.settings.source_type or 'unknown' }} source space;
+{{ 'free orientation' if free else 'fixed orientation' }}; n_sources={{ s.settings.nsource or 'n/a' }}).

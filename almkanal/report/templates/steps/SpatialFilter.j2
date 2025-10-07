@@ -1,0 +1,8 @@
+{# expected keys: kind, pick_ori, weight_norm, rank, is_free_ori, n_sources, src_type #}
+{% set kind = s.settings.kind or 'Beamformer' %}
+{{ kind }} spatial filter
+{%- set extras = [] -%}
+{%- for k, v in s.settings.items() if k != 'kind' and v is not none -%}
+{%- set _ = extras.append(k ~ '=' ~ v) -%}
+{%- endfor -%}
+{%- if extras %} ({{ extras | join('; ') }}){% endif %}.

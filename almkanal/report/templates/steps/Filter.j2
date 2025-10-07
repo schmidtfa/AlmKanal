@@ -1,0 +1,17 @@
+{# expected keys: l_freq, h_freq, method, phase, fir_window, fir_design, pad, skip_by_annotation #}
+{% set lf = s.settings.l_freq %}
+{% set hf = s.settings.h_freq %}
+{% set method = s.settings.method | default('fir') %}
+{% set phase = s.settings.phase | default('zero') %}
+{% set win = s.settings.fir_window | default('hamming') %}
+{% set design = s.settings.fir_design | default('firwin') %}
+Band-pass filtering at
+{%- if lf is not none and hf is not none -%}
+ {{ lf }}–{{ hf }} Hz
+{%- else -%}
+ an unspecified passband
+{%- endif -%}
+ using {{ method|upper }} (phase={{ phase }}, window={{ win }}, design={{ design }}
+{%- if s.settings.pad is not none %}, padding={{ s.settings.pad }}{% endif -%}
+{%- if s.settings.skip_by_annotation %}, skip_by_annotation={{ s.settings.skip_by_annotation | join(', ') }}{% endif -%}
+).

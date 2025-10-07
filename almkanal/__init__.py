@@ -2,15 +2,15 @@
 
 from almkanal.__version__ import __version__
 from almkanal.almkanal import AlmKanal, AlmKanalStep
-from almkanal.preproc_utils.bio_utils import PhysioCleaner
-from almkanal.preproc_utils.channel_utils import RANSAC, Maxwell, MultiBlockMaxwell, ReReference
-from almkanal.preproc_utils.epoch_utils import Epochs
-from almkanal.preproc_utils.event_utils import Events
-from almkanal.preproc_utils.filter_utils import Filter, Resample
-from almkanal.preproc_utils.ica_utils import ICA
-from almkanal.src_utils.headmodel_utils import ForwardModel
-from almkanal.src_utils.spatial_filter_utils import SpatialFilter
-from almkanal.src_utils.src_recon_utils import SourceReconstruction
+from almkanal.almkanal_steps.bio_utils import PhysioCleaner
+from almkanal.almkanal_steps.channel_utils import RANSAC, Maxwell, MultiBlockMaxwell, ReReference
+from almkanal.almkanal_steps.epoch_utils import Epochs
+from almkanal.almkanal_steps.event_utils import Events
+from almkanal.almkanal_steps.filter_utils import Filter, Resample
+from almkanal.almkanal_steps.headmodel_utils import ForwardModel
+from almkanal.almkanal_steps.ica_utils import ICA
+from almkanal.almkanal_steps.spatial_filter_utils import SpatialFilter
+from almkanal.almkanal_steps.src_recon_utils import SourceReconstruction
 
 __all__ = [
     'AlmKanal',
@@ -21,7 +21,6 @@ __all__ = [
     'MultiBlockMaxwell',
     'ReReference',
     'RANSAC',
-    'ReReference',
     'ICA',
     'PhysioCleaner',
     'Events',

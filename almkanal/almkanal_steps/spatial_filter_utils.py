@@ -11,7 +11,7 @@ from mne._fiff.pick import _contains_ch_type
 from numpy.typing import NDArray
 
 from almkanal import AlmKanalStep
-from almkanal.preproc_utils.channel_utils import run_maxwell
+from almkanal.almkanal_steps.channel_utils import run_maxwell
 
 
 # %%

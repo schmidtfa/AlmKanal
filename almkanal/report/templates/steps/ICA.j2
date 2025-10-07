@@ -1,0 +1,11 @@
+{# settings: anything persisted (e.g., method, n_components); results: eog/ecg/total medians/ranges #}
+Independent component analysis (ICA)
+{%- if s.settings %} with
+ {%- for k,v in s.settings.items() if v is not none -%}
+ {{ ' ' if loop.first else '; '}}{{ k }}={{ v }}
+ {%- endfor -%}
+{%- endif -%}
+; components attributed to ocular and cardiac artifacts were removed (per-subject medians:
+EOG {{ s.results.eog_median }} [{{ s.results.eog_range }}],
+ECG {{ s.results.ecg_median }} [{{ s.results.ecg_range }}],
+total {{ s.results.total_median }} [{{ s.results.total_range }}]).
