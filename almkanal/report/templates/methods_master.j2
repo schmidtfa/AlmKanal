@@ -1,8 +1,6 @@
 ### Preprocessing
-
 {# --- shared reference namespace (per render) --- #}
 {% set refns = namespace(order=[], nums={}, texts={}) %}
-
 {# --- macro: cite a reference by key; provide full text on first use --- #}
 {% macro ref(key, text=None) -%}
   {%- if key not in refns.nums %}
@@ -26,7 +24,8 @@
 
 {# --- References section (deduped, in order of first appearance) --- #}
 {% if refns.order %}
-\n### References
+
+### References
 {% for key in refns.order -%}
 {{ refns.nums[key] }}. {{ refns.texts[key] if refns.texts[key] is not none else key }}
 {% endfor %}

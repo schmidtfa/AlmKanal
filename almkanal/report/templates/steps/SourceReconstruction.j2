@@ -1,9 +1,8 @@
-{# expected keys: orig_data_type, source, atlas, label_mode, subject_id, subjects_dir #}
-{% set src = s.settings.source or 'source' %}
-Source reconstruction ({{ src }}
-{%- set extras = [] -%}
-{%- for k, v in s.settings.items() if k != 'source' and v is not none -%}
-{%- set _ = extras.append(k ~ '=' ~ v) -%}
-{%- endfor -%}
-{%- if extras %}; {{ extras | join('; ') }}{% endif -%}
-).
+{# Optional refs:
+{% set _ = ref('Glasser2016','Glasser, M. F., et al. (2016). A multi-modal parcellation of human cerebral cortex. *Nature*, 536, 171–178.') %}
+#}
+
+Sensor data were projected to source space using the spatial filters, and
+{%- if s.settings.atlas %} parcellated with the {{ 'HCP-MMP1' if s.settings.atlas|lower == 'glasser' else s.settings.atlas }} atlas{%- endif -%}
+{%- if s.settings.label_mode %} (label aggregation: {{ s.settings.label_mode }}){%- endif -%}.
+{%- if s.settings.n_labels %} The parcellation comprised {{ s.settings.n_labels }} labels.{% endif -%}

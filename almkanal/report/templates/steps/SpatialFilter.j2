@@ -1,8 +1,16 @@
-{# expected keys: kind, pick_ori, weight_norm, rank, is_free_ori, n_sources, src_type #}
-{% set kind = s.settings.kind or 'Beamformer' %}
-{{ kind }} spatial filter
-{%- set extras = [] -%}
-{%- for k, v in s.settings.items() if k != 'kind' and v is not none -%}
-{%- set _ = extras.append(k ~ '=' ~ v) -%}
-{%- endfor -%}
-{%- if extras %} ({{ extras | join('; ') }}){% endif %}.
+{# Optional refs:
+{% set _ = ref('VanVeen1997','Van Veen, B. D., et al. (1997). Localization of brain electrical activity via linearly constrained minimum variance spatial filtering. *IEEE Trans Biomed Eng*, 44(9), 867–880.') %}
+#}
+
+{{ (s.settings.kind or 'LCMV') }} beamformer spatial filters were computed
+{%- if s.settings.pick_ori %} (pick_ori={{ s.settings.pick_ori }}){% endif -%}
+{%- if s.settings.weight_norm %} with weight normalization={{ s.settings.weight_norm }}{% endif -%}
+{%- if s.settings.rank %}; rank={{ s.settings.rank }}{% endif -%}
+{%- if s.settings.reg is not none %}; regularization={{ s.settings.reg }}{% endif -%}
+{%- if s.settings.has_data_cov or s.settings.has_noise_cov %};
+ using
+  {%- if s.settings.has_data_cov %} a data covariance matrix{% endif -%}
+  {%- if s.settings.has_data_cov and s.settings.has_noise_cov %} and{% endif -%}
+  {%- if s.settings.has_noise_cov %} a noise covariance matrix{% endif -%}
+  {%- if s.settings.noise_cov_source %} (noise from {{ s.settings.noise_cov_source }}){% endif -%}
+{%- endif %}.

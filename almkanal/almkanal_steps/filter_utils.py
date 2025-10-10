@@ -1,3 +1,5 @@
+from typing import Literal
+
 import mne
 from attrs import define
 
@@ -10,8 +12,8 @@ class Filter(AlmKanalStep):
     lowpass: float = 40
     picks = None
     filter_length = 'auto'
-    l_trans_bandwidth = 'auto'
-    h_trans_bandwidth = 'auto'
+    l_trans_bandwidth: float | Literal['auto'] = 'auto'
+    h_trans_bandwidth: float | Literal['auto'] = 'auto'
     n_jobs = None
     method = 'fir'
     iir_params = None
@@ -25,13 +27,27 @@ class Filter(AlmKanalStep):
     must_be_after: tuple = ()
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
+        if self.l_trans_bandwidth == 'auto':
+            l_trans_bandwidth = min(
+                max(self.highpass * 0.25, 2), self.highpass
+            )  # mne python default -> but we want exact values for reports
+        else:
+            l_trans_bandwidth = self.l_trans_bandwidth
+
+        if self.h_trans_bandwidth == 'auto':
+            h_trans_bandwidth = min(
+                max(self.lowpass * 0.25, 2.0), data.info['sfreq'] / 2.0 - self.lowpass
+            )  # mne python default -> but we want exact values for reports
+        else:
+            h_trans_bandwidth = self.h_trans_bandwidth
+
         data.filter(
             l_freq=self.highpass,
             h_freq=self.lowpass,
             picks=self.picks,
             filter_length=self.filter_length,
-            l_trans_bandwidth=self.l_trans_bandwidth,
-            h_trans_bandwidth=self.h_trans_bandwidth,
+            l_trans_bandwidth=l_trans_bandwidth,
+            h_trans_bandwidth=h_trans_bandwidth,
             n_jobs=self.n_jobs,
             method=self.method,
             iir_params=self.iir_params,
@@ -49,11 +65,13 @@ class Filter(AlmKanalStep):
                 'h_freq': self.lowpass,
                 'picks': self.picks,
                 'filter_length': self.filter_length,
-                'l_trans_bandwidth': self.l_trans_bandwidth,
-                'h_trans_bandwidth': self.h_trans_bandwidth,
+                'l_trans_bandwidth': round(l_trans_bandwidth, 2),
+                'h_trans_bandwidth': round(h_trans_bandwidth, 2),
                 'n_jobs': self.n_jobs,
                 'method': self.method,
-                'iir_params': self.iir_params,
+                'iir_params': dict(order=4, ftype='butter', output='sos')
+                if self.method == 'iir' and self.iir_params is None
+                else self.iir_params,
                 'phase': self.phase,
                 'fir_window': self.fir_window,
                 'fir_design': self.fir_design,
