@@ -7,8 +7,10 @@
    train, train_freq, train_thresh, fit_only (bool)
 #}
 {# RESULTS you can provide (prefer mean±SD; fallback median+range):
-   total_mean, total_sd, eog_mean, eog_sd, ecg_mean, ecg_sd,
-   total_median, total_range, eog_median, eog_range, ecg_median, ecg_range
+   total_mean, total_sd,
+   eog_mean, eog_sd, ecg_mean, ecg_sd, emg_mean, emg_sd, train_mean, train_sd,
+   total_median, total_range,
+   eog_median, eog_range, ecg_median, ecg_range, emg_median, emg_range, train_median, train_range
 #}
 {% set method = (s.settings.method or 'fastica') | lower %}
 {% set ncomp  = s.settings.n_components %}
@@ -45,8 +47,10 @@
   {% set _ = ref('WenLiu2016',
     'Wen, H., & Liu, Z. (2016). Separating fractal and oscillatory components in the power spectrum of '
     'neurophysiological signal. *Brain Topography*, 29, 13–26. https://doi.org/10.1007/s10548-015-0448-0') %}
+  {% set _ = ref('SchmidtWeiszHartmann2025',
+    'Schmidt, F., Weisz, N., & Hartmann, T. (2025). PyRASA – Spectral parametrization in Python based on IRASA. '
+    '*Journal of Open Source Software*, 10(109), 7852. https://doi.org/10.21105/joss.07852') %}
 {% endif %}
-
 
 #### Independent Component Analysis
 For extracting physiological artifacts, 
@@ -64,27 +68,56 @@ independent components were computed using the {{ method|upper }} algorithm
 {%- if used_ecg or used_eog or used_emg or used_train -%}
 Components related to
 {%- set parts = [] -%}
-{%- if used_ecg %}{% set _ = parts.append('cardiac (ECG)') %}{% endif -%}
-{%- if used_eog %}{% set _ = parts.append('ocular (EOG)') %}{% endif -%}
-{%- if used_emg %}{% set _ = parts.append('muscle (EMG)') %}{% endif -%}
-{%- if used_train %}{% set _ = parts.append('train-related noise') %}{% endif -%}
+{%- if used_ecg %}{% set _ = parts.append(' cardiac (ECG)') %}{% endif -%}
+{%- if used_eog %}{% set _ = parts.append(' ocular (EOG)') %}{% endif -%}
 {{ parts | join(', ') }}
-were identified via Pearson *r* correlation with an appropriate reference signals.
-{%- if used_eog %}
-  {%- if thr_eog is not none %} EOG threshold: *r* > {{ thr_eog }}.{% endif -%}
-{%- endif -%}
-{%- if used_ecg %}
-  {%- if thr_ecg is not none %} ECG threshold: *r* > {{ thr_ecg }}.{% endif -%}
-{%- endif -%}
-{%- if used_emg %}{% if emg_thr is not none %} EMG detection used a relative threshold of {{ emg_thr }} SD.{% endif %}{% endif -%}
-{%- if used_train %} Train components were detected with IRASA at ~{{ train_f }} Hz (selection threshold {{ train_sd }} SD; {{ ref('WenLiu2016') }}).{%- endif -%}
+ activity were identified via Pearson *r* correlation with appropriate reference signals (
+{%- if used_eog and thr_eog is not none %} EOG threshold: *r* > {{ thr_eog }};{% endif -%}
+{%- if used_ecg and thr_ecg is not none %} ECG threshold: *r* > {{ thr_ecg }}).{% endif -%}
+{%- if used_emg and emg_thr is not none %} EMG detection used a relative threshold of {{ emg_thr }} SD.{% endif -%}
+{%- if used_train %} Train components were detected with IRASA at ~{{ train_f }} Hz (selection threshold {{ train_sd }} SD; {{ ref('WenLiu2016') }}, {{ ref('SchmidtWeiszHartmann2025') }}).{%- endif -%}
 {%- endif %}
 
 The computed ICA was applied to the original data to remove the identified components.
-{# --- summary of rejections --- #}
-{%- if s.results.total_mean is defined and s.results.total_sd is defined -%}
- On average, {{ "%.2f"|format(s.results.total_mean) }} components were rejected per subject (SD = {{ "%.2f"|format(s.results.total_sd) }}).
-{%- elif s.results.total_median is defined and s.results.total_range is defined -%}
- The number of rejected components per subject had a median of {{ s.results.total_median }} [{{ s.results.total_range }}].
-{%- endif -%}
-
+{# --- summary of rejections (totals + per-group means/SD with fallbacks) --- #}
+{% set lines = [] %}
+{# Total #}
+{% if s.results.total_mean is defined and s.results.total_sd is defined %}
+  {% set _ = lines.append("On average, " ~ "%.2f"|format(s.results.total_mean) ~ " components were rejected per subject (SD = " ~ "%.2f"|format(s.results.total_sd) ~ ").") %}
+{% elif s.results.total_median is defined and s.results.total_range is defined %}
+  {% set _ = lines.append("The number of rejected components per subject had a median of " ~ s.results.total_median ~ " [" ~ s.results.total_range ~ "].") %}
+{% endif %}
+{# Per-group #}
+{% set groups = [] %}
+{% if used_eog %}
+  {% if s.results.eog_mean is defined and s.results.eog_sd is defined %}
+    {% set _ = groups.append("EOG " ~ "%.2f"|format(s.results.eog_mean) ~ " ± " ~ "%.2f"|format(s.results.eog_sd)) %}
+  {% elif s.results.eog_median is defined and s.results.eog_range is defined %}
+    {% set _ = groups.append("EOG median " ~ s.results.eog_median ~ " [" ~ s.results.eog_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if used_ecg %}
+  {% if s.results.ecg_mean is defined and s.results.ecg_sd is defined %}
+    {% set _ = groups.append("ECG " ~ "%.2f"|format(s.results.ecg_mean) ~ " ± " ~ "%.2f"|format(s.results.ecg_sd)) %}
+  {% elif s.results.ecg_median is defined and s.results.ecg_range is defined %}
+    {% set _ = groups.append("ECG median " ~ s.results.ecg_median ~ " [" ~ s.results.ecg_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if used_emg %}
+  {% if s.results.emg_mean is defined and s.results.emg_sd is defined %}
+    {% set _ = groups.append("EMG " ~ "%.2f"|format(s.results.emg_mean) ~ " ± " ~ "%.2f"|format(s.results.emg_sd)) %}
+  {% elif s.results.emg_median is defined and s.results.emg_range is defined %}
+    {% set _ = groups.append("EMG median " ~ s.results.emg_median ~ " [" ~ s.results.emg_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if used_train %}
+  {% if s.results.train_mean is defined and s.results.train_sd is defined %}
+    {% set _ = groups.append("Train " ~ "%.2f"|format(s.results.train_mean) ~ " ± " ~ "%.2f"|format(s.results.train_sd)) %}
+  {% elif s.results.train_median is defined and s.results.train_range is defined %}
+    {% set _ = groups.append("Train median " ~ s.results.train_median ~ " [" ~ s.results.train_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if groups %}
+  {% set _ = lines.append("By artifact type: " ~ groups|join("; ") ~ ".") %}
+{% endif %}
+{{ " " ~ lines|join(" ") }}

@@ -1,53 +1,67 @@
-from typing import Literal
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Literal
 
 import mne
 from attrs import define
 
 from almkanal import AlmKanalStep
 
+if TYPE_CHECKING:
+    import numpy.typing as npt
+
 
 @define
 class Filter(AlmKanalStep):
-    highpass: float = 0.1
-    lowpass: float = 40
-    picks = None
-    filter_length = 'auto'
+    highpass: float | None = 0.1
+    lowpass: float | None = 40.0
+    picks: str | npt.ArrayLike | slice | None = None
+    filter_length: str | int = 'auto'
     l_trans_bandwidth: float | Literal['auto'] = 'auto'
     h_trans_bandwidth: float | Literal['auto'] = 'auto'
-    n_jobs = None
-    method = 'fir'
-    iir_params = None
-    phase = 'zero'
-    fir_window = 'hamming'
-    fir_design = 'firwin'
-    skip_by_annotation = ('edge', 'bad_acq_skip')
-    pad = 'reflect_limited'
+    n_jobs: int | str | None = None
+    method: str = 'fir'
+    iir_params: dict[str, Any] | None = None
+    phase: str = 'zero'
+    fir_window: str = 'hamming'
+    fir_design: str = 'firwin'
+    skip_by_annotation: str | tuple[str, ...] | list[str] = ('edge', 'bad_acq_skip')
+    pad: str = 'reflect_limited'
 
-    must_be_before: tuple = ()
-    must_be_after: tuple = ()
+    must_be_before: tuple[str, ...] = ()
+    must_be_after: tuple[str, ...] = ()
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict[str, Any]) -> dict[str, Any]:
+        # --- compute transition bandwidths for REPORT (floats) and for API call (float | 'auto')
+        l_tb_report: float | None = None
+        h_tb_report: float | None = None
+
         if self.l_trans_bandwidth == 'auto':
-            l_trans_bandwidth = min(
-                max(self.highpass * 0.25, 2), self.highpass
-            )  # mne python default -> but we want exact values for reports
+            if self.highpass is not None:
+                # exact value inspired by MNE default, but concrete for reporting
+                l_tb_report = float(min(max(self.highpass * 0.25, 2.0), self.highpass))
+            l_tb_param: float | str = l_tb_report if l_tb_report is not None else 'auto'
         else:
-            l_trans_bandwidth = self.l_trans_bandwidth
+            l_tb_param = self.l_trans_bandwidth
+            l_tb_report = float(self.l_trans_bandwidth)
 
         if self.h_trans_bandwidth == 'auto':
-            h_trans_bandwidth = min(
-                max(self.lowpass * 0.25, 2.0), data.info['sfreq'] / 2.0 - self.lowpass
-            )  # mne python default -> but we want exact values for reports
+            if self.lowpass is not None:
+                nyq_margin = float(data.info['sfreq']) / 2.0 - self.lowpass
+                h_tb_report = float(min(max(self.lowpass * 0.25, 2.0), nyq_margin))
+            h_tb_param: float | str = h_tb_report if h_tb_report is not None else 'auto'
         else:
-            h_trans_bandwidth = self.h_trans_bandwidth
+            h_tb_param = self.h_trans_bandwidth
+            h_tb_report = float(self.h_trans_bandwidth)
 
+        # --- apply filter
         data.filter(
             l_freq=self.highpass,
             h_freq=self.lowpass,
             picks=self.picks,
             filter_length=self.filter_length,
-            l_trans_bandwidth=l_trans_bandwidth,
-            h_trans_bandwidth=h_trans_bandwidth,
+            l_trans_bandwidth=l_tb_param,
+            h_trans_bandwidth=h_tb_param,
             n_jobs=self.n_jobs,
             method=self.method,
             iir_params=self.iir_params,
@@ -58,6 +72,19 @@ class Filter(AlmKanalStep):
             pad=self.pad,
         )
 
+        # normalize skip_by_annotation to a JSON-friendly list (keep str as-is)
+        if isinstance(self.skip_by_annotation, str):
+            skip_for_json: str | list[str] = self.skip_by_annotation
+        else:
+            skip_for_json = list(self.skip_by_annotation)
+
+        # default iir_params only when needed
+        iir_params_json: dict[str, Any] | None
+        if self.method == 'iir' and self.iir_params is None:
+            iir_params_json = {'order': 4, 'ftype': 'butter', 'output': 'sos'}
+        else:
+            iir_params_json = self.iir_params
+
         return {
             'data': data,
             'filter_info': {
@@ -65,30 +92,25 @@ class Filter(AlmKanalStep):
                 'h_freq': self.lowpass,
                 'picks': self.picks,
                 'filter_length': self.filter_length,
-                'l_trans_bandwidth': round(l_trans_bandwidth, 2),
-                'h_trans_bandwidth': round(h_trans_bandwidth, 2),
+                'l_trans_bandwidth': None if l_tb_report is None else round(l_tb_report, 2),
+                'h_trans_bandwidth': None if h_tb_report is None else round(h_tb_report, 2),
                 'n_jobs': self.n_jobs,
                 'method': self.method,
-                'iir_params': dict(order=4, ftype='butter', output='sos')
-                if self.method == 'iir' and self.iir_params is None
-                else self.iir_params,
+                'iir_params': iir_params_json,
                 'phase': self.phase,
                 'fir_window': self.fir_window,
                 'fir_design': self.fir_design,
-                'skip_by_annotation': self.skip_by_annotation,
+                'skip_by_annotation': skip_for_json,
                 'pad': self.pad,
             },
         }
 
-    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict[str, Any]) -> None:
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='Raw (filtered)')
-
         elif isinstance(data, mne.BaseEpochs):
             base_corr = data.copy()
             base_corr.apply_baseline(baseline=(None, 0))
-            # report.add_epochs(base_corr, psd=False, title='EpochedResample')
-
             evokeds = base_corr.average(by_event_type=True)
             report.add_evokeds(evokeds, n_time_points=5)
 
@@ -96,23 +118,22 @@ class Filter(AlmKanalStep):
 @define
 class Resample(AlmKanalStep):
     sfreq: int
-    npad = 'auto'
-    window = 'auto'
-    n_jobs = None
-    pad = 'auto'
-    method = 'fft'
-    must_be_before: tuple = ()
-    must_be_after: tuple = ('Epochs',)
+    npad: str = 'auto'
+    window: str = 'auto'
+    n_jobs: int | None = None
+    pad: str = 'auto'
+    method: str = 'fft'
+    must_be_before: tuple[str, ...] = ()
+    must_be_after: tuple[str, ...] = ('Epochs',)
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
-        if not self.sfreq / 2 >= data.info['lowpass']:
-            lowpass = data.info['lowpass']
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict[str, Any]) -> dict[str, Any]:
+        if not (self.sfreq / 2 >= float(data.info['lowpass'])):
+            lowpass = float(data.info['lowpass'])
             raise ValueError(
                 'You need to apply an anti-aliasing filter before downsampling the data.'
-                f' Currently you lowpass the data at {lowpass}Hz. '
-                'Note: I am aware that the resampling method in MNE does that automatically, '
-                'but I am not a big fan of that approach as I prefer to set filters explicitely '
-                'hence the error message.'
+                f' Currently you lowpass the data at {lowpass} Hz. '
+                'Note: MNE’s resampling applies an internal anti-aliasing filter, but this pipeline '
+                'prefers explicit filter settings for reporting.'
             )
 
         data.resample(
@@ -130,22 +151,17 @@ class Resample(AlmKanalStep):
                 'sfreq': self.sfreq,
                 'npad': self.npad,
                 'window': self.window,
-                #'stim_picks': None,
                 'n_jobs': self.n_jobs,
-                #'events': None,
                 'pad': self.pad,
                 'method': self.method,
             },
         }
 
-    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict[str, Any]) -> None:
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='RawResample')
-
         elif isinstance(data, mne.BaseEpochs):
             base_corr = data.copy()
             base_corr.apply_baseline(baseline=(None, 0))
-            # report.add_epochs(base_corr, psd=False, title='EpochedResample')
-
             evokeds = base_corr.average(by_event_type=True)
             report.add_evokeds(evokeds, n_time_points=5)

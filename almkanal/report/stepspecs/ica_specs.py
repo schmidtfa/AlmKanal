@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from statistics import mean, median, pstdev
 from typing import Any
+
+from numpy import mean, median, std
 
 from .registry import StepSpec, register_step
 
@@ -15,7 +16,7 @@ _ALLOWED_KEYS: set[str] = {
     'corr_metric',
     'eog',
     'eog_corr_thresh',
-    'surrogate_eog_chs',  # expect {"left": [...], "right": [...]}
+    'surrogate_eog_chs',
     'ecg',
     'ecg_corr_thresh',
     'ecg_from_meg',
@@ -29,18 +30,17 @@ _ALLOWED_KEYS: set[str] = {
 
 # Keys to drop (non-serializable or large)
 _IGNORE_KEYS: set[str] = {
-    'ica',  # mne.preprocessing.ICA object
+    'ica',
     'component_ids',
-    'components_dict',  # used only in summarize()
+    'components_dict',
     'eog_scores',
     'ecg_scores',
+    # add others here if they appear, e.g. 'emg_scores'
 }
 
 
 def _to_native(x: Any) -> Any:
-    """Convert numpy scalars/arrays to Python types; leave mappings/lists as-is."""
     try:
-        # numpy scalar has .item(); guard with try to avoid importing numpy here
         item = getattr(x, 'item', None)
         if callable(item):
             return item()
@@ -50,21 +50,16 @@ def _to_native(x: Any) -> Any:
 
 
 def _sanitize_surrogate(chs: Any) -> dict[str, list[str]] | None:
-    """Ensure surrogate_eog_chs has {'left': [..], 'right': [..]} lists of strings."""
     if not isinstance(chs, dict):
         return None
     left = chs.get('left')
     right = chs.get('right')
     if not isinstance(left, list | tuple) or not isinstance(right, list | tuple):
         return None
-    return {
-        'left': [str(c) for c in left],
-        'right': [str(c) for c in right],
-    }
+    return {'left': [str(c) for c in left], 'right': [str(c) for c in right]}
 
 
 def _settings(info: dict[str, Any]) -> dict[str, Any]:
-    """Pick & sanitize ICA settings for reporting."""
     out: dict[str, Any] = {}
     for k, v in info.items():
         if k in _IGNORE_KEYS:
@@ -83,52 +78,65 @@ def _med_range(xs: list[int]) -> tuple[str, str]:
     if not xs:
         return 'n/a', 'n/a'
     xs_sorted = sorted(xs)
-    med = median(xs_sorted)
+    med = median(xs_sorted)  # may be float
     rng = f'{xs_sorted[0]}–{xs_sorted[-1]}' if xs_sorted[0] != xs_sorted[-1] else str(xs_sorted[0])
-    return (f'{med:.1f}' if isinstance(med, float) else str(med)), rng
+    return (f'{float(med):.1f}' if isinstance(med, float) else str(med)), rng
+
+
+def _mean_sd(xs: list[int]) -> tuple[float, float] | None:
+    if not xs:
+        return None
+    m = float(mean(xs))
+    s = float(std(xs)) if len(xs) > 1 else 0.0  # NumPy std defaults to population SD (ddof=0)
+    return m, s
 
 
 def _summarize(infos: list[dict[str, Any]]) -> dict[str, Any]:
-    """Aggregate per-subject ICA rejections (EOG/ECG/total)."""
+    """Aggregate per-subject ICA rejections (EOG/ECG/EMG/train and total)."""
     eog_counts: list[int] = []
     ecg_counts: list[int] = []
+    emg_counts: list[int] = []
+    train_counts: list[int] = []
     total_counts: list[int] = []
 
     for info in infos:
         comps = info.get('components_dict') or {}
         e = set(comps.get('eog') or [])
         c = set(comps.get('ecg') or [])
+        m = set(comps.get('emg') or [])
+        t = set(comps.get('train') or [])
         eog_counts.append(len(e))
         ecg_counts.append(len(c))
-        total_counts.append(len(e | c))
+        emg_counts.append(len(m))
+        train_counts.append(len(t))
+        total_counts.append(len(e | c | m | t))
 
     out: dict[str, Any] = {}
 
-    # Preferred: mean ± SD
-    if total_counts:
-        out['total_mean'] = mean(total_counts)
-        out['total_sd'] = pstdev(total_counts) if len(total_counts) > 1 else 0.0
-    if eog_counts:
-        out['eog_mean'] = mean(eog_counts)
-        out['eog_sd'] = pstdev(eog_counts) if len(eog_counts) > 1 else 0.0
-    if ecg_counts:
-        out['ecg_mean'] = mean(ecg_counts)
-        out['ecg_sd'] = pstdev(ecg_counts) if len(ecg_counts) > 1 else 0.0
+    # Means ± SDs (JSON-friendly floats)
+    for key, arr in (
+        ('eog', eog_counts),
+        ('ecg', ecg_counts),
+        ('emg', emg_counts),
+        ('train', train_counts),
+        ('total', total_counts),
+    ):
+        ms = _mean_sd(arr)
+        if ms is not None:
+            out[f'{key}_mean'], out[f'{key}_sd'] = ms
 
-    # Fallback: median + range
-    em, er = _med_range(eog_counts)
-    cm, cr = _med_range(ecg_counts)
-    tm, tr = _med_range(total_counts)
-    out.update(
-        {
-            'eog_median': em,
-            'eog_range': er,
-            'ecg_median': cm,
-            'ecg_range': cr,
-            'total_median': tm,
-            'total_range': tr,
-        }
-    )
+    # Medians + ranges (fallbacks)
+    for key, arr in (
+        ('eog', eog_counts),
+        ('ecg', ecg_counts),
+        ('emg', emg_counts),
+        ('train', train_counts),
+        ('total', total_counts),
+    ):
+        med, rng = _med_range(arr)
+        out[f'{key}_median'] = med
+        out[f'{key}_range'] = rng
+
     return out
 
 

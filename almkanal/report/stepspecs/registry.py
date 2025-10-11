@@ -12,10 +12,15 @@ SettingsFn = Callable[[dict[str, Any]], dict[str, Any]]
 SummarizeFn = Callable[[list[dict[str, Any]]], dict[str, Any]]
 
 
+def _empty_summarize(_: list[dict[str, Any]]) -> dict[str, Any]:
+    """Default no-op summarizer so summarize_fn is always callable."""
+    return {}
+
+
 @dataclass(frozen=True)
 class StepSpec:
     settings_fn: SettingsFn
-    summarize_fn: SummarizeFn | None = None
+    summarize_fn: SummarizeFn = _empty_summarize  # non-optional default
 
 
 _REGISTRY: dict[str, StepSpec] = {}
@@ -65,6 +70,10 @@ def load_stepspec_package(package: str) -> None:
         importlib.import_module(modname)
 
 
-# handy key selector
 def keys_selector(*keys: str) -> SettingsFn:
-    return lambda info: {k: info.get(k) for k in keys if k in info}
+    """Return a settings_fn that picks only the given keys from the info dict."""
+
+    def _selector(info: dict[str, Any]) -> dict[str, Any]:
+        return {k: info.get(k) for k in keys if k in info}
+
+    return _selector

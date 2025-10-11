@@ -114,7 +114,7 @@ def build_context_from_files(
         spec = specs.get(step, StepSpec(settings_fn=lambda info: dict(info)))  # fallback: all fields
         settings_pairs = [(fn, spec.settings_fn(info)) for fn, info in per_step_pairs[step]]
         canon = require_identical(step, settings_pairs)  # enforce identical settings
-        results = spec.summarize_fn(per_step_infos[step]) if spec.summarize_fn else {}
+        results = spec.summarize_fn(per_step_infos[step])
         steps_ctx.append(StepContext(step, canon, results))
 
     return MethodsContext(
