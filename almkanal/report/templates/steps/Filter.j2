@@ -1,0 +1,62 @@
+{# steps/Filter.j2 — concise, human-readable reporting aligned with MNE + Widmann (2015) + Keil et al. #}
+{% set lf = s.settings.l_freq %}
+{% set hf = s.settings.h_freq %}
+{% set method = (s.settings.method | default('fir')) | lower %}
+{% set iir_order = s.settings.iir_params.order | default(4) %}
+{% set phase = s.settings.phase | default('zero') %}
+{% set win = s.settings.fir_window | default('hamming') %}
+{% set design = s.settings.fir_design | default('firwin') %}
+{% set ltb = s.settings.l_trans_bandwidth | default(none) %}
+{% set htb = s.settings.h_trans_bandwidth | default(none) %}
+{% set ripple = s.settings.passband_ripple_db | default(none) %}
+{% set atten = s.settings.stopband_atten_db | default(none) %}
+{% set roll_in  = s.settings.rolloff | default(none) %}
+{% set pad = s.settings.pad | default(none) %}
+{% set applied_to = s.settings.applied_to | default(none) %} {# e.g., 'continuous' or 'epoched' (optional) #}
+{# decide filter kind #}
+{% if lf is not none and hf is not none %}
+  {% if lf < hf %}
+    {% set kind = 'band-pass' %}
+  {% elif lf > hf %}
+    {% set kind = 'band-stop' %}
+  {% else %}
+    {% set kind = 'notch' %}
+  {% endif %}
+{% elif lf is not none %}
+  {% set kind = 'high-pass' %}
+{% elif hf is not none %}
+  {% set kind = 'low-pass' %}
+{% else %}
+  {% set kind = 'filter' %}
+{% endif %}
+{# FIR cutoff label, and cutoff frequencies at mid-transition (MNE definition) #}
+{% set cutoff_label = '–12 dB' if phase == 'zero-double' else '–6 dB' %}
+{% set cut_low  = (lf - (ltb / 2.0)) if (method == 'fir' and lf is not none and ltb is number) else (lf if method == 'iir' else none) %}
+{% set cut_high = (hf + (htb / 2.0)) if (method == 'fir' and hf is not none and htb is number) else (hf if method == 'iir' else none) %}
+{# Roll-off text #}
+{% if roll_in is not none %}
+  {% set roll_text = roll_in %}
+{% else %}
+  {% if method == 'iir' %}
+    {% set roll_text = '≈ ' ~ (6.02 * iir_order) | round(1) ~ ' dB/octave (' ~ (20 * iir_order) ~ ' dB/decade)' %}
+  {% else %}
+    {% if kind in ['band-pass','band-stop','notch'] %}
+      {% set roll_text = 'set by the transition bandwidths (low ' ~ (ltb ~ ' Hz' if ltb is number else 'n/a') ~ ', high ' ~ (htb ~ ' Hz' if htb is number else 'n/a') ~ ')' %}
+    {% elif kind == 'high-pass' %}
+      {% set roll_text = 'set by the transition bandwidth (' ~ (ltb ~ ' Hz' if ltb is number else 'n/a') ~ ')' %}
+    {% elif kind == 'low-pass' %}
+      {% set roll_text = 'set by the transition bandwidth (' ~ (htb ~ ' Hz' if htb is number else 'n/a') ~ ')' %}
+    {% else %}
+      {% set roll_text = 'set by the transition bandwidth(s)' %}
+    {% endif %}
+  {% endif %}
+{% endif %}
+
+
+#### Offline filtering
+{% if kind in ['band-pass','band-stop'] %}A {{ kind }} filter ({{ lf }}–{{ hf }} Hz) {% elif kind == 'notch' %}A notch filter {{ lf }} {% elif kind == 'high-pass' %}A high-pass filter at {{ lf }} {% elif kind == 'low-pass' %}A low-pass filter at {{ hf }} {% endif %}was applied to the {% if applied_to %} {{ applied_to }} {% endif %}data.
+{% if method == 'fir' %}The finite impulse response (FIR, {{ win }} window) filter was zero-phase (acausal, forward–backward) with a transition bandwidth of {% if kind in ['band-pass','band-stop','notch'] %}{{ ltb | round(3) }}Hz on the low edge and {{ htb | round(3) }}Hz on the high edge{% elif kind == 'high-pass' %} {{ ltb | round(3) }}Hz{% elif kind == 'low-pass' %} {{ htb | round(3) }}Hz{% else %} as specified{% endif %}.
+Cutoffs are defined at the {{ cutoff_label }} midpoint of each transition band, yielding{% if cut_low is not none and cut_high is not none %} cutoff frequencies of {{ cut_low | round(3) }} Hz (lower) and {{ cut_high | round(3) }} Hz (upper){% elif cut_low is not none %} a cutoff frequency of {{ cut_low | round(3) }} Hz{% elif cut_high is not none %} a cutoff frequency of {{ cut_high | round(3) }} Hz{% else %} the reported midpoint cutoffs{% endif %}.
+{% elif method == 'iir' %}The infinite impulse response (IIR, {{ iir_order }}th-order Butterworth) filter was applied forward–backward for zero phase (acausal). Cutoff{% if kind in ['band-pass','band-stop'] %} frequencies were at the band edges ({{ lf }} and {{ hf }} Hz){% else %} frequency was at {{ (lf if lf is not none else hf) }} Hz{% endif %}; the asymptotic roll-off was {{ roll_text }}.
+{% endif %}{% if ripple is not none or atten is not none %}The frequency-response characteristics of the filter{% if ripple is not none and atten is not none %} were {{ ripple }} dB passband ripple and {{ atten }} dB stopband attenuation{% elif ripple is not none %} included {{ ripple }} dB passband ripple{% elif atten is not none %} included {{ atten }} dB stopband attenuation{% endif %}.{% endif %}
+Reporting was aimed to follow recommended practices for electrophysiological filtering ({{ ref('Widmann2015', 'Widmann, A., Schröger, E., & Maess, B. (2015). Digital filter design for electrophysiological data: A practical approach. Journal of Neuroscience Methods, 250, 34–46. doi:10.1016/j.jneumeth.2014.08.002') }}, {{ ref('Keil2014', 'Keil, A., Debener, S., Gratton, G., Junghöfer, M., Kappenman, E. S., Luck, S. J., Luu, P., Miller, G. A., & Yee, C. M. (2014). Committee report: Publication guidelines and recommendations for studies using EEG and MEG. Psychophysiology, 51(1), 1–21. https://doi.org/10.1111/psyp.12147') }}).

@@ -110,7 +110,35 @@ class PhysioCleaner(AlmKanalStep):
             emg=self.emg,
         )
 
-        return {'data': data}
+        return {'data': data,
+                "physio_info": { #hardcoded for now
+                    "bio_info": {
+                    "sampling_rate": 1000,
+                    "ecg": {
+                        "ecg": self.ecg is not None,
+                        "clean_method": "neurokit",
+                        "powerline_hz": 50,
+                        "rpeak_method": "neurokit",
+                        "channels": ["ECG"]
+                    },
+                    "eog": {
+                        "eog": self.eog is not None,
+                        "clean_method": "neurokit",
+                        "bandpass_hz": [0.25, 7.5],
+                        "blink_method": "mne",
+                        "channels": ["VEOG", "HEOG"]
+                    },
+                    "emg": {
+                        "emg": self.emg is not None,
+                        "clean_method": "biosppy",
+                        "amplitude": {"lowcut": 10, "highcut": 400, "envelope_lp": 8},
+                        "activation_method": "threshold",
+                        "channels": ["EMG1", "EMG2"]
+                    }
+                    }
+                }
+        }
+
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
         pass  # maybe let this function plot ECG ERP etc.
