@@ -1,0 +1,17 @@
+{# Optional refs (uncomment if you want them numbered)
+{% set _ = ref('HamalainenSarvas1989','Hämäläinen, M., & Sarvas, J. (1989). Realistic conductivity geometry model of the human head for interpretation of neuromagnetic data. *IEEE Trans Biomed Eng*, 36(2), 165–171.') %}
+#}
+
+
+#### Source Analysis
+To relate sensor-level signals to cortical generators, a forward (leadfield) model was computed
+for a {{ s.settings.source_type or 'surface' }} source space
+{%- if s.settings.ico_level %} ({{ s.settings.ico_level }}){% endif -%}
+{%- if s.settings.n_per_hemi %} with {{ s.settings.n_per_hemi|sum }} total sources{% endif -%}
+{%- if s.settings.free_orientation %}, using free orientation{% else %}, using fixed orientation{% endif %}.
+{%- if s.settings.template_subject %} Co-registration used the template subject ‘fsaverage’.{% endif -%}
+{%- if s.settings.bem_model or s.settings.bem_layers %}
+ A boundary element head model was used
+  {%- if s.settings.bem_model %} ({{ s.settings.bem_model }}){% endif -%}
+  {%- if s.settings.bem_layers %}; layers={{ s.settings.bem_layers }}{% endif -%}.
+{%- endif %}

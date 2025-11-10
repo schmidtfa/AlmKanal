@@ -1,0 +1,14 @@
+{# expected keys: tmin, tmax, baseline, reject, flat, preload #}
+{% set tmin = s.settings.tmin %}
+{% set tmax = s.settings.tmax %}
+Data were epoched
+{%- if tmin is not none and tmax is not none -%}
+ from {{ tmin }} to {{ tmax }} s
+{%- endif -%}
+ relative to events
+{%- if s.settings.baseline is not none %} (baseline={{ s.settings.baseline }}){%- endif -%}
+{%- set extras = [] -%}
+{%- for k, v in s.settings.items() if k not in ['tmin','tmax','baseline'] and v is not none -%}
+{%- set _ = extras.append(k ~ '=' ~ v) -%}
+{%- endfor -%}
+{%- if extras %}; {{ extras | join('; ') }}{%- endif -%}.

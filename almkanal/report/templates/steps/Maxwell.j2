@@ -1,0 +1,16 @@
+{# Maxwell / SSS with inline numbered citations via ref() macro #}
+
+#### Signal Space Separation
+A signal-space separation (SSS) algorithm ({{ ref('TauluKajola2005', 'Samu Taulu and Matti Kajola. Presentation of electromagnetic multichannel data: the signal space separation method. *Journal of Applied Physics*, 97(12):124905, 2005. doi:10.1063/1.1935742') }}, {{ ref('TauluSimola2006', 'Samu Taulu and Juha Simola. Spatiotemporal signal space separation method for rejecting nearby interference in MEG measurements. *Physics in Medicine and Biology*, 51(7):1759–1768, 2006. doi:10.1088/0031-9155/51/7/008') }}), implemented in MNE-Python ({{ ref('Gramfort2014', 'Gramfort, A., Luessi, M., Larson, E., Engemann, D. A., Strohmeier, D., Brodbeck, C., ... & Hämäläinen, M. S. (2014). MNE software for processing MEG and EEG data. neuroimage, 86, 446-460. doi:10.1016/j.neuroimage.2013.10.027')}}), was applied to identify and interpolate bad channels and to remove external magnetic interference from the MEG data
+{%- if s.settings.destination is not none %}
+ Additionally, the algorithm aligned the data to a common standard head position
+ {%- if s.settings.destination is sequence -%}
+  ({{ s.settings.destination | join(', ') }}).
+ {%- else -%}
+  ({{ s.settings.destination }}).
+ {%- endif -%}
+{%- else %}.
+{%- endif %}
+{%- if s.settings.st_duration is not none %} tSSS was applied with st_duration={{ s.settings.st_duration }}.{% endif %}
+{%- if s.settings.calibration_file is not none %} A fine-calibration file was used.{% else %} No fine-calibration file was used.{% endif %}
+{%- if s.settings.cross_talk_file is not none %} Cross-talk compensation was applied.{% else %} No cross-talk compensation was applied.{% endif %}
