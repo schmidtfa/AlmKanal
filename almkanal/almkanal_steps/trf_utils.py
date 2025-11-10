@@ -65,7 +65,7 @@ class TRFSpanSpec:
         return list(self.spans_by_label.keys())
 
 
-def build_trf_epochs(  # noqa: C901, PLR0915
+def build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     raw: mne.io.BaseRaw,
     spec: TRFSpanSpec,  # <<< use the attrs object
     base_audio_path: str | Path,  # root; WAV is base / <label>.wav
@@ -143,7 +143,7 @@ def build_trf_epochs(  # noqa: C901, PLR0915
         if n_aud != desired_n:
             audio_data = audio_data[:, :desired_n]
 
-        #t_seg_off = t_seg_on + seg_len_s
+        # t_seg_off = t_seg_on + seg_len_s
         t_seg_off = t_seg_on + (desired_n - 1) / sfreq
 
         # crop segment and add audio as misc

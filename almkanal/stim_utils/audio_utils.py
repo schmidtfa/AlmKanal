@@ -68,8 +68,7 @@ def prepare_audio(
 
         elif feature == 'flux':
             odf = librosa.onset.onset_strength(
-                S=librosa.power_to_db(np.maximum(s, 1e-12), 
-                                      ref=np.max), sr=sr, hop_length=hop
+                S=librosa.power_to_db(np.maximum(s, 1e-12), ref=np.max), sr=sr, hop_length=hop
             )
             x = odf[None, :]
             names = ['flux']
