@@ -65,7 +65,7 @@ class TRFSpanSpec:
         return list(self.spans_by_label.keys())
 
 
-def build_trf_epochs(  # noqa: C901, PLR0915
+def build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     raw: mne.io.BaseRaw,
     spec: TRFSpanSpec,  # <<< use the attrs object
     base_audio_path: str | Path,  # root; WAV is base / <label>.wav
@@ -126,10 +126,29 @@ def build_trf_epochs(  # noqa: C901, PLR0915
             continue
 
         t_seg_on = (on_corr / sfreq) + hw_delay_s
-        t_seg_off = t_seg_on + seg_len_s
+
+        # audio length in samples
+        n_aud = int(audio_data.shape[1])
+
+        # how many MEG samples are actually available starting at t_seg_on?
+        # (+1 because include_tmax=True includes the last sample)
+        n_meg_avail = max(0, int(np.floor((raw.times[-1] - t_seg_on) * sfreq)) + 1)
+
+        # we can only keep the minimum of the two
+        desired_n = min(n_aud, n_meg_avail)
+        if desired_n <= 0:
+            continue
+
+        # trim audio to exactly the number of MEG samples we can obtain
+        if n_aud != desired_n:
+            audio_data = audio_data[:, :desired_n]
+
+        # t_seg_off = t_seg_on + seg_len_s
+        t_seg_off = t_seg_on + (desired_n - 1) / sfreq
 
         # crop segment and add audio as misc
-        seg = raw.copy().crop(tmin=t_seg_on, tmax=t_seg_off, include_tmax=False)
+        seg = raw.copy().crop(tmin=t_seg_on, tmax=t_seg_off, include_tmax=True)
+
         info_aud = mne.create_info(
             ch_names=audio_names,
             sfreq=float(fs_aud),
