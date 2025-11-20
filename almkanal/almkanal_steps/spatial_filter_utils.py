@@ -333,6 +333,7 @@ class SpatialFilter(AlmKanalStep):
     noise_cov: None | NDArray = None
     empty_room: None | str | mne.io.Raw = None
     nearest_empty_room: bool = False
+    chans2keep: list | None = None
 
     must_be_before: tuple = ('SourceReconstruction',)
     must_be_after: tuple = (
@@ -369,6 +370,9 @@ class SpatialFilter(AlmKanalStep):
         elif self.pick_dict is None and info['Picks'] is None:
             raise ValueError('pick_dict must be provided for spatial filtering.')
 
+        # before picking data we want to keep our extra data (e.g. envelopes, ECG, EOG or eyetracker)
+        extra_data = {ch: data.get_data(ch) for ch in self.chans2keep} if self.chans2keep is not None else None
+
         if self.fwd is None:
             self.fwd = info['ForwardModel']['fwd_info']['fwd']
 
@@ -389,6 +393,7 @@ class SpatialFilter(AlmKanalStep):
                 'lcmv_settings': lcmv_settings,
                 'data_cov': data_cov,
                 'noise_cov': noise_cov,
+                'extra_data': extra_data,
             },
         }
 
