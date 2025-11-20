@@ -196,7 +196,7 @@ class SourceReconstruction(AlmKanalStep):
         if type(stc) is dict:
             stc['extra_data'] = info['SpatialFilter']['spatial_filter_info']['extra_data']
         else:
-            stc = {'stc': stc, 'extra_data': info['SpatialFilter']['spatial_filter_info']['extra_data']}
+            stc = {'label_tc': stc, 'extra_data': info['SpatialFilter']['spatial_filter_info']['extra_data']}
 
         # add metadata for events to src file
         if isinstance(data, mne.BaseEpochs):
