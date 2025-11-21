@@ -222,7 +222,8 @@ class SourceReconstruction(AlmKanalStep):
         import matplotlib.pyplot as plt
         import scipy.signal as dsp
 
-        if isinstance(data, dict) and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
+        # if isinstance(data, dict) and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
+        if self.return_parc:
             freq, psd = dsp.welch(data['label_tc'], fs=data['fs'], nperseg=data['fs'] * 4, noverlap=data['fs'] * 2)
 
             f, ax = plt.subplots(ncols=2, figsize=(15, 5))
