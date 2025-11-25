@@ -25,9 +25,9 @@ def _resample_poly_exact(x: np.ndarray, fs_in: int | float, fs_out: int | float,
     return y
 
 
-def prepare_audio(
+def prepare_audio(  # noqa PLR0915
     audio_path: str,
-    feature: str = 'envelope',  # 'envelope' | 'mel' | 'flux' | 'rectify'
+    feature: str = 'envelope',
     target_fs: float = 100.0,  # desired feature rate (Hz)
     cutoff_hz: float = 80.0,  # LP for envelope-like features
     n_mels: int = 32,
@@ -82,9 +82,59 @@ def prepare_audio(
             )  # [n_mels, n_frames]
             centers = librosa.mel_frequencies(n_mels=n_mels, fmin=fmin, fmax=fmax)
             names = [f'mel_{int(round(fc))}Hz' for fc in centers]
+    elif feature in ['pitch', 'pitch_voicing']:
+        # Frame length for pYIN:
+        # ~40 ms window, at least 2 hops long
+        frame_length = max(2 * hop, int(round(0.04 * sr)))
+
+        # Speech-like pitch range (change if needed)
+        fmin = 50.0
+        fmax = 400.0
+
+        # pYIN: returns f0 (Hz), voiced flag, and voicing probability
+        f0, voiced_flag, voiced_prob = librosa.pyin(
+            y,
+            fmin=fmin,
+            fmax=fmax,
+            sr=sr,
+            frame_length=frame_length,
+            hop_length=hop,
+        )  # f0.shape == (n_frames,)
+
+        # Robust voicing decision: voiced_flag already boolean
+        # also exclude NaNs just in case
+        voiced = (voiced_flag) & ~np.isnan(f0)
+
+        if feature == 'pitch':
+            # Plain F0 in Hz, but avoid NaNs (TRF hates them)
+            f0_hz = f0.copy()
+            f0_hz[~voiced] = 0.0  # unvoiced -> 0 Hz
+
+            x = f0_hz[None, :]  # [1, n_frames]
+            names = ['f0_hz']
+
+        elif feature == 'pitch_voicing':
+            # 1) log2(F0), mean-centered over *voiced* frames only
+            f0_log2 = np.zeros_like(f0)
+            if np.any(voiced):
+                f0_log2[voiced] = np.log2(f0[voiced])
+                f0_log2[voiced] -= np.mean(f0_log2[voiced])
+
+            # set unvoiced frames to 0
+            f0_log2[~voiced] = 0.0
+
+            # 2) voicing regressor; you can also use voiced_prob instead
+            v = voiced.astype(float)
+            # or:
+            # v = voiced_prob.astype(float)
+
+            x = np.vstack([f0_log2, v])  # [2, n_frames]
+            names = ['log2_f0_centered', 'voicing']
 
     else:
-        raise ValueError("feature must be one of {'envelope','mel','flux'}")
+        raise ValueError(
+            "feature must be one of {'envelope','rectify','mel','flux','mel_onsets','pitch','pitch_voicing'}"
+        )
 
     # 2) one LP for ALL features (time axis = 0)
     cutoff = min(max(cutoff_hz, 1e-6), 0.49 * base_fs)
