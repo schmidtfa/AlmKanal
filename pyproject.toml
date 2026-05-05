@@ -21,7 +21,7 @@ keywords = ['preprocessing', 'M/EEG', 'MNE Python', 'source analysis']
 requires-python = ">=3.11"
 dependencies = ["mne>=1.8", "pyrasa>=1.1.1,<2", "autoreject>=0.4.3",
                 "attrs", "neurokit2", 'ipyevents', "jinja2>=3.1,<4",
-                "pandoc"]
+                "pandoc", "librosa"]
 
 [tool.pixi.system-requirements]
 linux = "4.18"
@@ -75,6 +75,7 @@ autoreject = ">=0.4.3,<0.5"
 pywavelets = ">=1.8.0,<2"
 jinja2 = ">=3.1.6,<4"
 pandoc = ">=3.8.2,<4"
+librosa = ">=0.11.0,<0.12"
 
 
 [tool.pixi.feature]

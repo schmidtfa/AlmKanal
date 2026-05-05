@@ -193,6 +193,20 @@ class SourceReconstruction(AlmKanalStep):
                 label_mode=self.label_mode,
             )
 
+        if type(stc) is not dict:
+            stc = {
+                'label_tc': stc,
+                'fs': data.info['sfreq'],
+                'extra_data': info['SpatialFilter']['spatial_filter_info']['extra_data'],
+            }
+
+        if 'SpatialFilter' in info:
+            stc['extra_data'] = info['SpatialFilter']['spatial_filter_info']['extra_data']
+
+        # add metadata for events to src file
+        if isinstance(data, mne.BaseEpochs):
+            stc['metadata'] = data.metadata
+
         return {
             'data': stc,
             'stc_info': {
@@ -209,7 +223,8 @@ class SourceReconstruction(AlmKanalStep):
         import matplotlib.pyplot as plt
         import scipy.signal as dsp
 
-        if isinstance(data, dict) and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
+        # # if isinstance(data, dict) and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
+        if self.return_parc and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
             freq, psd = dsp.welch(data['label_tc'], fs=data['fs'], nperseg=data['fs'] * 4, noverlap=data['fs'] * 2)
 
             f, ax = plt.subplots(ncols=2, figsize=(15, 5))

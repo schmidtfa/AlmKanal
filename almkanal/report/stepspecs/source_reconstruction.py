@@ -54,7 +54,7 @@ def _select_forward_model(info: dict[str, Any]) -> dict[str, Any]:
         'ico_level': ico,  # e.g., "ico-4" if surface decimated
         # frames / subject template
         'coord_frame': _get(fwd, 'coord_frame') or _get(src_list[0] or {}, 'coord_frame'),
-        'template_subject': info.get('subject_id_freesurfer') or _get(src_list[0] or {}, 'subject_his_id'),
+        #'template_subject': info.get('subject_id_freesurfer') or _get(src_list[0] or {}, 'subject_his_id'),
         'subjects_dir': info.get('subject_dir'),
         # bem summary if you log it (optional—will render if present)
         'bem_model': info.get('bem_model'),
@@ -83,7 +83,7 @@ def _select_spatial_filter(info: dict[str, Any]) -> dict[str, Any]:
         'kind': (filt.get('kind') or 'LCMV'),
         'pick_ori': (filt.get('pick_ori') or lcmv.get('pick_ori')),
         'weight_norm': (filt.get('weight_norm') or lcmv.get('weight_norm')),
-        'rank': (filt.get('rank') or lcmv.get('rank')),
+        #'rank': (filt.get('rank') or lcmv.get('rank')),
         'is_free_ori': bool(filt.get('is_free_ori')),
         'n_sources': filt.get('n_sources')
         or _get(info, 'filters', 'vertices')
@@ -115,7 +115,7 @@ def _select_source_recon(info: dict[str, Any]) -> dict[str, Any]:
         'atlas': info.get('atlas'),  # e.g., "glasser" (HCP-MMP1)
         'label_mode': info.get('label_mode'),  # e.g., "pca_flip"
         'subjects_dir': info.get('subjects_dir'),
-        'subject_id': info.get('subject_id'),
+        #'subject_id': info.get('subject_id'),
         # optional: number of labels if you log it
         'n_labels': info.get('n_labels'),
     }
