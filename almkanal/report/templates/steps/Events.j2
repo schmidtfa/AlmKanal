@@ -1,0 +1,11 @@
+{# expected keys: event_id (dict), stim_channel, min_duration, consecutive #}
+{% set eid = s.settings.event_id %}
+Events were detected
+{%- if eid is mapping and eid %}
+ (event_id: {%- for k, v in eid.items() -%}{{ ' ' if loop.first else ', '}}{{ k }}={{ v }}{%- endfor -%})
+{%- endif -%}
+{%- set extras = [] -%}
+{%- for k, v in s.settings.items() if k != 'event_id' and v is not none -%}
+{%- set _ = extras.append(k ~ '=' ~ v) -%}
+{%- endfor -%}
+{%- if extras %} with {{ extras | join('; ') }}{% endif %}.
