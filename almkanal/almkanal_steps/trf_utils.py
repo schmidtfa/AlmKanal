@@ -16,6 +16,7 @@ from almkanal.almkanal import AlmKanalStep
 from almkanal.stim_utils.alignment_utils import (
     DEFAULT_FALLBACK_DRIFT_US_PER_S,
     apply_raw_wav_alignment,
+    assume_raw_wav_alignment,
     estimate_raw_wav_alignment,
     find_audio_trials,
     summarize_alignments,
@@ -92,8 +93,10 @@ class TRFSpanSpec:
 
         Set infer_missing_ends=True to replace missing end triggers with WAV
         duration * (1 + fallback_drift_us_per_s / 1e6), on the raw clock.
-        The default prior is +499 us/s; EpochTRF still estimates actual offset
-        and drift by cross-correlation when audio_channels are supplied.
+        The default prior is +499 us/s; this only defines the span. EpochTRF
+        estimates actual offset and drift when audio_channels are supplied.
+        Without recorded audio, enable realign_without_audio on EpochTRF to
+        also resample the neural data, using the same fallback_drift_us_per_s.
         Pass base_audio_path for relative WAV paths, and end_triggers=None
         when no end-trigger codes exist. Actual end triggers take precedence.
         End-inference provenance is retained in epoch metadata and reports;
@@ -136,23 +139,28 @@ def _aligned_segment(
     off_samp: int | None,
     wav: Path,
     delay_samples: int,
-    audio_channels: Sequence[str],
+    audio_channels: Sequence[str] | None,
+    fallback_drift_us_per_s: float,
     alignment_kwargs: Mapping[str, Any],
     preserve_annotations: bool,
     verbose: bool,
 ) -> tuple[mne.io.BaseRaw, dict[str, Any]]:
     sfreq = float(raw.info['sfreq'])
-    trial = raw.copy().crop(
-        tmin=(on_samp - raw.first_samp) / sfreq,
-        tmax=None if off_samp is None else (off_samp - raw.first_samp) / sfreq,
-    )
-    alignment = estimate_raw_wav_alignment(
-        trial,
-        wav,
-        audio_channels=audio_channels,
-        verbose=verbose,
-        **alignment_kwargs,
-    )
+    if audio_channels is None:
+        alignment = assume_raw_wav_alignment(wav, sfreq, fallback_drift_us_per_s=fallback_drift_us_per_s)
+    else:
+        trial = raw.copy().crop(
+            tmin=(on_samp - raw.first_samp) / sfreq,
+            tmax=None if off_samp is None else (off_samp - raw.first_samp) / sfreq,
+        )
+        alignment = estimate_raw_wav_alignment(
+            trial,
+            wav,
+            audio_channels=audio_channels,
+            verbose=verbose,
+            **alignment_kwargs,
+        )
+        alignment = {**alignment, 'alignment_method': 'audio'}
     before = max(0, -delay_samples)
     after = max(0, delay_samples)
     aligned = apply_raw_wav_alignment(
@@ -184,6 +192,8 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     epoch_len_s: float = 5.0,
     wav_ext: str = '.wav',
     audio_channels: Sequence[str] | None = None,
+    realign_without_audio: bool = False,
+    fallback_drift_us_per_s: float = DEFAULT_FALLBACK_DRIFT_US_PER_S,
     alignment_kwargs: Mapping[str, Any] | None = None,
     preserve_annotations: bool = True,
     on_alignment_error: Literal['raise', 'skip'] = 'raise',
@@ -197,6 +207,8 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
         raise ValueError('audio_channels must contain at least one recorded audio channel, or be None.')
     if alignment_kwargs and audio_channels is None:
         raise ValueError('alignment_kwargs requires audio_channels to enable realignment.')
+    if realign_without_audio and (not np.isfinite(fallback_drift_us_per_s) or 1.0 + fallback_drift_us_per_s / 1e6 <= 0):
+        raise ValueError('fallback_drift_us_per_s must be finite and yield a positive clock slope (> -1000000).')
     if on_alignment_error not in {'raise', 'skip'}:
         raise ValueError("on_alignment_error must be either 'raise' or 'skip'.")
     if hw_delay_s < 0:
@@ -240,7 +252,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
             'end_inference_wav_duration_s': trial_metadata.get('end_inference_wav_duration_s'),
         }
         alignment = None
-        if audio_channels is not None:
+        if audio_channels is not None or realign_without_audio:
             try:
                 seg, alignment = _aligned_segment(
                     raw,
@@ -249,6 +261,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
                     wav,
                     delay_samples,
                     audio_channels,
+                    fallback_drift_us_per_s,
                     dict(alignment_kwargs or {}),
                     preserve_annotations,
                     verbose,
@@ -335,6 +348,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
                     'wav_t_on': local_on_s,
                     'wav_t_off': local_on_s + epoch_len_s,
                     'alignment_offset_s': [alignment['offset_s']] * len(ep),
+                    'alignment_method': [alignment['alignment_method']] * len(ep),
                     'clock_slope': [slope] * len(ep),
                     'drift_us_per_s': [alignment['drift_us_per_s']] * len(ep),
                     'hw_delay_s': [hw_delay_s] * len(ep),
@@ -379,6 +393,8 @@ def build_trf_epochs(
     epoch_len_s: float = 5.0,
     wav_ext: str = '.wav',
     audio_channels: Sequence[str] | None = None,
+    realign_without_audio: bool = False,
+    fallback_drift_us_per_s: float = DEFAULT_FALLBACK_DRIFT_US_PER_S,
     alignment_kwargs: Mapping[str, Any] | None = None,
     preserve_annotations: bool = True,
     on_alignment_error: Literal['raise', 'skip'] = 'raise',
@@ -387,6 +403,12 @@ def build_trf_epochs(
     """Build TRF epochs, optionally realigning before physical-delay correction.
 
     Supplying audio_channels enables per-trial offset and drift estimation.
+    With audio_channels=None, realign_without_audio=True instead resamples using
+    WAV duration and fallback_drift_us_per_s (default +499 us/s). This assumes
+    the trial onset is WAV time zero; no onset offset is measured. Positive
+    drift means t_raw = (1 + drift / 1e6) * t_wav relative to the trial onset.
+    Recorded audio takes precedence when supplied, and failed audio fits follow
+    on_alignment_error without falling back to an assumed drift.
     hw_delay_s always shifts neural data relative to WAV features, after any
     realignment, rounded to the nearest sample on the corrected clock.
     Positive values advance neural events; the default +0.0165 s compensates
@@ -408,6 +430,8 @@ def build_trf_epochs(
         epoch_len_s=epoch_len_s,
         wav_ext=wav_ext,
         audio_channels=audio_channels,
+        realign_without_audio=realign_without_audio,
+        fallback_drift_us_per_s=fallback_drift_us_per_s,
         alignment_kwargs=alignment_kwargs,
         preserve_annotations=preserve_annotations,
         on_alignment_error=on_alignment_error,
@@ -420,8 +444,15 @@ def build_trf_epochs(
 class EpochTRF(AlmKanalStep):
     """Attach WAV features and epoch trials, with optional audio realignment.
 
-    audio_channels=None retains fixed-delay-only processing. Otherwise, recorded
-    audio channels must still be present with sufficient bandwidth for alignment.
+    audio_channels=None retains fixed-delay-only processing unless
+    realign_without_audio=True. That opt-in mode uses the original WAV duration
+    and fallback_drift_us_per_s (default +499 us/s) to resample neural data,
+    assuming WAV time zero at each trial onset: t_raw = (1 + drift / 1e6) * t_wav.
+    It cannot measure an onset offset or confirm the assumed drift. The original
+    end sample does not determine the drift; the WAV defines output duration.
+    Recorded audio takes precedence when audio_channels are supplied and must
+    still be present with sufficient bandwidth for alignment. Failed audio fits
+    follow on_alignment_error without falling back to an assumed drift.
     Each trial is first corrected to WAV time, then hw_delay_s is applied to
     neural data before attaching the unchanged WAV feature channels. Positive
     values advance neural events relative to those features; the default
@@ -456,6 +487,9 @@ class EpochTRF(AlmKanalStep):
     on_alignment_error: Literal['raise', 'skip'] = 'raise'
     verbose: bool = True
 
+    realign_without_audio: bool = field(default=False, kw_only=True)
+    fallback_drift_us_per_s: float = field(default=DEFAULT_FALLBACK_DRIFT_US_PER_S, kw_only=True)
+
     must_be_before: tuple = ()
     must_be_after: tuple = ()
 
@@ -471,6 +505,8 @@ class EpochTRF(AlmKanalStep):
             hw_delay_s=self.hw_delay_s,
             epoch_len_s=self.epoch_len_s,
             audio_channels=self.audio_channels,
+            realign_without_audio=self.realign_without_audio,
+            fallback_drift_us_per_s=self.fallback_drift_us_per_s,
             alignment_kwargs=self.alignment_kwargs,
             preserve_annotations=self.preserve_annotations,
             on_alignment_error=self.on_alignment_error,
@@ -494,7 +530,16 @@ class EpochTRF(AlmKanalStep):
                 'hw_delay_s': self.hw_delay_s,
                 'applied_hw_delay_s': round(self.hw_delay_s * sfreq) / sfreq,
                 'epoch_len_s': self.epoch_len_s,
-                'realign_audio': self.audio_channels is not None,
+                'realign_audio': self.audio_channels is not None or self.realign_without_audio,
+                'alignment_method': (
+                    'audio'
+                    if self.audio_channels is not None
+                    else 'assumed_drift'
+                    if self.realign_without_audio
+                    else None
+                ),
+                'realign_without_audio': self.realign_without_audio,
+                'fallback_drift_us_per_s': self.fallback_drift_us_per_s,
                 'audio_channels': None if self.audio_channels is None else list(self.audio_channels),
                 'alignment_kwargs': alignment_settings,
                 'preserve_annotations': self.preserve_annotations,
@@ -510,6 +555,7 @@ class EpochTRF(AlmKanalStep):
             alignment = trf_info['alignment_info']
             columns = {
                 'label': 'Trial',
+                'alignment_method': 'Alignment method',
                 'end_inferred': 'End inferred',
                 'end_inference_drift_us_per_s': 'End prior (µs/s)',
                 'offset_s': 'Offset (s)',
@@ -521,6 +567,15 @@ class EpochTRF(AlmKanalStep):
                 'n_epochs': 'Epochs',
             }
             table = pd.DataFrame(alignment['trials']).reindex(columns=list(columns)).rename(columns=columns)
+            if trf_info.get('alignment_method') == 'assumed_drift':
+                method = (
+                    f'<p>Assumed drift correction: {trf_info["fallback_drift_us_per_s"]:g} µs/s. '
+                    'Neural data were resampled using the original WAV duration, assuming WAV time zero '
+                    'at the trial onset (zero offset). No recorded audio was used; drift and offset '
+                    'were not measured, and residual/correlation diagnostics are unavailable.</p>'
+                )
+            else:
+                method = '<p>Alignment offset and drift were estimated from recorded audio.</p>'
             html = (
                 f'<p>Aligned {alignment["n_trials_aligned"]} of {alignment["n_trials_found"]} trials; '
                 f'{alignment["n_trials_failed"]} failed. Physical-delay correction after realignment: '
@@ -529,8 +584,8 @@ class EpochTRF(AlmKanalStep):
                 'WAV feature channels were left unchanged; positive values advance neural events '
                 'to compensate playback-to-ear delay, and negative values add lag.</p>'
                 f'<p>{alignment["n_trials_end_inferred"]} trial ends were inferred from WAV duration '
-                'and an assumed drift rate. These priors only defined trial spans; '
-                'the reported alignment drift was estimated from the audio.</p>'
+                'and an assumed drift rate.</p>'
+                + method
                 + table.to_html(index=False, escape=True, float_format=lambda value: f'{value:.6g}')
             )
             if alignment['failures']:

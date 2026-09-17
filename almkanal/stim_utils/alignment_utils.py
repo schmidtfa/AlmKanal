@@ -494,6 +494,7 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
     residuals = anchor_lags - (offset + drift * anchor_times)
 
     alignment: dict[str, Any] = {
+        'alignment_method': 'audio',
         'offset_s': float(offset),
         'clock_slope': float(clock_slope),
         'raw_sfreq': raw_sfreq,
@@ -534,6 +535,43 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
             f'drift={drift * 1e6:+.3f} us/s, residual RMS={alignment["residual_rms_ms"]:.3f} ms'
         )
     return alignment
+
+
+def assume_raw_wav_alignment(
+    wav_file: str | Path,
+    raw_sfreq: float,
+    *,
+    fallback_drift_us_per_s: float = DEFAULT_FALLBACK_DRIFT_US_PER_S,
+) -> dict[str, Any]:
+    """Construct a clock correction from WAV duration and an assumed drift.
+
+    The trial onset is assumed to coincide with WAV time zero. Positive drift
+    lengthens the trial on the recording clock: t_raw = (1 + drift / 1e6) * t_wav.
+    No audio is measured, so offset and fit quality cannot be estimated.
+    """
+    slope = 1.0 + fallback_drift_us_per_s / 1e6
+    if not np.isfinite(slope) or slope <= 0:
+        raise ValueError('fallback_drift_us_per_s must be finite and yield a positive clock slope (> -1000000).')
+    wav_path = Path(wav_file)
+    if not wav_path.is_file():
+        raise FileNotFoundError(f'WAV file does not exist: {wav_path}')
+    duration_s = float(librosa.get_duration(path=wav_path))
+    if not np.isfinite(duration_s) or duration_s <= 0:
+        raise ValueError(f'WAV duration must be finite and positive: {wav_path}')
+    return {
+        'alignment_method': 'assumed_drift',
+        'offset_s': 0.0,
+        'clock_slope': float(slope),
+        'raw_sfreq': float(raw_sfreq),
+        'wav_duration_s': duration_s,
+        'drift_us_per_s': float(fallback_drift_us_per_s),
+        'total_drift_ms': float(fallback_drift_us_per_s * duration_s / 1000),
+        'residual_rms_ms': None,
+        'residual_max_ms': None,
+        'median_correlation': None,
+        'n_anchors': 0,
+        'n_anchor_inliers': 0,
+    }
 
 
 def apply_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
@@ -656,7 +694,8 @@ def summarize_alignments(trials: Sequence[Mapping[str, Any]]) -> dict[str, dict[
     }
     summary = {}
     for name, (key, scale) in metrics.items():
-        values = np.asarray([float(trial[key]) * scale for trial in trials], dtype=float)
+        # Assumed drift has no measured residuals or correlations.
+        values = np.asarray([float(trial[key]) * scale for trial in trials if trial.get(key) is not None], dtype=float)
         if values.size:
             summary[name] = {
                 'n': int(values.size),

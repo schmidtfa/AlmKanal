@@ -116,6 +116,25 @@ def test_alignment_can_use_wav_duration_without_end_sample(timing_data) -> None:
     assert len(epochs) == 4
 
 
+def test_recorded_audio_takes_precedence_over_assumed_drift(timing_data) -> None:
+    step = EpochTRF(
+        lambda raw: timing_data['spec'], timing_data['path'],
+        audio_channels=['recorded'], realign_without_audio=True,
+        epoch_len_s=1, hw_delay_s=0, verbose=False,
+    )
+    result = step.run(timing_data['raw'], {})
+    assert result['TRF_info']['alignment_method'] == 'audio'
+    assert result['data'].metadata['alignment_method'].eq('audio').all()
+    assert result['data'].metadata['clock_slope'].eq(1.2).all()
+    # An audio-estimation error must still fail instead of silently
+    # substituting the assumed rate.
+    step.gen_span_spec = lambda raw: TRFSpanSpec(
+        {'missing': (1634, 4134)}, wav_by_label={'missing': 'missing.wav'},
+    )
+    with pytest.raises(RuntimeError, match='Audio alignment failed'):
+        step.run(timing_data['raw'], {})
+
+
 def test_alignment_disabled_retains_fixed_delay_processing(timing_data, monkeypatch) -> None:
     def unexpected(*args, **kwargs):
         pytest.fail('Disabled realignment must not estimate alignment.')

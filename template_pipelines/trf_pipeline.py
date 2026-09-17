@@ -20,6 +20,8 @@ class TRFPipe(Job):
         epoch_len_s: float = 5.0,
         infer_missing_ends: bool = False,
         fallback_drift_us_per_s: float = 499.0,
+        audio_channels: tuple[str, ...] | None = ('AUDIO001',),
+        realign_without_audio: bool = False,
     ) -> None:
         full_path = Path(data_path) / f'{subject_id}_raw.fif'
         raw = mne.io.read_raw(full_path, preload=True)
@@ -46,7 +48,7 @@ class TRFPipe(Job):
                 end_triggers=99,  # Use None if the dataset has no end-trigger codes.
                 stim_channel='STI101',
                 # Enable for missing end triggers. WAV duration and the assumed
-                # drift define the span; cross-correlation still fits actual drift.
+                # drift define the span. EpochTRF controls the actual resampling.
                 infer_missing_ends=infer_missing_ends,
                 base_audio_path=audio_path,
                 fallback_drift_us_per_s=fallback_drift_us_per_s,
@@ -58,8 +60,14 @@ class TRFPipe(Job):
                 EpochTRF(
                     gen_span_spec=make_spans,
                     base_audio_path=audio_path,
-                    audio_channels=['AUDIO001'],
-                    alignment_kwargs={'window_s': 10.0, 'step_s': 5.0, 'min_corr': 0.3},
+                    # Without recorded audio, pass audio_channels=None and
+                    # realign_without_audio=True to use WAV duration and +499 us/s.
+                    audio_channels=audio_channels,
+                    realign_without_audio=realign_without_audio,
+                    fallback_drift_us_per_s=fallback_drift_us_per_s,
+                    alignment_kwargs=(
+                        {'window_s': 10.0, 'step_s': 5.0, 'min_corr': 0.3} if audio_channels is not None else None
+                    ),
                     # Realign first, then apply the physical delay. The default
                     # +0.0165 advances MEG to compensate the 16.5 ms air-tube
                     # delay; the subsequently added WAV feature is not shifted.
@@ -82,5 +90,5 @@ class TRFPipe(Job):
 # After all jobs finish, aggregate their JSON files into Methods text:
 # from almkanal import preprocessing_report
 # preprocessing_report(files, 'methods.md')
-# This includes inferred-end counts/priors, measured drift/offset statistics,
+# This includes inferred-end counts/priors, measured or assumed drift,
 # and the subsequent physical delay.
