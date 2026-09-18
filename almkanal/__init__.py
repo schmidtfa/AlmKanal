@@ -11,7 +11,7 @@ from almkanal.almkanal_steps.headmodel_utils import ForwardModel
 from almkanal.almkanal_steps.ica_utils import ICA
 from almkanal.almkanal_steps.spatial_filter_utils import SpatialFilter
 from almkanal.almkanal_steps.src_recon_utils import SourceReconstruction
-from almkanal.almkanal_steps.trf_utils import EpochTRF
+from almkanal.almkanal_steps.trf_utils import EpochTRF, TRFSpanSpec
 from almkanal.report.exporting import preprocessing_report
 
 __all__ = [
@@ -28,6 +28,7 @@ __all__ = [
     'Events',
     'Epochs',
     'EpochTRF',
+    'TRFSpanSpec',
     'ForwardModel',
     'SpatialFilter',
     'SourceReconstruction',

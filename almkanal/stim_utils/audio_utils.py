@@ -6,7 +6,7 @@ import numpy as np
 from scipy.signal import butter, resample_poly, sosfiltfilt
 
 
-def _resample_poly_exact(x: np.ndarray, fs_in: int | float, fs_out: int | float, axis: int = 1) -> np.ndarray:
+def resample_poly_exact(x: np.ndarray, fs_in: int | float, fs_out: int | float, axis: int = -1) -> np.ndarray:
     """Polyphase resample, then trim/pad to n_out = round(T * fs_out)."""
     t_in = x.shape[axis] / float(fs_in)  # exclusive end
     n_out = int(round(t_in * float(fs_out)))
@@ -146,7 +146,7 @@ def prepare_audio(  # noqa PLR0915
         # r = Fraction(float(target_fs) / float(base_fs)).limit_denominator(1000)
         # X = resample_poly(X, up=r.numerator, down=r.denominator, axis=0)
         fs = float(target_fs)
-        x = _resample_poly_exact(x, base_fs, target_fs)
+        x = resample_poly_exact(x, base_fs, target_fs)
     else:
         fs = float(base_fs)
 

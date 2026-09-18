@@ -109,9 +109,11 @@ class Filter(AlmKanalStep):
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='Raw (filtered)')
         elif isinstance(data, mne.BaseEpochs):
-            base_corr = data.copy()
-            base_corr.apply_baseline(baseline=(None, 0))
-            evokeds = base_corr.average(by_event_type=True)
+            report_data = data.copy()
+            # A pre-zero baseline is unavailable in zero-starting TRF windows.
+            if report_data.tmin < 0 <= report_data.tmax:
+                report_data.apply_baseline(baseline=(None, 0))
+            evokeds = report_data.average(by_event_type=True)
             report.add_evokeds(evokeds, n_time_points=5)
 
 
@@ -161,7 +163,9 @@ class Resample(AlmKanalStep):
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='RawResample')
         elif isinstance(data, mne.BaseEpochs):
-            base_corr = data.copy()
-            base_corr.apply_baseline(baseline=(None, 0))
-            evokeds = base_corr.average(by_event_type=True)
+            report_data = data.copy()
+            # A pre-zero baseline is unavailable in zero-starting TRF windows.
+            if report_data.tmin < 0 <= report_data.tmax:
+                report_data.apply_baseline(baseline=(None, 0))
+            evokeds = report_data.average(by_event_type=True)
             report.add_evokeds(evokeds, n_time_points=5)
