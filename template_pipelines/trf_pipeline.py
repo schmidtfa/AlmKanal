@@ -95,4 +95,3 @@ class TRFPipe(Job):
         report.save(output_path.with_suffix('.html'), overwrite=True)
         ak.generate_json(str(output_path.with_suffix('.json')))
         joblib.dump((epochs, report), self.full_output_path)
-

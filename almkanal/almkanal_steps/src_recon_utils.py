@@ -7,14 +7,16 @@ from attrs import define
 from almkanal import AlmKanalStep
 
 
-def src2parc(
-    stc: mne.SourceEstimate,
-    fs: int,
+def src2parc(  # noqa: C901, PLR0912
+    stc: mne.SourceEstimate | mne.VolSourceEstimate | list,
+    fs: float,
     subject_id: str | None,
     subjects_dir: Path | str,
     source: str | None = 'surface',
     atlas: str = 'glasser',
     label_mode: str = 'mean_flip',
+    *,
+    src: mne.SourceSpaces | None = None,
 ) -> dict:
     """
     Parcellate source data into predefined brain regions using an atlas.
@@ -40,71 +42,108 @@ def src2parc(
         Dictionary containing parcellation information, including labels, hemisphere assignments,
         and extracted time courses for each region.
     """
+    if not subject_id:
+        raise ValueError('subject_id must be the actual FreeSurfer subject name.')
+    if source not in ('surface', 'volume'):
+        raise ValueError("source must be 'surface' or 'volume'.")
+    atlases = {
+        'dk': ('aparc', 'aparc+aseg'),
+        'destrieux': ('aparc.a2009s', 'aparc.a2009s+aseg'),
+        'glasser': ('HCPMMP1', None),
+    }
+    if atlas not in atlases:
+        raise ValueError("atlas must be 'dk', 'destrieux', or 'glasser'.")
+    surf_atlas, vol_atlas = atlases[atlas]
+    if source == 'volume' and vol_atlas is None:
+        raise ValueError('No volumetric model for the glasser atlas is available.')
 
-    if atlas == 'dk':
-        vol_atlas = 'aparc+aseg'
-        surf_atlas = 'aparc'
-    elif atlas == 'destrieux':
-        vol_atlas = 'aparc.a2009s+aseg'
-        surf_atlas = 'aparc.a2009s'
-    elif atlas == 'glasser':
-        if source == 'volume':
-            raise ValueError('No volumetric model for the glasser atlas available')
-        surf_atlas = 'HCPMMP1'
+    fs_dir = Path(subjects_dir).expanduser().resolve()
+    if not (fs_dir / subject_id).is_dir() and (fs_dir / 'freesurfer' / subject_id).is_dir():
+        fs_dir = fs_dir / 'freesurfer'
+    subject_path = fs_dir / subject_id
+    if not subject_path.is_dir():
+        raise FileNotFoundError(f'FreeSurfer subject not found: {subject_path}')
 
-    fs_dir = Path(subjects_dir) / 'freesurfer'
-    # mean flip time series costs significantly less memory than averaging the irasa'd spectra
+    if src is None:
+        # Compatibility for callers using existing template source-space files.
+        # ForwardModel -> SourceReconstruction always supplies fwd['src'].
+        suffix = 'ico-4' if source == 'surface' else 'vol-5'
+        src_file = subject_path / 'bem' / f'{subject_id}-{suffix}-src.fif'
+        if not src_file.is_file():
+            raise ValueError("Pass src=fwd['src']; no compatible saved source space was found.")
+        src = mne.read_source_spaces(src_file)
+
+    if src.kind != source:
+        raise ValueError(f'source={source!r} does not match the supplied source space ({src.kind!r}).')
+    src_subjects = {space.get('subject_his_id') for space in src} - {None}
+    if src_subjects and src_subjects != {subject_id}:
+        raise ValueError(f'Source space subjects {src_subjects} do not match {subject_id!r}.')
+
     if source == 'surface':
-        src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-ico-4-src.fif'
-        src = mne.read_source_spaces(src_file)
-        labels_mne = mne.read_labels_from_annot(f'{subject_id}_from_template', parc=surf_atlas, subjects_dir=fs_dir)
-        names_order_mne = np.array([label.name[:-3] for label in labels_mne])
-
-        rh = [label.hemi == 'rh' for label in labels_mne]
-        lh = [label.hemi == 'lh' for label in labels_mne]
-
-        parc = {'lh': lh, 'rh': rh, 'parc': surf_atlas, 'names_order_mne': names_order_mne, 'fs': fs}
-        parc.update({'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode=label_mode)})
-    elif source == 'volume':
-        src_file = f'{fs_dir}/{subject_id}_from_template/bem/{subject_id}_from_template-vol-5-src.fif'
-        src = mne.read_source_spaces(src_file)
-        labels_mne = (
-            fs_dir / f'{subject_id}_from_template' / 'mri' / (vol_atlas + '.mgz')
-        )  # os.path.join(fs_dir, f'{subject_id}_from_template', 'mri/' + vol_atlas + '.mgz')
-
-        label_names = mne.get_volume_labels_from_aseg(labels_mne)
-
-        ctx_logical = ['ctx' in label for label in label_names]
-        sctx_logical = [not f for f in ctx_logical]
-
-        ctx_labels = np.array([label[4:] for label in label_names if 'ctx' in label])
-        sctx_labels = list(np.array(label_names)[sctx_logical])
-        rh = [label[:2] == 'rh' for label in ctx_labels]
-        lh = [label[:2] == 'lh' for label in ctx_labels]
-
-        parc = {
-            'lh': lh,
-            'rh': rh,
-            'parc': vol_atlas + '.mgz',
-            'labels_mne': label_names,
-            'ctx_labels': ctx_labels,
-            'ctx_logical': ctx_logical,
-            'sctx_logical': sctx_logical,
-            'sctx_labels': sctx_labels,
+        for hemi in ('lh', 'rh'):
+            annot_file = subject_path / 'label' / f'{hemi}.{surf_atlas}.annot'
+            if not annot_file.is_file():
+                raise FileNotFoundError(
+                    f'Missing annotation: {annot_file}. Prepare this atlas for '
+                    'the individual FreeSurfer subject before parcellation.'
+                )
+        labels_mne = mne.read_labels_from_annot(subject_id, parc=surf_atlas, subjects_dir=fs_dir)
+        return {
+            'lh': [label.hemi == 'lh' for label in labels_mne],
+            'rh': [label.hemi == 'rh' for label in labels_mne],
+            'parc': surf_atlas,
+            'names_order_mne': np.array([label.name[:-3] for label in labels_mne]),
             'fs': fs,
+            'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode=label_mode),
         }
-        parc.update(
-            {'label_tc': mne.extract_label_time_course(stc, labels_mne, src, mode='auto')}
-        )  # NOTE: This needs to be auto
 
-    else:
-        raise ValueError('the only valid options for source are `surface` and `volume`.')
-
-    return parc
+    labels_mne = subject_path / 'mri' / f'{vol_atlas}.mgz'
+    if not labels_mne.is_file():
+        raise FileNotFoundError(f'Missing volumetric atlas: {labels_mne}')
+    label_names = mne.get_volume_labels_from_aseg(labels_mne)
+    ctx_logical = ['ctx' in label for label in label_names]
+    sctx_logical = [not is_ctx for is_ctx in ctx_logical]
+    ctx_labels = np.array([label[4:] for label in label_names if 'ctx' in label])
+    return {
+        'lh': [label[:2] == 'lh' for label in ctx_labels],
+        'rh': [label[:2] == 'rh' for label in ctx_labels],
+        'parc': f'{vol_atlas}.mgz',
+        'labels_mne': label_names,
+        'ctx_labels': ctx_labels,
+        'ctx_logical': ctx_logical,
+        'sctx_logical': sctx_logical,
+        'sctx_labels': list(np.array(label_names)[sctx_logical]),
+        'fs': fs,
+        'label_tc': mne.extract_label_time_course(stc, str(labels_mne), src, mode='auto'),
+    }
 
 
 @define
 class SourceReconstruction(AlmKanalStep):
+    """
+    Perform source reconstruction and optional parcellation.
+
+    Parameters
+    ----------
+    return_parc : bool, optional
+        Whether to return parcellated source data. Defaults to False.
+    label_mode : str, optional
+        Mode for extracting label time courses ('mean_flip', etc.). Defaults to 'mean_flip'.
+    subject_id : str | None, optional
+        Subject identifier for parcellation. Required if `return_parc` is True.
+    subjects_dir : str | None, optional
+        Path to FreeSurfer subjects directory. Required if `return_parc` is True.
+    atlas : str, optional
+        Atlas for parcellation ('glasser', 'dk', etc.). Defaults to 'glasser'.
+    source : str, optional
+        Source space type ('surface' or 'volume'). Defaults to 'surface'.
+
+    Returns
+    -------
+    dict | mne.SourceEstimate | dict | mne.VolSourceEstimate
+        Source time courses or parcellated data.
+    """
+
     filters: None | mne.beamformer.Beamformer = None
     return_parc: bool = False
     label_mode: str = 'pca_flip'
@@ -112,110 +151,66 @@ class SourceReconstruction(AlmKanalStep):
     subjects_dir: Path | str | None = None
     atlas: str = 'glasser'
     source: str | None = None
-
     must_be_before: tuple = ()
-    must_be_after: tuple = (
-        'Maxwell',
-        'ICA',
-        'ForwardModel',
-        'SpatialFilter',
-    )
+    must_be_after: tuple = ('Maxwell', 'ICA', 'ForwardModel', 'SpatialFilter')
+    src: mne.SourceSpaces | None = None
 
-    def run(  # noqa C901
-        self,
-        data: mne.io.BaseRaw | mne.BaseEpochs,
-        info: dict,
-    ) -> dict | mne.SourceEstimate | mne.VolSourceEstimate:
-        """
-        Perform source reconstruction and optional parcellation.
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
+        fwd_info = info.get('ForwardModel', {}).get('fwd_info', {})
+        spatial_info = info.get('SpatialFilter', {}).get('spatial_filter_info', {})
+        filters = self.filters if self.filters is not None else spatial_info.get('filters')
+        if filters is None:
+            raise ValueError('Provide filters or run SpatialFilter before SourceReconstruction.')
 
-        Parameters
-        ----------
-        return_parc : bool, optional
-            Whether to return parcellated source data. Defaults to False.
-        label_mode : str, optional
-            Mode for extracting label time courses ('mean_flip', etc.). Defaults to 'mean_flip'.
-        subject_id : str | None, optional
-            Subject identifier for parcellation. Required if `return_parc` is True.
-        subjects_dir : str | None, optional
-            Path to FreeSurfer subjects directory. Required if `return_parc` is True.
-        atlas : str, optional
-            Atlas for parcellation ('glasser', 'dk', etc.). Defaults to 'glasser'.
-        source : str, optional
-            Source space type ('surface' or 'volume'). Defaults to 'surface'.
-
-        Returns
-        -------
-        dict | mne.SourceEstimate | dict | mne.VolSourceEstimate
-            Source time courses or parcellated data.
-        """
-
-        if self.filters is None:
-            self.filters = info['SpatialFilter']['spatial_filter_info']['filters']
-
-        if self.source is None:
-            self.source = info['ForwardModel']['fwd_info']['source_type']
+        source = self.source if self.source is not None else fwd_info.get('source_type')
+        subject_id = self.subject_id if self.subject_id is not None else fwd_info.get('subject_id_freesurfer')
+        subjects_dir = self.subjects_dir
+        if subjects_dir is None:
+            subjects_dir = fwd_info.get('subjects_dir', fwd_info.get('subject_dir'))
+        src = self.src
+        if src is None and 'fwd' in fwd_info:
+            src = fwd_info['fwd']['src']
+        if source is None and src is not None:
+            source = src.kind
 
         if isinstance(data, mne.io.BaseRaw):
-            stc = mne.beamformer.apply_lcmv_raw(data, self.filters)
-
+            stc = mne.beamformer.apply_lcmv_raw(data, filters)
         elif isinstance(data, mne.BaseEpochs):
-            stc = mne.beamformer.apply_lcmv_epochs(data, self.filters)
+            stc = mne.beamformer.apply_lcmv_epochs(data, filters)
+        else:
+            raise TypeError('data must be an MNE Raw or Epochs object.')
 
         if self.return_parc:
-            if np.logical_and(self.subject_id is None, 'ForwardModel' in info):
-                self.subject_id: str = info['ForwardModel']['fwd_info']['subject_id_freesurfer']
-
-            elif np.logical_and(self.subject_id is None, 'ForwardModel' not in info):
-                assert isinstance(
-                    self.subject_id, str
-                ), 'You need to set the correct name for the `subject_id` if you want to get parcels.'
-
-            if np.logical_and(self.subjects_dir is None, 'ForwardModel' in info):
-                self.subjects_dir: str = info['ForwardModel']['fwd_info']['subjects_dir']
-
-            elif np.logical_and(self.subjects_dir is None, 'ForwardModel' not in info):
-                assert isinstance(
-                    self.subject_id, str
-                ), 'You need to set the correct name for the `subjects_dir` if you want to get parcels.'
-
-            # handle case if subjects_dir is still None
-            if self.subjects_dir is None:
-                raise ValueError('You need to set the correct name for the `subjects_dir` if you want to get parcels.')
-
-            stc = src2parc(
+            if subject_id is None or subjects_dir is None or source is None:
+                raise ValueError(
+                    'Parcellation needs subject_id, subjects_dir, and source, '
+                    'either explicitly or from ForwardModel.'
+                )
+            result = src2parc(
                 stc,
                 fs=data.info['sfreq'],
-                subject_id=self.subject_id,
-                subjects_dir=self.subjects_dir,
+                subject_id=subject_id,
+                subjects_dir=subjects_dir,
+                source=source,
                 atlas=self.atlas,
-                source=self.source,
                 label_mode=self.label_mode,
+                src=src,
             )
+        else:
+            result = {'label_tc': stc, 'fs': data.info['sfreq']}
 
-        if type(stc) is not dict:
-            stc = {
-                'label_tc': stc,
-                'fs': data.info['sfreq'],
-                'extra_data': info['SpatialFilter']['spatial_filter_info']['extra_data'],
-            }
-
-        if 'SpatialFilter' in info:
-            stc['extra_data'] = info['SpatialFilter']['spatial_filter_info']['extra_data']
-
-        # add metadata for events to src file
+        result['extra_data'] = spatial_info.get('extra_data')
         if isinstance(data, mne.BaseEpochs):
-            stc['metadata'] = data.metadata
-
+            result['metadata'] = data.metadata
         return {
-            'data': stc,
+            'data': result,
             'stc_info': {
                 'orig_data_type': 'raw' if isinstance(data, mne.io.BaseRaw) else 'epochs',
-                'subject_id': self.subject_id,
-                'subjects_dir': self.subjects_dir,
+                'subject_id': subject_id,
+                'subjects_dir': subjects_dir,
                 'label_mode': self.label_mode,
                 'atlas': self.atlas,
-                'source': self.source,
+                'source': source,
             },
         }
 
@@ -223,22 +218,13 @@ class SourceReconstruction(AlmKanalStep):
         import matplotlib.pyplot as plt
         import scipy.signal as dsp
 
-        # # if isinstance(data, dict) and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
         if self.return_parc and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
             freq, psd = dsp.welch(data['label_tc'], fs=data['fs'], nperseg=data['fs'] * 4, noverlap=data['fs'] * 2)
-
             f, ax = plt.subplots(ncols=2, figsize=(15, 5))
-
             for cax, title in zip(ax, ['SemiLog', 'LogLog']):
                 cax.set_title(title)
                 cax.set_xlabel('Frequency (Hz)')
                 cax.set_ylabel('Power (Log)')
-
             ax[0].semilogy(freq, psd.T, alpha=0.25)
             ax[1].loglog(freq, psd.T, alpha=0.25)
-            report.add_figure(
-                fig=f,
-                title='ParcellationPowerSpectra',
-                image_format='PNG',
-                caption='',
-            )
+            report.add_figure(fig=f, title='ParcellationPowerSpectra', image_format='PNG', caption='')
