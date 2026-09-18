@@ -66,9 +66,9 @@ def test_fwd(gen_mne_data_raw, source, atlas):
                                       subjects_dir='./data_old/',
                                       source=source),
                         SpatialFilter(pick_dict=pick_dict),
-                        SourceReconstruction(subject_id = 'sample',
-                                            subjects_dir = './data_old/',
-                                            source=source,
+                        SourceReconstruction(#subject_id = 'sample',
+                                            #subjects_dir = './data_old/',
+                                            #source=source,
                                             atlas=atlas,
                                             return_parc=True,)])
 
@@ -129,9 +129,9 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
                                 subjects_dir='./data_old/',
                                 source=source),
                  SpatialFilter(pick_dict=pick_dict),
-                 SourceReconstruction(subject_id = 'sample',
-                                        subjects_dir = './data_old/',
-                                        source=source,
+                 SourceReconstruction(#subject_id = 'sample',
+                                       # subjects_dir = './data_old/',
+                                        #source=source,
                                         atlas=atlas,
                                         return_parc=True,)])
     ak.run(raw)
