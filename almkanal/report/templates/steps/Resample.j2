@@ -1,0 +1,7 @@
+{# expected keys: sfreq/new_sfreq/resample_sfreq, npad, window #}
+{% set sf = s.settings.sfreq or s.settings.new_sfreq or s.settings.resample_sfreq %}
+Data were resampled to {{ sf }} Hz{%- set extras = [] -%}
+{%- for k,v in s.settings.items() if k not in ['sfreq','new_sfreq','resample_sfreq'] and v is not none -%}
+{%- set _ = extras.append(k ~ '=' ~ v) -%}
+{%- endfor -%}
+{%- if extras %} ({{ extras | join('; ') }}){% endif %}.
