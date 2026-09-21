@@ -47,7 +47,10 @@ def run_maxwell(
         calibration=calibration_file,
         cross_talk=cross_talk_file,  # noqa
     )
-    raw.info['bads'] = noisy_chs + flat_chs
+    raw.info['bads'] = list(
+    dict.fromkeys(
+        raw.info['bads'] + noisy_chs + flat_chs)
+    )
 
     raw = mne.preprocessing.maxwell_filter(
         raw,

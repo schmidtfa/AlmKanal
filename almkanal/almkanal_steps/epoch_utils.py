@@ -86,13 +86,12 @@ class Epochs(AlmKanalStep):
         data: mne.io.BaseRaw,
         info: dict,
     ) -> dict:
-
         events = self.events
-        
+
         if events is None:
             try:
                 events = info['Events']['event_info']['events']
-            except:
+            except KeyError:
                 raise ValueError(
                     'You need to either supply `events` to epochs or select them in a previous '
                     'step in the pipeline to create epochs'
