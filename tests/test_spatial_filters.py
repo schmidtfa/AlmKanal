@@ -249,38 +249,42 @@ def test_preproc_empty_room_maxwell_and_ica(
 
     if use_epochs:
         data = mne.EpochsArray(
-            np.zeros(
-                (2, 1, 20)
-            ),
+            np.zeros((2, 1, 20)),
             raw.info.copy(),
             verbose=False,
         )
     else:
         data = raw
 
-    prepare = Mock(
-        return_value=raw_er
+    prepare_mock = Mock(
+        name='prepare_emptyroom',
+        return_value=raw_er,
     )
 
-    maxwell = Mock(
-        return_value=raw_er
+    maxwell_mock = Mock(
+        name='run_maxwell',
+        return_value=raw_er,
     )
 
-    ica = Mock()
+    ica = Mock(name='ica')
+    ica_copy = Mock(name='ica_copy')
+    ica_copy.exclude = []
+
+    ica.copy.return_value = ica_copy
 
     monkeypatch.setattr(
         mne.preprocessing,
         'maxwell_filter_prepare_emptyroom',
-        prepare,
+        prepare_mock,
     )
 
     monkeypatch.setattr(
         sfu,
         'run_maxwell',
-        maxwell,
+        maxwell_mock,
     )
 
-    info = {
+    preproc_info = {
         'Maxwell': {
             'maxwell_info': {
                 'coord_frame': 'head',
@@ -289,31 +293,30 @@ def test_preproc_empty_room_maxwell_and_ica(
         'ICA': {
             'ica_info': {
                 'ica': ica,
-
-                # Makes this test compatible
-                # with the older implementation too.
-                'component_ids': [
-                    np.array(
-                        [],
-                        dtype=int,
-                    )
-                ],
+                'fit_only': False,
+                'applied_exclude': [1, 3],
             },
         },
     }
 
-    sfu.preproc_empty_room(
+    result = sfu.preproc_empty_room(
         raw_er=raw_er,
         data=data,
-        preproc_info=info,
+        preproc_info=preproc_info,
         picks=raw_er.ch_names,
     )
 
-    prepare.assert_called_once()
-    maxwell.assert_called_once()
+    assert result is raw_er
 
-    assert ica.apply.call_count == 1
+    prepare_mock.assert_called_once()
+    maxwell_mock.assert_called_once()
 
+    ica.copy.assert_called_once()
+    assert ica_copy.exclude == [1, 3]
+
+    ica_copy.apply.assert_called_once_with(
+        raw_er
+    )
 
 @pytest.mark.parametrize(
     'nearest',

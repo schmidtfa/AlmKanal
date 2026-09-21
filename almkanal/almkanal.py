@@ -132,7 +132,7 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
             if all(isinstance(block, mne.io.BaseRaw) for block in data):
                 for ix, block in enumerate(data):
                     report.add_raw(block, butterfly=False, psd=True, title=f'raw_data_block_{ix}')
-            elif all(isinstance(block, mne.io.BaseEpochs) for block in data):
+            elif all(isinstance(block, mne.BaseEpochs) for block in data):
                 for ix, block in enumerate(data):
                     report.add_epochs(block, psd=False, title=f'epoch_data_block_{ix}')
         else:

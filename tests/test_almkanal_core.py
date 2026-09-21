@@ -111,3 +111,75 @@ def mock_report(
     )
 
     return report
+
+def test_dependency_must_be_before():
+    step = DummyStep()
+    step.must_be_before = ('TargetStep',)
+
+    with pytest.raises(ValueError, match='should follow'):
+        AlmKanal(steps=[TargetStep(), step])
+
+
+def test_dependency_must_be_after():
+    step = DummyStep()
+    step.must_be_after = ('TargetStep',)
+
+    with pytest.raises(ValueError, match='should precede'):
+        AlmKanal(steps=[step, TargetStep()])
+
+
+def test_base_step_methods_raise():
+    step = AlmKanalStep()
+
+    with pytest.raises(NotImplementedError):
+        step.run(None, {})
+
+    with pytest.raises(NotImplementedError):
+        step.reports(None, None, {})
+
+
+def test_invalid_pipeline_input(mock_report):
+    with pytest.raises(ValueError, match='Input data'):
+        AlmKanal(steps=[]).run(np.zeros(10))
+
+
+def test_bad_step_return_raises(raw_small, mock_report):
+    with pytest.raises(ValueError, match="'data' key"):
+        AlmKanal(steps=[BadStep()]).run(raw_small)
+
+
+def test_pipeline_callable(raw_small, mock_report):
+    processed, report = AlmKanal(steps=[])(raw_small)
+
+    assert processed is raw_small
+    assert report is mock_report
+
+
+def test_raw_list_and_picking(raw_small, mock_report):
+    data = [raw_small.copy(), raw_small.copy()]
+
+    pipeline = AlmKanal(
+        steps=[],
+        pick_params={'meg': True, 'stim': False},
+    )
+
+    processed, report = pipeline.run(data)
+
+    assert report is mock_report
+    assert mock_report.add_raw.call_count == 2
+    mock_report.add_epochs.assert_not_called()
+    assert len(processed) == 2
+
+    for block in processed:
+        assert block.ch_names == ['MEG 0111']
+
+
+def test_epochs_list_is_reported(epochs_small, mock_report):
+    data = [epochs_small.copy(), epochs_small.copy()]
+
+    processed, report = AlmKanal(steps=[]).run(data)
+
+    assert processed is data
+    assert report is mock_report
+    assert mock_report.add_epochs.call_count == 2
+    mock_report.add_raw.assert_not_called()
