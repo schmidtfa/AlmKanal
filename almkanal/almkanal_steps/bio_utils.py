@@ -69,7 +69,25 @@ def run_bio_preproc(
 
     # Concatenate the processed bio data with stimulus channel data and return a new RawArray
     bio_data = np.concatenate([bio_clean.to_numpy(), bio_df[stim_channel_names].to_numpy()], axis=1).T
-    return mne.io.RawArray(bio_data, bio_info)
+    result = mne.io.RawArray(
+        bio_data,
+        bio_info,
+        first_samp=raw.first_samp,
+    )
+
+    result.set_meas_date(raw.info['meas_date'])
+
+    annotations = raw.annotations.copy()
+
+    if annotations.orig_time is None:
+        annotations.onset -= raw.first_time
+
+    result.set_annotations(
+        annotations,
+        on_missing='ignore',
+    )
+
+    return result
 
 
 @define
@@ -114,27 +132,27 @@ class PhysioCleaner(AlmKanalStep):
             'data': data,
             'physio_info': {  # hardcoded for now
                 'bio_info': {
-                    'sampling_rate': 1000,
+                    'sampling_rate': float(data.info['sfreq']),
                     'ecg': {
                         'ecg': self.ecg is not None,
                         'clean_method': 'neurokit',
                         'powerline_hz': 50,
                         'rpeak_method': 'neurokit',
-                        'channels': ['ECG'],
+                        'channels': [] if self.ecg is None else [self.ecg],
                     },
                     'eog': {
                         'eog': self.eog is not None,
                         'clean_method': 'neurokit',
                         'bandpass_hz': [0.25, 7.5],
                         'blink_method': 'mne',
-                        'channels': ['VEOG', 'HEOG'],
+                        'channels': [] if self.eog is None else [self.eog],
                     },
                     'emg': {
                         'emg': self.emg is not None,
                         'clean_method': 'biosppy',
                         'amplitude': {'lowcut': 10, 'highcut': 400, 'envelope_lp': 8},
                         'activation_method': 'threshold',
-                        'channels': ['EMG1', 'EMG2'],
+                        'channels': [] if self.emg is None else [self.emg],
                     },
                 }
             },
