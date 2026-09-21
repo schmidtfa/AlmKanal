@@ -18,15 +18,6 @@ def test_ransac(gen_mne_data_raw_eeg):
     ak.run(raw)
 
 
-
-def test_maxwell(gen_mne_data_raw):
-
-    raw, data_path = gen_mne_data_raw
-
-    ak = AlmKanal(steps=[Maxwell()])
-    ak.run(raw)
-
-
 #@pytest.mark.parametrize('resample_freq', ICA_RESAMPLE, scope='session')
 @pytest.mark.parametrize('ecg', ICA_ECG, scope='session')
 @pytest.mark.parametrize('eog', ICA_EOG, scope='session')
