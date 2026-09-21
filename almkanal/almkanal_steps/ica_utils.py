@@ -425,7 +425,7 @@ class ICA(AlmKanalStep):
                 titles.update({int(val): f'{key}'})
 
         # if info['ICA']['ica_info']['ica'] is not None:
-        try:
+        if len(titles) > 0:
             report.add_ica(
                 info['ICA']['ica_info']['ica'],
                 inst=data,
@@ -438,5 +438,5 @@ class ICA(AlmKanalStep):
 
             if isinstance(data, mne.io.BaseRaw):
                 report.add_raw(data, butterfly=False, psd=True, title='Raw (ICA)')
-        except ValueError:
+        else:
             print('No bad ICA components detected.')
