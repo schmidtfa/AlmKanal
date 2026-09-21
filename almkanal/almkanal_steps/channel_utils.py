@@ -181,8 +181,11 @@ class MultiBlockMaxwell(AlmKanalStep):
         # blocks_pos = np.array(block_pos_l)
         # all_distances = np.sqrt(blocks_pos[:,0]**2 + blocks_pos[:,1]**2 + blocks_pos[:,2]**2)
         # mean_distance = np.median(all_distances)
-        block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
-        trans_avg_pos = np.median(block_pos_l, axis=0)
+        if self.mw_destination is None:
+            block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
+            destination = np.median(block_pos_l, axis=0)
+        else:
+            destination = self.mw_destination
 
         raw_max_list = []
         for raw in data:
@@ -190,7 +193,7 @@ class MultiBlockMaxwell(AlmKanalStep):
                 run_maxwell(
                     raw=raw,
                     coord_frame=self.mw_coord_frame,
-                    destination=trans_avg_pos,
+                    destination=destination,
                     calibration_file=self.mw_calibration_file,
                     cross_talk_file=self.mw_cross_talk_file,
                     st_duration=self.mw_st_duration,
@@ -284,8 +287,26 @@ class RANSAC(AlmKanalStep):
         bad_chs_eeg = ransac.bad_chs_
         print(f'RANSAC detected the following bad channels: {bad_chs_eeg}')
 
-        data.info['bads'] = bad_chs_eeg
+        previous_bads = data.info['bads'].copy()
+
+        eeg_picks = mne.pick_types(
+            data.info,
+            eeg=True,
+            meg=False,
+            exclude=[],
+        )
+
+        eeg_ch_names = {data.ch_names[pick] for pick in eeg_picks}
+        non_eeg_bads = list(set(previous_bads).difference(eeg_ch_names))
+
+        previous_eeg_bads = [ch for ch in previous_bads if ch in eeg_ch_names]
+        
+
+        data.info['bads'] = list(dict.fromkeys(previous_eeg_bads + bad_chs_eeg))
+        
         raw_ransac = interpolate_bads(data, data.info['bads'])
+
+        raw_ransac.info['bads'] = non_eeg_bads
 
         return {
             'data': raw_ransac,
