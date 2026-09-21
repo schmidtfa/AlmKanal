@@ -1,0 +1,48 @@
+{% set lines = [] %}
+{% if s.results.get('n_trials_end_inferred', 0) %}
+  {% set priors = [] %}
+  {% for rate, count in s.results.end_inference_drift_counts.items() %}
+    {% do priors.append('%.3f'|format(rate|float) ~ ' µs/s for ' ~ count ~ (' trial' if count == 1 else ' trials')) %}
+  {% endfor %}
+  {% set n_inferred = s.results.n_trials_end_inferred %}
+  {% do lines.append('Trial endpoints were inferred for ' ~ n_inferred ~ (' trial' if n_inferred == 1 else ' trials') ~ ' without end triggers, using WAV duration multiplied by (1 + assumed signed drift / 1000000), with drift in µs/s (assumed rates: ' ~ priors|join('; ') ~ '). Existing end triggers were retained.') %}
+  {% if s.settings.get('realign_audio', false) and s.settings.get('alignment_method') != 'assumed_drift' %}
+    {% do lines.append('These assumed rates only defined the trial spans; the actual alignment offset and drift were subsequently estimated from the audio.') %}
+  {% endif %}
+{% endif %}
+{% if s.settings.get('realign_audio', false) %}
+  {% if s.settings.get('alignment_method') == 'assumed_drift' %}
+    {% do lines.append('Without recorded audio, neural data were resampled to the reference WAV clock using the original WAV duration and an assumed signed drift of ' ~ '%.3f'|format(s.settings.fallback_drift_us_per_s) ~ ' µs/s. Relative to each trial onset, recording time was modeled as WAV time multiplied by (1 + assumed drift / 1000000). WAV time zero was assumed to coincide with the trial onset (zero offset). Neither drift nor onset offset was measured from audio; residual timing error and correlation diagnostics were unavailable.') %}
+  {% else %}
+  {% set a = s.settings.alignment_kwargs %}
+  {% do lines.append('Each audio trial was realigned to its reference WAV using normalized cross-correlation of recorded and reference audio envelopes and a linear model of onset offset and clock drift.') %}
+  {% do lines.append('Synchronization envelopes were sampled at ' ~ a.sync_sfreq ~ ' Hz; correlations used ' ~ a.window_s ~ '-s windows spaced ' ~ a.step_s ~ ' s apart, a maximum lag of ' ~ a.max_lag_s ~ ' s, and a minimum correlation of ' ~ a.min_corr ~ '.') %}
+  {% if a.reject_outliers %}
+    {% do lines.append('Outlying synchronization anchors were rejected before fitting the final clock correction.') %}
+  {% endif %}
+  {% do lines.append('At least ' ~ a.min_anchors ~ ' accepted anchors were required per trial. Neural data were resampled to the WAV clock before applying the physical-delay correction.') %}
+  {% endif %}
+  {% if s.results.get('n_trials_aligned', 0) %}
+    {% do lines.append('Across ' ~ s.results.n_recordings ~ ' recordings, ' ~ s.results.n_trials_aligned ~ ' of ' ~ s.results.n_trials_found ~ ' trials were successfully aligned; ' ~ s.results.n_trials_failed ~ ' failed and were skipped, and ' ~ s.results.n_trials_epoched ~ ' trials contributed epochs.') %}
+    {% if s.settings.get('alignment_method') != 'assumed_drift' %}
+    {% set metrics = s.results.metrics %}
+    {% set drift = metrics.drift_us_per_s %}
+    {% set offset = metrics.offset_ms %}
+    {% set rms = metrics.residual_rms_ms %}
+    {% set corr = metrics.median_correlation %}
+    {% set anchors = metrics.n_anchor_inliers %}
+    {% do lines.append('Statistics were pooled over successfully aligned trials (mean ± population SD): signed clock drift ' ~ '%.3f'|format(drift.mean) ~ ' ± ' ~ '%.3f'|format(drift.sd) ~ ' µs/s (range ' ~ '%.3f'|format(drift.min) ~ ' to ' ~ '%.3f'|format(drift.max) ~ ' µs/s); onset offset ' ~ '%.3f'|format(offset.mean) ~ ' ± ' ~ '%.3f'|format(offset.sd) ~ ' ms; residual RMS timing error ' ~ '%.3f'|format(rms.mean) ~ ' ± ' ~ '%.3f'|format(rms.sd) ~ ' ms; within-trial median anchor correlation ' ~ '%.3f'|format(corr.mean) ~ ' ± ' ~ '%.3f'|format(corr.sd) ~ '; and retained anchors per trial ' ~ '%.2f'|format(anchors.mean) ~ ' ± ' ~ '%.2f'|format(anchors.sd) ~ '.') %}
+    {% endif %}
+  {% endif %}
+{% endif %}
+{% if s.settings.hw_delay_s is defined %}
+  {% do lines.append('A physical-delay correction of ' ~ '%.3f'|format(s.settings.hw_delay_s * 1000) ~ ' ms was applied' ~ (' after realignment' if s.settings.get('realign_audio', false) else '') ~ '; positive values advance neural events relative to the WAV features to compensate playback-to-ear delay, and negative values add lag. The WAV feature channels were left unchanged.') %}
+  {% if s.settings.applied_hw_delay_s is defined %}
+    {% do lines.append('The delay rounded to the sampling grid was ' ~ '%.3f'|format(s.settings.applied_hw_delay_s * 1000) ~ ' ms.') %}
+  {% endif %}
+{% endif %}
+{% if s.settings.feature is defined %}
+  {% do lines.append('WAV-derived ' ~ s.settings.feature ~ ' features were attached to the neural data.') %}
+{% endif %}
+{% do lines.append('Data were epoched in ' ~ s.settings.epoch_len_s ~ 's long epochs.') %}
+{{ lines | join(' ') }}

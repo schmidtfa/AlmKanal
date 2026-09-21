@@ -1,0 +1,123 @@
+{# steps/ICA.j2 — ICA paragraph with method-specific citations, no MNE version printed #}
+{# SETTINGS you can provide (optional):
+   method, n_components,
+   ica_hp_freq, ica_lp_freq, resample_freq,
+   eog_corr_thresh, ecg_corr_thresh,
+   eog, ecg, emg, emg_thresh,
+   train, train_freq, train_thresh, fit_only (bool)
+#}
+{# RESULTS you can provide (prefer mean±SD; fallback median+range):
+   total_mean, total_sd,
+   eog_mean, eog_sd, ecg_mean, ecg_sd, emg_mean, emg_sd, train_mean, train_sd,
+   total_median, total_range,
+   eog_median, eog_range, ecg_median, ecg_range, emg_median, emg_range, train_median, train_range
+#}
+{% set method = (s.settings.method or 'fastica') | lower %}
+{% set ncomp  = s.settings.n_components %}
+{% set fit_hp = s.settings.ica_hp_freq %}
+{% set fit_lp = s.settings.ica_lp_freq %}
+{% set resamp = s.settings.resample_freq %}
+{% set thr_ecg = s.settings.ecg_corr_thresh %}
+{% set thr_eog = s.settings.eog_corr_thresh %}
+{% set used_eog = s.settings.eog %}
+{% set used_ecg = s.settings.ecg %}
+{% set used_emg = s.settings.emg %}
+{% set emg_thr = s.settings.emg_thresh %}
+{% set used_train = s.settings.train %}
+{% set train_f = s.settings.train_freq %}
+{% set train_sd = s.settings.train_thresh %}
+{# Always cite MNE #}
+{% set _ = ref('Gramfort2014',
+  'Gramfort, A., et al. (2014). MNE software for processing MEG and EEG data. '
+  '*NeuroImage*, 86, 446–460. https://doi.org/10.1016/j.neuroimage.2013.10.027') %}
+{# Method-specific citations #}
+{% if method == 'fastica' %}
+  {% set _ = ref('Hyvarinen1999',
+    'Hyvärinen, A. (1999). Fast and robust fixed-point algorithms for independent component analysis. '
+    '*IEEE Transactions on Neural Networks*, 10(3), 626–634. https://doi.org/10.1109/72.761722') %}
+{% elif method == 'picard' %}
+  {% set _ = ref('Ablin2018TSP',
+    'Ablin, P., Cardoso, J.-F., & Gramfort, A. (2018). Faster independent component analysis by preconditioning '
+    'with Hessian approximations. *IEEE Transactions on Signal Processing*, 66(15), 4040–4049. https://arxiv.org/abs/1706.08171') %}
+  {% set _ = ref('Ablin2018ICASSP',
+    'Ablin, P., Cardoso, J.-F., & Gramfort, A. (2018). Faster ICA under orthogonal constraint. '
+    'In *ICASSP 2018*, 4464–4468. https://doi.org/10.1109/ICASSP.2018.8461662') %}
+{% endif %}
+{% if used_train %}
+  {% set _ = ref('WenLiu2016',
+    'Wen, H., & Liu, Z. (2016). Separating fractal and oscillatory components in the power spectrum of '
+    'neurophysiological signal. *Brain Topography*, 29, 13–26. https://doi.org/10.1007/s10548-015-0448-0') %}
+  {% set _ = ref('SchmidtWeiszHartmann2025',
+    'Schmidt, F., Weisz, N., & Hartmann, T. (2025). PyRASA – Spectral parametrization in Python based on IRASA. '
+    '*Journal of Open Source Software*, 10(109), 7852. https://doi.org/10.21105/joss.07852') %}
+{% endif %}
+
+#### Independent Component Analysis
+For extracting physiological artifacts, 
+{%- if ncomp is not none %} {{ ncomp }} {% else %} a set of {% endif -%}
+independent components were computed using the {{ method|upper }} algorithm
+{%- if method == 'fastica' %} ({{ ref('Hyvarinen1999') }})
+{%- elif method == 'picard' %} ({{ ref('Ablin2018TSP') }}; {{ ref('Ablin2018ICASSP') }})
+{%- endif -%}
+; implemented in MNE-Python ({{ ref('Gramfort2014') }}).
+{%- if fit_hp is not none or fit_lp is not none or resamp is not none %} Because ICA is sensitive to low-frequency drifts, components were estimated on a copy of the data
+{%- if fit_hp is not none %} high-pass filtered at {{ fit_hp }} Hz{% endif -%}
+{%- if fit_lp is not none %}{% if fit_hp is not none %} and{% endif %} low-pass filtered at {{ fit_lp }} Hz{% endif -%}
+{%- if resamp is not none %}{% if fit_hp is not none or fit_lp is not none %} and{% endif %} downsampled to {{ resamp }} Hz{% endif -%}.{% endif %}
+
+{%- if used_ecg or used_eog or used_emg or used_train -%}
+Components related to
+{%- set parts = [] -%}
+{%- if used_ecg %}{% set _ = parts.append(' cardiac (ECG)') %}{% endif -%}
+{%- if used_eog %}{% set _ = parts.append(' ocular (EOG)') %}{% endif -%}
+{{ parts | join(', ') }}
+ activity were identified via Pearson *r* correlation with appropriate reference signals (
+{%- if used_eog and thr_eog is not none %} EOG threshold: *r* > {{ thr_eog }};{% endif -%}
+{%- if used_ecg and thr_ecg is not none %} ECG threshold: *r* > {{ thr_ecg }}).{% endif -%}
+{%- if used_emg and emg_thr is not none %} EMG detection used a relative threshold of {{ emg_thr }} SD.{% endif -%}
+{%- if used_train %} Train components were detected with IRASA at ~{{ train_f }} Hz (selection threshold {{ train_sd }} SD; {{ ref('WenLiu2016') }}, {{ ref('SchmidtWeiszHartmann2025') }}).{%- endif -%}
+{%- endif %}
+
+The computed ICA was applied to the original data to remove the identified components.
+{# --- summary of rejections (totals + per-group means/SD with fallbacks) --- #}
+{% set lines = [] %}
+{# Total #}
+{% if s.results.total_mean is defined and s.results.total_sd is defined %}
+  {% set _ = lines.append("On average, " ~ "%.2f"|format(s.results.total_mean) ~ " components were rejected per subject (SD = " ~ "%.2f"|format(s.results.total_sd) ~ ").") %}
+{% elif s.results.total_median is defined and s.results.total_range is defined %}
+  {% set _ = lines.append("The number of rejected components per subject had a median of " ~ s.results.total_median ~ " [" ~ s.results.total_range ~ "].") %}
+{% endif %}
+{# Per-group #}
+{% set groups = [] %}
+{% if used_eog %}
+  {% if s.results.eog_mean is defined and s.results.eog_sd is defined %}
+    {% set _ = groups.append("EOG " ~ "%.2f"|format(s.results.eog_mean) ~ " ± " ~ "%.2f"|format(s.results.eog_sd)) %}
+  {% elif s.results.eog_median is defined and s.results.eog_range is defined %}
+    {% set _ = groups.append("EOG median " ~ s.results.eog_median ~ " [" ~ s.results.eog_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if used_ecg %}
+  {% if s.results.ecg_mean is defined and s.results.ecg_sd is defined %}
+    {% set _ = groups.append("ECG " ~ "%.2f"|format(s.results.ecg_mean) ~ " ± " ~ "%.2f"|format(s.results.ecg_sd)) %}
+  {% elif s.results.ecg_median is defined and s.results.ecg_range is defined %}
+    {% set _ = groups.append("ECG median " ~ s.results.ecg_median ~ " [" ~ s.results.ecg_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if used_emg %}
+  {% if s.results.emg_mean is defined and s.results.emg_sd is defined %}
+    {% set _ = groups.append("EMG " ~ "%.2f"|format(s.results.emg_mean) ~ " ± " ~ "%.2f"|format(s.results.emg_sd)) %}
+  {% elif s.results.emg_median is defined and s.results.emg_range is defined %}
+    {% set _ = groups.append("EMG median " ~ s.results.emg_median ~ " [" ~ s.results.emg_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if used_train %}
+  {% if s.results.train_mean is defined and s.results.train_sd is defined %}
+    {% set _ = groups.append("Train " ~ "%.2f"|format(s.results.train_mean) ~ " ± " ~ "%.2f"|format(s.results.train_sd)) %}
+  {% elif s.results.train_median is defined and s.results.train_range is defined %}
+    {% set _ = groups.append("Train median " ~ s.results.train_median ~ " [" ~ s.results.train_range ~ "]") %}
+  {% endif %}
+{% endif %}
+{% if groups %}
+  {% set _ = lines.append("By artifact type: " ~ groups|join("; ") ~ ".") %}
+{% endif %}
+{{ " " ~ lines|join(" ") }}

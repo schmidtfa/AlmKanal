@@ -1,0 +1,11 @@
+{# expected keys: reference, ref_channels, projection #}
+{% set ref = s.settings.reference or s.settings.ref_channels %}
+EEG re-referencing using
+{%- if ref is sequence and (ref is not string) -%}
+ channels {{ ref | join(', ') }}
+{%- elif ref is not none -%}
+ {{ ref }}
+{%- else -%}
+ average reference
+{%- endif -%}
+{%- if s.settings.projection is not none %} (projection={{ s.settings.projection }}){% endif %}.
