@@ -52,9 +52,9 @@ def eog_ica_from_meg(
     eog_indices, eog_scores = ica.find_bads_eog(raw, ch_name=eog_list, measure='correlation', threshold=threshold)
 
     left_scores = np.mean([eog_scores[ix] for ix, _ in enumerate(left_eog_chs)], axis=0)
-    right_scores = np.mean([eog_scores[ix + len(left_eog_chs)] for ix, _ in enumerate(left_eog_chs)], axis=0)
+    right_scores = np.mean([eog_scores[ix + len(left_eog_chs)] for ix, _ in enumerate(right_eog_chs)], axis=0)
 
-    for eog_ix in eog_indices:
+    for eog_ix in eog_indices.copy():
         if np.logical_or(
             np.logical_and(left_scores[eog_ix] > 0, right_scores[eog_ix] < 0),
             np.logical_and(left_scores[eog_ix] < 0, right_scores[eog_ix] > 0),
@@ -198,6 +198,9 @@ def run_ica(  # noqa: C901, PLR0912
         bads.append(train_idcs)
 
     bad_ids = np.concatenate(bads).astype(int).tolist() if len(bads) > 0 else []
+    bad_ids = sorted(set(bad_ids))
+
+    ica.exclude = bad_ids
 
     if 'eog_scores' not in locals():
         eog_scores = None
@@ -207,7 +210,7 @@ def run_ica(  # noqa: C901, PLR0912
     # % drop physiological components
     if not fit_only:
         raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
-        ica.apply(raw, exclude=bad_ids)
+        ica.apply(raw)
 
     return raw, ica, components_dict, eog_scores, ecg_scores
 
