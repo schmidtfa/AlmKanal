@@ -1,5 +1,6 @@
 import importlib
 import importlib.util
+from pathlib import PurePath
 from typing import Any, no_type_check
 
 # --- Optional NumPy import without try/except ---
@@ -38,18 +39,25 @@ def build_json(  # noqa C901
         if x is None or isinstance(x, bool | int | float | str):
             return x
 
+        if isinstance(x, PurePath):
+            return str(x)
+
         if isinstance(x, NUMPY_GENERIC):
             return x.item()
         if isinstance(x, NUMPY_NDARRAY):
+            if x.ndim == 0:
+                return sanitize(x.item())
+
             size = int(x.size)
+
             if size > max_seq_elems:
                 return {
                     'size': size,
                     'shape': tuple(map(int, x.shape)),
                     'dtype': str(x.dtype),
                 }
-            # small enough: convert to list and recurse
-            return [sanitize(i) for i in x.tolist()]
+
+            return sanitize(x.tolist())
 
         # Dict → sanitize values; drop non-serializable
         if isinstance(x, dict):

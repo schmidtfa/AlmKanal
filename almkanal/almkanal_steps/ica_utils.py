@@ -5,7 +5,6 @@ import numpy as np
 from attrs import define
 from pyrasa.irasa import irasa
 from pyrasa.utils.peak_utils import get_band_info
-from scipy.stats import zscore
 
 from almkanal.almkanal import AlmKanalStep
 
@@ -53,9 +52,9 @@ def eog_ica_from_meg(
     eog_indices, eog_scores = ica.find_bads_eog(raw, ch_name=eog_list, measure='correlation', threshold=threshold)
 
     left_scores = np.mean([eog_scores[ix] for ix, _ in enumerate(left_eog_chs)], axis=0)
-    right_scores = np.mean([eog_scores[ix + len(left_eog_chs)] for ix, _ in enumerate(left_eog_chs)], axis=0)
+    right_scores = np.mean([eog_scores[ix + len(left_eog_chs)] for ix, _ in enumerate(right_eog_chs)], axis=0)
 
-    for eog_ix in eog_indices:
+    for eog_ix in eog_indices.copy():
         if np.logical_or(
             np.logical_and(left_scores[eog_ix] > 0, right_scores[eog_ix] < 0),
             np.logical_and(left_scores[eog_ix] < 0, right_scores[eog_ix] > 0),
@@ -194,11 +193,14 @@ def run_ica(  # noqa: C901, PLR0912
 
     # remove train based
     if train:
-        train_idcs = find_train_ica(raw_copy, ica, train_freq, sd=train_thresh)
+        train_idcs = find_train_ica(raw_copy, ica, train_freq, peak_threshold=train_thresh)
         components_dict.update({'train': train_idcs})
         bads.append(train_idcs)
 
     bad_ids = np.concatenate(bads).astype(int).tolist() if len(bads) > 0 else []
+    bad_ids = sorted(set(bad_ids))
+
+    ica.exclude = bad_ids
 
     if 'eog_scores' not in locals():
         eog_scores = None
@@ -207,8 +209,13 @@ def run_ica(  # noqa: C901, PLR0912
 
     # % drop physiological components
     if not fit_only:
-        raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
-        ica.apply(raw, exclude=bad_ids)
+        ica.apply(raw)
+
+        note = f'# excluded components: {len(bad_ids)}; ' f'excluded ICA: {bad_ids}'
+
+        previous_description = raw.info.get('description')
+
+        raw.info['description'] = f'{previous_description}\n{note}' if previous_description else note
 
     return raw, ica, components_dict, eog_scores, ecg_scores
 
@@ -220,7 +227,7 @@ def find_train_ica(
     duration: int = 4,
     overlap: float = 0.5,
     hmax: float = 2,
-    sd: float = 2,
+    peak_threshold: float = 2,
 ) -> list:
     """
     Detect ICA components associated with train artifacts in MEG data.
@@ -239,7 +246,7 @@ def find_train_ica(
         Overlap ratio for PSD computation windows. Defaults to 0.5.
     hmax : float, optional
         Maximum up/downsampling factor for IRASA. Defaults to 2.
-    sd : float, optional
+    peak_threshold : float, optional
         Standard deviation threshold for peak power detection. Defaults to 2.
 
     Returns
@@ -248,18 +255,22 @@ def find_train_ica(
         List of ICA component indices associated with train artifacts.
     """
 
-    # we add a small value to the hmax to be absolutely sure i am not going into filters
-    # choice is pretty arbitrary we just want to absolutely avoid runnning into errors and
-    # the artifact of interest is usually not on the borders of the spectrum.
-    hmax_filt = hmax + 0.5
-
     # get info for train timeseries
     ic_signal = ica.get_sources(raw).get_data()
 
     # run irasa
     fs = raw.info['sfreq']
 
-    lower, upper = raw.info['highpass'] / hmax_filt, raw.info['lowpass'] / hmax_filt
+    eps = 1e-4
+    lower, upper = (raw.info['highpass'] * hmax) + eps, (raw.info['lowpass'] / hmax) - eps
+
+    if not lower <= train_freq <= upper:
+        raise ValueError(
+            f'Train frequency ({train_freq:.2f} Hz) is outside the '
+            f'IRASA frequency range ({lower:.2f}-{upper:.2f} Hz).'
+        )
+
+    ch_names = list(np.arange(ic_signal.shape[0]))
 
     irasa_out = irasa(
         ic_signal,
@@ -268,25 +279,20 @@ def find_train_ica(
         nperseg=int(duration * fs),
         noverlap=int(duration * fs * overlap),
         hset_info=(1, hmax, 0.05),
+        ch_names=np.asarray(ch_names),
+        filter_settings=(
+            raw.info['highpass'],
+            raw.info['lowpass'],
+        ),
     )
 
     train_peaks = get_band_info(
-        irasa_out.get_peaks(), freq_range=(train_freq - 1, train_freq + 1), ch_names=list(np.arange(ic_signal.shape[0]))
+        irasa_out.get_peaks(peak_threshold=peak_threshold),
+        freq_range=(train_freq - 1, train_freq + 1),
+        ch_names=ch_names,
     ).dropna()
 
-    # select the right number of components based on a thresholding procedure
-    bad_ics = []
-    if train_peaks.shape[0] > 1:
-        while (zscore(train_peaks['pw']) > sd).sum() > 0:
-            bad_ch = train_peaks[zscore(train_peaks['pw']) > sd]['ch_name'].values
-            bad_ics.append(bad_ch)
-            train_peaks = train_peaks.query(f'ch_name not in {list(bad_ch)}')
-    else:
-        bad_ics.append(train_peaks['ch_name'].values)
-
-    if len(bad_ics) > 0:
-        bad_ics = [int(val) for val in np.concatenate(bad_ics)]
-
+    bad_ics = train_peaks['ch_name'].astype(int).tolist()
     return bad_ics
 
 
@@ -312,7 +318,7 @@ class ICA(AlmKanalStep):
     emg_thresh: float = 0.5
     train: bool = True
     train_freq: int = 16
-    train_thresh: float = 3.0
+    train_thresh: float = 2.0
     img_path: None | str = None
     fname: None | str = None
 
@@ -395,6 +401,8 @@ class ICA(AlmKanalStep):
                 'ica': ica,
                 'component_ids': list(components_dict.values()),
                 'components_dict': components_dict,
+                'fit_only': self.fit_only,
+                'applied_exclude': [] if self.fit_only else ica.exclude.copy(),
                 'eog_scores': eog_scores,
                 'ecg_scores': ecg_scores,
                 'n_components': self.n_components,
@@ -424,7 +432,7 @@ class ICA(AlmKanalStep):
                 titles.update({int(val): f'{key}'})
 
         # if info['ICA']['ica_info']['ica'] is not None:
-        try:
+        if len(titles) > 0:
             report.add_ica(
                 info['ICA']['ica_info']['ica'],
                 inst=data,
@@ -437,5 +445,5 @@ class ICA(AlmKanalStep):
 
             if isinstance(data, mne.io.BaseRaw):
                 report.add_raw(data, butterfly=False, psd=True, title='Raw (ICA)')
-        except ValueError:
+        else:
             print('No bad ICA components detected.')

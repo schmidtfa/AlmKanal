@@ -47,7 +47,7 @@ def run_maxwell(
         calibration=calibration_file,
         cross_talk=cross_talk_file,  # noqa
     )
-    raw.info['bads'] = noisy_chs + flat_chs
+    raw.info['bads'] = list(dict.fromkeys(raw.info['bads'] + noisy_chs + flat_chs))
 
     raw = mne.preprocessing.maxwell_filter(
         raw,
@@ -122,18 +122,6 @@ class Maxwell(AlmKanalStep):
         }
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        maxfilter_info_txt = f"""A signal-space separation (SSS) algorithm was used to remove external magnetic
-        interference from the MEG signal (1,2).
-        Additionally the head the algorithm aligned the data to a common standard head position
-        {info['Maxwell']['maxwell_info']['destination']}.
-
-        'References:
-        1. Samu Taulu and Matti Kajola. Presentation of electromagnetic multichannel data: the signal space
-           separation method. Journal of Applied Physics, 97(12):124905, 2005. doi:10.1063/1.1935742
-        2. Samu Taulu and Juha Simola. Spatiotemporal signal space separation method for rejecting nearby interference
-           in MEG measurements. Physics in Medicine and Biology, 51(7):1759–1768, 2006. doi:10.1088/0031-9155/51/7/008.
-           """
-        report.add_html(maxfilter_info_txt, title='raw_maxfiltered_method_txt')
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
 
 
@@ -181,8 +169,11 @@ class MultiBlockMaxwell(AlmKanalStep):
         # blocks_pos = np.array(block_pos_l)
         # all_distances = np.sqrt(blocks_pos[:,0]**2 + blocks_pos[:,1]**2 + blocks_pos[:,2]**2)
         # mean_distance = np.median(all_distances)
-        block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
-        trans_avg_pos = np.median(block_pos_l, axis=0)
+        if self.mw_destination is None:
+            block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
+            destination = np.median(block_pos_l, axis=0)
+        else:
+            destination = self.mw_destination
 
         raw_max_list = []
         for raw in data:
@@ -190,7 +181,7 @@ class MultiBlockMaxwell(AlmKanalStep):
                 run_maxwell(
                     raw=raw,
                     coord_frame=self.mw_coord_frame,
-                    destination=trans_avg_pos,
+                    destination=destination,
                     calibration_file=self.mw_calibration_file,
                     cross_talk_file=self.mw_cross_talk_file,
                     st_duration=self.mw_st_duration,
@@ -203,7 +194,7 @@ class MultiBlockMaxwell(AlmKanalStep):
             'data': raw_max,
             'maxwell_info': {
                 'coord_frame': self.mw_coord_frame,
-                'destination': trans_avg_pos,
+                'destination': destination,
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
@@ -215,7 +206,7 @@ class MultiBlockMaxwell(AlmKanalStep):
 
 
 @define
-class RANSAC(AlmKanalStep):
+class EEGRANSAC(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
 
@@ -233,7 +224,7 @@ class RANSAC(AlmKanalStep):
         info: dict,
     ) -> dict:
         """
-        Apply RANSAC to discover bad channels and interpolate them using autorejects methods.
+        Apply RANSAC to discover bad EEG channels and interpolate them using autorejects methods.
 
         Parameters
         ----------
@@ -284,8 +275,25 @@ class RANSAC(AlmKanalStep):
         bad_chs_eeg = ransac.bad_chs_
         print(f'RANSAC detected the following bad channels: {bad_chs_eeg}')
 
-        data.info['bads'] = bad_chs_eeg
+        previous_bads = data.info['bads'].copy()
+
+        eeg_picks = mne.pick_types(
+            data.info,
+            eeg=True,
+            meg=False,
+            exclude=[],
+        )
+
+        eeg_ch_names = {data.ch_names[pick] for pick in eeg_picks}
+        non_eeg_bads = list(set(previous_bads).difference(eeg_ch_names))
+
+        previous_eeg_bads = [ch for ch in previous_bads if ch in eeg_ch_names]
+
+        data.info['bads'] = list(dict.fromkeys(previous_eeg_bads + bad_chs_eeg))
+
         raw_ransac = interpolate_bads(data, data.info['bads'])
+
+        raw_ransac.info['bads'] = non_eeg_bads
 
         return {
             'data': raw_ransac,
@@ -308,12 +316,12 @@ class ReReference(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
 
-    ref_channels = 'average'
-    projection = False
-    ch_type = 'auto'
-    forward = None
-    joint = False
-    verbose = False
+    ref_channels: str | list[str] | dict = 'average'
+    projection: bool = False
+    ch_type: str | list[str] = 'auto'
+    forward: mne.Forward | None = None
+    joint: bool = False
+    verbose: bool | str | int | None = False
 
     def run(
         self,

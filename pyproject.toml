@@ -21,7 +21,7 @@ keywords = ['preprocessing', 'M/EEG', 'MNE Python', 'source analysis']
 requires-python = ">=3.11"
 dependencies = ["mne>=1.8", "pyrasa", "autoreject>=0.4.3",
                 "attrs", "neurokit2", 'ipyevents', "jinja2>=3.1,<4",
-                "pandoc", "librosa"]
+                "pandoc", "librosa", "python-picard>=0.8", "nibabel>=5.3.2",]
 
 [tool.pixi.system-requirements]
 linux = "4.18"

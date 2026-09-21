@@ -1,6 +1,6 @@
 from almkanal import (AlmKanal, Maxwell, ICA, ForwardModel, 
                       SpatialFilter, SourceReconstruction, PhysioCleaner,
-                      RANSAC, ReReference, Filter, Resample)
+                      EEGRANSAC, ReReference, Filter, Resample)
 import pytest
 from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE_SURF, SOURCE_VOL
 import mne
@@ -11,19 +11,10 @@ def test_ransac(gen_mne_data_raw_eeg):
 
     raw, data_path = gen_mne_data_raw_eeg
 
-    ak = AlmKanal(steps=[RANSAC(),
+    ak = AlmKanal(steps=[EEGRANSAC(),
                          Filter(),
                          ReReference(),
                          Resample(100)])
-    ak.run(raw)
-
-
-
-def test_maxwell(gen_mne_data_raw):
-
-    raw, data_path = gen_mne_data_raw
-
-    ak = AlmKanal(steps=[Maxwell()])
     ak.run(raw)
 
 
@@ -66,9 +57,9 @@ def test_fwd(gen_mne_data_raw, source, atlas):
                                       subjects_dir='./data_old/',
                                       source=source),
                         SpatialFilter(pick_dict=pick_dict),
-                        SourceReconstruction(subject_id = 'sample',
-                                            subjects_dir = './data_old/',
-                                            source=source,
+                        SourceReconstruction(#subject_id = 'sample',
+                                            #subjects_dir = './data_old/',
+                                            #source=source,
                                             atlas=atlas,
                                             return_parc=True,)])
 
@@ -129,9 +120,9 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
                                 subjects_dir='./data_old/',
                                 source=source),
                  SpatialFilter(pick_dict=pick_dict),
-                 SourceReconstruction(subject_id = 'sample',
-                                        subjects_dir = './data_old/',
-                                        source=source,
+                 SourceReconstruction(#subject_id = 'sample',
+                                       # subjects_dir = './data_old/',
+                                        #source=source,
                                         atlas=atlas,
                                         return_parc=True,)])
     ak.run(raw)
@@ -140,3 +131,13 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     ak.generate_json()
 
 
+def test_rereference_constructor():
+
+    step = ReReference(
+        ref_channels=['Cz'],
+        projection=False,
+        ch_type='eeg',
+    )
+
+    assert step.ref_channels == ['Cz']
+    assert step.ch_type == 'eeg'

@@ -86,17 +86,20 @@ class Epochs(AlmKanalStep):
         data: mne.io.BaseRaw,
         info: dict,
     ) -> dict:
-        if self.events is None:
-            self.events = info['Events']['event_info']['events']
-        else:
-            raise ValueError(
-                'You need to either supply `events` to epochs or select them in a previous '
-                'step in the pipeline to create epochs'
-            )
+        events = self.events
+
+        if events is None:
+            try:
+                events = info['Events']['event_info']['events']
+            except KeyError:
+                raise ValueError(
+                    'You need to either supply `events` to epochs or select them in a previous '
+                    'step in the pipeline to create epochs'
+                )
 
         epochs = mne.Epochs(
             data,
-            events=self.events,
+            events=events,
             event_id=self.event_id,
             baseline=self.baseline,
             tmin=self.tmin,
@@ -120,7 +123,7 @@ class Epochs(AlmKanalStep):
         return {
             'data': epochs,
             'epochs_info': {
-                'events': self.events,
+                'events': events,
                 'event_id': self.event_id,
                 'baseline': self.baseline,
                 'tmin': self.tmin,
@@ -143,8 +146,6 @@ class Epochs(AlmKanalStep):
 
     def reports(self, data: mne.BaseEpochs, report: mne.Report, info: dict) -> None:
         base_corr = data.copy()
-        base_corr.apply_baseline(baseline=(None, 0))
-        # report.add_epochs(base_corr, psd=False, title='epochs')
 
         evokeds = base_corr.average(by_event_type=True)
         report.add_evokeds(evokeds, n_time_points=5)

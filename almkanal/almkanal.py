@@ -1,5 +1,7 @@
 # %%
 import json
+import warnings
+from collections import Counter
 from copy import deepcopy
 
 import mne
@@ -110,6 +112,17 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:  # noqa: C901, PLR0912
         """Applies each preprocessing step in sequence and returns the processed data, along with a report."""
 
+        self.info['steps_info'] = {}
+        if isinstance(data, list):
+            if not data:
+                raise ValueError('Input data list must not be empty.')
+
+            only_raw = all(isinstance(block, mne.io.BaseRaw) for block in data)
+
+            only_epochs = all(isinstance(block, mne.BaseEpochs) for block in data)
+
+            if not (only_raw or only_epochs):
+                raise ValueError('Input data lists must contain only Raw or only Epochs objects.')
         report = mne.Report(title='Pipeline Report')
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='raw_data')
@@ -119,7 +132,7 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
             if all(isinstance(block, mne.io.BaseRaw) for block in data):
                 for ix, block in enumerate(data):
                     report.add_raw(block, butterfly=False, psd=True, title=f'raw_data_block_{ix}')
-            elif all(isinstance(block, mne.io.BaseRaw) for block in data):
+            elif all(isinstance(block, mne.io.BaseEpochs) for block in data):
                 for ix, block in enumerate(data):
                     report.add_epochs(block, psd=False, title=f'epoch_data_block_{ix}')
         else:
@@ -170,7 +183,17 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
         return:
          A dictionary containing all the settings used in the almkanal pipeline.
         """
+        repeated = [name for name, count in Counter(self.info['steps']).items() if count > 1]
 
+        if repeated:
+            warnings.warn(
+                'Repeated step names: '
+                f'{", ".join(repeated)}. '
+                'The current JSON format retains only the final result '
+                'for each step name, not the complete processing history.',
+                UserWarning,
+                stacklevel=2,
+            )
         json_file = build_json(self.info, max_seq_elems=max_elements)
 
         if path is not None:

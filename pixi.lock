@@ -6247,7 +6247,7 @@ packages:
 - pypi: ./
   name: almkanal
   version: 1.0.0.dev0
-  sha256: cb2bc82b18c4ddb9bbdff899145d6e2bfedb6f77ccdaa0001188b1c8c4e81f21
+  sha256: 96275946a4718dd841e7574864a54f65fefd62287818994c2b43a046c2b7791e
   requires_dist:
   - attrs
   - autoreject>=0.4.3
@@ -6256,8 +6256,10 @@ packages:
   - librosa
   - mne>=1.8
   - neurokit2
+  - nibabel>=5.3.2
   - pandoc
   - pyrasa
+  - python-picard>=0.8
   requires_python: '>=3.11'
 - conda: https://conda.anaconda.org/conda-forge/linux-64/alsa-lib-1.2.14-hb9d3cd8_0.conda
   sha256: b9214bc17e89bf2b691fad50d952b7f029f6148f4ac4fe7c60c08f093efdf745
