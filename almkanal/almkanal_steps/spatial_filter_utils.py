@@ -163,7 +163,12 @@ def preproc_empty_room(
         raw_er.resample(data.info['sfreq'])
 
     if 'ICA' in preproc_info:
-        preproc_info['ICA']['ica_info']['ica'].apply(raw_er)
+        ica_info = preproc_info['ICA']['ica_info']
+
+        if not ica_info.get('fit_only', False):
+            ica = ica_info['ica'].copy()
+            ica.exclude = list(ica_info.get('applied_exclude', ica.exclude))
+            ica.apply(raw_er)
 
     return raw_er
 

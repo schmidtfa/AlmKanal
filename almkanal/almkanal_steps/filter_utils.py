@@ -92,8 +92,8 @@ class Filter(AlmKanalStep):
                 'h_freq': self.lowpass,
                 'picks': self.picks,
                 'filter_length': self.filter_length,
-                'l_trans_bandwidth': None if l_tb_report is None else round(l_tb_report, 2),
-                'h_trans_bandwidth': None if h_tb_report is None else round(h_tb_report, 2),
+                'l_trans_bandwidth': l_tb_report,
+                'h_trans_bandwidth': h_tb_report,
                 'n_jobs': self.n_jobs,
                 'method': self.method,
                 'iir_params': iir_params_json,
@@ -109,11 +109,7 @@ class Filter(AlmKanalStep):
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='Raw (filtered)')
         elif isinstance(data, mne.BaseEpochs):
-            report_data = data.copy()
-            # A pre-zero baseline is unavailable in zero-starting TRF windows.
-            if report_data.tmin < 0 <= report_data.tmax:
-                report_data.apply_baseline(baseline=(None, 0))
-            evokeds = report_data.average(by_event_type=True)
+            evokeds = data.average(by_event_type=True)
             report.add_evokeds(evokeds, n_time_points=5)
 
 
@@ -163,9 +159,5 @@ class Resample(AlmKanalStep):
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='RawResample')
         elif isinstance(data, mne.BaseEpochs):
-            report_data = data.copy()
-            # A pre-zero baseline is unavailable in zero-starting TRF windows.
-            if report_data.tmin < 0 <= report_data.tmax:
-                report_data.apply_baseline(baseline=(None, 0))
-            evokeds = report_data.average(by_event_type=True)
+            evokeds = data.average(by_event_type=True)
             report.add_evokeds(evokeds, n_time_points=5)

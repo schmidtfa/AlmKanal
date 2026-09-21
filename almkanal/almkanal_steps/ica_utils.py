@@ -209,8 +209,13 @@ def run_ica(  # noqa: C901, PLR0912
 
     # % drop physiological components
     if not fit_only:
-        raw.info['description'] = f'# excluded components: {len(bad_ids)}; excluded ICA: {bad_ids}'
         ica.apply(raw)
+
+        note = f'# excluded components: {len(bad_ids)}; ' f'excluded ICA: {bad_ids}'
+
+        previous_description = raw.info.get('description')
+
+        raw.info['description'] = f'{previous_description}\n{note}' if previous_description else note
 
     return raw, ica, components_dict, eog_scores, ecg_scores
 
@@ -396,6 +401,8 @@ class ICA(AlmKanalStep):
                 'ica': ica,
                 'component_ids': list(components_dict.values()),
                 'components_dict': components_dict,
+                'fit_only': self.fit_only,
+                'applied_exclude': [] if self.fit_only else ica.exclude.copy(),
                 'eog_scores': eog_scores,
                 'ecg_scores': ecg_scores,
                 'n_components': self.n_components,

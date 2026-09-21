@@ -1,8 +1,9 @@
 import pytest
 import mne
 
+
 @pytest.fixture(scope='session')
-def gen_mne_data_raw():
+def _mne_raw_template():
     data_path = mne.datasets.sample.data_path()
 
     meg_path = data_path / 'MEG' / 'sample'
@@ -17,7 +18,7 @@ def gen_mne_data_raw():
 
 
 @pytest.fixture(scope='session')
-def gen_mne_data_raw_eeg():
+def _mne_raw_eeg_template():
     data_path = mne.datasets.sample.data_path()
 
     meg_path = data_path / 'MEG' / 'sample'
@@ -32,7 +33,7 @@ def gen_mne_data_raw_eeg():
 
 
 @pytest.fixture(scope='session')
-def gen_mne_data_epochs():
+def _mne_epochs_template():
 
     # % now lets check-out the events
     event_id = {
@@ -68,5 +69,25 @@ def gen_mne_data_epochs():
     epochs.resample(sfreq=10)
 
     yield epochs
+
+
+@pytest.fixture
+def gen_mne_data_raw(_mne_raw_template):
+    raw, data_path = _mne_raw_template
+    return raw.copy(), data_path
+
+
+@pytest.fixture
+def gen_mne_data_raw_eeg(_mne_raw_eeg_template):
+    raw, data_path = _mne_raw_eeg_template
+    return raw.copy(), data_path
+
+
+@pytest.fixture
+def gen_mne_data_epochs(_mne_epochs_template):
+    return _mne_epochs_template.copy()
+
+
+
 
 
