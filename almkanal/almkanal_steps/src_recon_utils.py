@@ -128,17 +128,22 @@ class SourceReconstruction(AlmKanalStep):
     return_parc : bool, optional
         Whether to return parcellated source data. Defaults to False.
     label_mode : str, optional
-        Mode for extracting label time courses ('mean_flip', etc.). Defaults to 'mean_flip'.
+        Surface parcellation extraction mode. Defaults to 'pca_flip'.
+        Volume parcellation uses mode='auto'.
     subject_id : str | None, optional
-        Subject identifier for parcellation. Required if `return_parc` is True.
-    subjects_dir : str | None, optional
-        Path to FreeSurfer subjects directory. Required if `return_parc` is True.
-    atlas : str, optional
-        Atlas for parcellation ('glasser', 'dk', etc.). Defaults to 'glasser'.
-    source : str, optional
-        Source space type ('surface' or 'volume'). Defaults to 'surface'.
+        Actual FreeSurfer subject name. Inferred from ForwardModel when
+        omitted. Must be available for parcellation.
+    subjects_dir : str | Path | None, optional
+        Directory containing the FreeSurfer subject. Inferred from
+        ForwardModel when omitted. Must be available for parcellation.
+    source : str | None, optional
+        Source-space type ('surface' or 'volume'). When None, inferred
+        from ForwardModel or the supplied source space.
+    src : mne.SourceSpaces | None, optional
+        Source space corresponding to the source estimates. Defaults to
+        the preceding ForwardModel's source space when available.
 
-    Returns
+        Returns
     -------
     dict | mne.SourceEstimate | dict | mne.VolSourceEstimate
         Source time courses or parcellated data.

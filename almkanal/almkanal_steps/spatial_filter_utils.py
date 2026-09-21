@@ -239,6 +239,10 @@ def comp_spatial_filters(
     noise_cov: None | NDArray = None,
     empty_room: None | str | mne.io.Raw = None,
     nearest_empty_room: bool = False,
+    lcmv_reg: float = 0.05,
+    lcmv_pick_ori: None | str = 'max-power',
+    lcmv_weight_norm: str | None = 'nai',
+    lcmv_reduce_rank: bool = False,
 ) -> mne.beamformer.Beamformer:
     """
     Compute spatial filters for source reconstruction using LCMV beamformers.
@@ -296,8 +300,13 @@ def comp_spatial_filters(
     # if you have mixed sensor types we need a noise covariance matrix
     # per default we take this from an empty room recording
     # importantly this should be preprocessed similarly to the actual data
-    if np.logical_and(
-        np.logical_and(n_ch_types > 1, noise_cov is None),
+    if noise_cov is not None:
+        true_rank = mne.compute_rank(
+            noise_cov,
+            info=info,
+        )
+    elif np.logical_and(
+        n_ch_types > 1,
         np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.BaseRaw)),
     ):
         # assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
@@ -312,15 +321,12 @@ def comp_spatial_filters(
             get_nearest=nearest_empty_room,
         )
 
-    elif np.logical_and(
-        np.logical_and(n_ch_types > 1, noise_cov is None),
-        np.logical_and(empty_room is None, not nearest_empty_room),
-    ):
+    elif np.logical_and(n_ch_types > 1, empty_room is None):
         warnings.warn("""You have multiple sensor types, but did neither specify a noise covariance
                       matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix!""")
 
         noise_cov = mne.make_ad_hoc_cov(info)
-        # TODO: check in with thomas if rank should be computed on data_cov if ad-hoc cov is created
+
         true_rank = mne.compute_rank(data_cov, info=info)
 
     elif n_ch_types == 1:
@@ -329,11 +335,12 @@ def comp_spatial_filters(
         noise_cov = None
 
     lcmv_settings = {
-        'reg': 0.05,
+        'reg': lcmv_reg,
         'noise_cov': noise_cov,
-        'pick_ori': 'max-power',
-        'weight_norm': 'nai',
+        'pick_ori': lcmv_pick_ori,
+        'weight_norm': lcmv_weight_norm,
         'rank': true_rank,
+        'reduce_rank': lcmv_reduce_rank,
     }
 
     filters = mne.beamformer.make_lcmv(info, fwd, data_cov, **lcmv_settings)
@@ -381,22 +388,26 @@ class SpatialFilter(AlmKanalStep):
         None
         """
 
-        if self.pick_dict is None and info['Picks'] is not None:
-            self.pick_dict = info['Picks']
+        pick_dict = self.pick_dict
 
-        elif self.pick_dict is None and info['Picks'] is None:
+        if pick_dict is None:
+            pick_dict = info['Picks']
+
+        if pick_dict is None:
             raise ValueError('pick_dict must be provided for spatial filtering.')
 
         # before picking data we want to keep our extra data (e.g. envelopes, ECG, EOG or eyetracker)
         extra_data = {ch: data.get_data(ch) for ch in self.chans2keep} if self.chans2keep is not None else None
 
-        if self.fwd is None:
-            self.fwd = info['ForwardModel']['fwd_info']['fwd']
+        fwd = self.fwd
+
+        if fwd is None:
+            fwd = info['ForwardModel']['fwd_info']['fwd']
 
         filters, lcmv_settings, noise_cov, data_cov = comp_spatial_filters(
             data=data,
-            fwd=self.fwd,
-            pick_dict=self.pick_dict,
+            fwd=fwd,
+            pick_dict=pick_dict,
             data_cov=self.data_cov,
             noise_cov=self.noise_cov,
             preproc_info=info,

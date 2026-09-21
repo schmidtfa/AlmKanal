@@ -39,23 +39,17 @@ def compute_headmodel(
     *,
     mri_path: str | Path | None = None,
 ) -> tuple[mne.transforms.Transform, matplotlib.figure.Figure]:
-    """
-    Plot the head model coregistration, including sensor and digitization points.
+    """Estimate head-to-MRI coregistration and return its transform and figure.
 
-    Parameters
-    ----------
-    coreg : mne.transforms.Transform
-        The coregistration transform matrix aligning MEG and MRI coordinate systems.
-    info : mne.Info
-        The MEG data information structure.
-    subject_id : str
-        Subject identifier for labeling the plots.
-    out_folder : Path
-        Path to the directory where the coregistration plot will be saved.
+    For template anatomy, fit and scale fsaverage to the recording.
+    For individual anatomy, fit a rigid transform without scaling the MRI.
 
-    Returns
-    -------
-    None
+    subject_id is the output/cache identifier supplied by ForwardModel.
+    For template processing, ForwardModel already includes the
+    '_from_template' suffix in this identifier.
+
+    When supplied, mri_path selects the FreeSurfer subject independently
+    of the output/cache identifier.
     """
     use_template = template_mri and mri_path is None
     fs_dir, mri_subject = _resolve_mri_paths(subject_id, subjects_dir, mri_path)
@@ -327,14 +321,19 @@ class ForwardModel(AlmKanalStep):
     ----------
     subject_id : str
         Subject identifier.
-    subjects_dir : str
-        Path to the FreeSurfer subjects directory.
+    subjects_dir : str | Path
+        AlmKanal working directory. Template anatomy is stored under
+        ``subjects_dir / 'freesurfer'`` and headmodel outputs under
+        ``subjects_dir / 'headmodels'``.
+    mri_path : str | Path | None, optional
+        Path to one prepared FreeSurfer subject directory, not a raw
+        MRI image file and not the parent directory containing subjects.
+        When provided, individual anatomy is used regardless of
+        ``template_mri``. Defaults to None.
     source : str, optional
         Type of source space ('surface' or 'volume'). Defaults to 'surface'.
     template_mri : bool, optional
         Whether to use a template MRI. Defaults to True.
-    mri_path : str | Path | None = None
-        Path to an individual MRI file to use for a headmodel
     redo_hdm : bool, optional
         Whether to recompute the head model. Defaults to True.
 
@@ -365,8 +364,7 @@ class ForwardModel(AlmKanalStep):
 
         if use_template:
             fs_dir.mkdir(parents=True, exist_ok=True)
-            if not (fs_dir / 'fsaverage').is_dir():
-                mne.datasets.fetch_fsaverage(subjects_dir=fs_dir)
+            mne.datasets.fetch_fsaverage(subjects_dir=fs_dir)
 
             # This must also run when fsaverage was downloaded previously.
             template_src = fs_dir / 'fsaverage' / 'bem' / 'fsaverage-ico-4-src.fif'
