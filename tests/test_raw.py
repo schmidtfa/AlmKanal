@@ -131,3 +131,13 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     ak.generate_json()
 
 
+def test_rereference_constructor():
+
+    step = ReReference(
+        ref_channels=['Cz'],
+        projection=False,
+        ch_type='eeg',
+    )
+
+    assert step.ref_channels == ['Cz']
+    assert step.ch_type == 'eeg'

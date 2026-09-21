@@ -300,10 +300,9 @@ class RANSAC(AlmKanalStep):
         non_eeg_bads = list(set(previous_bads).difference(eeg_ch_names))
 
         previous_eeg_bads = [ch for ch in previous_bads if ch in eeg_ch_names]
-        
 
         data.info['bads'] = list(dict.fromkeys(previous_eeg_bads + bad_chs_eeg))
-        
+
         raw_ransac = interpolate_bads(data, data.info['bads'])
 
         raw_ransac.info['bads'] = non_eeg_bads
@@ -329,12 +328,12 @@ class ReReference(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
 
-    ref_channels = 'average'
-    projection = False
-    ch_type = 'auto'
-    forward = None
-    joint = False
-    verbose = False
+    ref_channels: str | list[str] | dict = 'average'
+    projection: bool = False
+    ch_type: str | list[str] = 'auto'
+    forward: mne.Forward | None = None
+    joint: bool = False
+    verbose: bool | str | int | None = False
 
     def run(
         self,
