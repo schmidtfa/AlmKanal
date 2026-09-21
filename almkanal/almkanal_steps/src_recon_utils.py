@@ -214,6 +214,9 @@ class SourceReconstruction(AlmKanalStep):
                 'subject_id': subject_id,
                 'subjects_dir': subjects_dir,
                 'label_mode': self.label_mode,
+                'effective_label_mode': (
+                    ('auto' if source == 'volume' else self.label_mode) if self.return_parc else None
+                ),
                 'atlas': self.atlas,
                 'source': source,
             },
