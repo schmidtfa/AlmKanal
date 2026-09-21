@@ -112,7 +112,7 @@ def preproc_empty_room(
     if 'Maxwell' in preproc_info:
         if isinstance(data, mne.BaseEpochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
-        elif isinstance(data, mne.io.fiff.raw.Raw):
+        elif isinstance(data, mne.io.BaseRaw):
             raw = data
 
         raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
@@ -121,34 +121,49 @@ def preproc_empty_room(
     # picks = mne.pick_types(raw_er.info, **pick_dict)
     # raw_er.pick(picks=picks)
     # Add filtering here -> i.e. check if deviation between empty and real data and then filter
-    if bool(
-        np.logical_and(
-            np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False,
-            (np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01),) is False,
+    highpass_diff = not np.isclose(
+        data.info['highpass'],
+        raw_er.info['highpass'],
+        atol=0.01,
+    )
+
+    lowpass_diff = not np.isclose(
+        data.info['lowpass'],
+        raw_er.info['lowpass'],
+        atol=0.01,
+    )
+
+    if highpass_diff and lowpass_diff:
+        raw_er.filter(
+            l_freq=data.info['highpass'],
+            h_freq=data.info['lowpass'],
         )
-    ):
-        raw_er.filter(l_freq=data.info['highpass'], h_freq=data.info['lowpass'])
-    elif np.isclose(data.info['highpass'], raw_er.info['highpass'], atol=0.01) is False:
+
+    elif highpass_diff:
         raw_er.filter(
             l_freq=data.info['highpass'],
             h_freq=None,
         )
-    elif np.isclose(data.info['lowpass'], raw_er.info['lowpass'], atol=0.01) is False:
-        raw_er.filter(l_freq=None, h_freq=data.info['lowpass'])
+
+    elif lowpass_diff:
+        raw_er.filter(
+            l_freq=None,
+            h_freq=data.info['lowpass'],
+        )
+
     else:
         print('No filtering applied')
 
-    # TODO: Also make sure that the sampling rate is the same
-    if np.isclose(data.info['sfreq'], raw_er.info['sfreq'], atol=0.9) is False:
+    if not np.isclose(
+        data.info['sfreq'],
+        raw_er.info['sfreq'],
+        atol=0.9,
+    ):
         # adjust for small floating point differences
         raw_er.resample(data.info['sfreq'])
 
     if 'ICA' in preproc_info:
-        component_ids = np.concatenate(preproc_info['ICA']['ica_info']['component_ids'])
-        if len(component_ids) == 0:
-            component_ids = None
-
-        preproc_info['ICA']['ica_info']['ica'].apply(raw_er, exclude=component_ids)
+        preproc_info['ICA']['ica_info']['ica'].apply(raw_er)
 
     return raw_er
 
