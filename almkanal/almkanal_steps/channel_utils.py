@@ -206,7 +206,7 @@ class MultiBlockMaxwell(AlmKanalStep):
             'data': raw_max,
             'maxwell_info': {
                 'coord_frame': self.mw_coord_frame,
-                'destination': trans_avg_pos,
+                'destination': destination,
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
