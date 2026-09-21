@@ -275,6 +275,7 @@ def comp_spatial_filters(
 
     if isinstance(pick_dict, dict):
         picks = mne.pick_types(data.info, **pick_dict)
+        picks = [data.ch_names[pick] for pick in picks]
         data.pick(picks=picks)
     elif pick_dict is None:
         picks = None
