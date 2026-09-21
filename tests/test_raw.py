@@ -1,6 +1,6 @@
 from almkanal import (AlmKanal, Maxwell, ICA, ForwardModel, 
                       SpatialFilter, SourceReconstruction, PhysioCleaner,
-                      RANSAC, ReReference, Filter, Resample)
+                      EEGRANSAC, ReReference, Filter, Resample)
 import pytest
 from .settings import CH_PICKS, ICA_TRAIN, ICA_EOG, ICA_ECG, ICA_THRESH, ICA_RESAMPLE, ICA_NCOMPS, SOURCE_SURF, SOURCE_VOL
 import mne
@@ -11,7 +11,7 @@ def test_ransac(gen_mne_data_raw_eeg):
 
     raw, data_path = gen_mne_data_raw_eeg
 
-    ak = AlmKanal(steps=[RANSAC(),
+    ak = AlmKanal(steps=[EEGRANSAC(),
                          Filter(),
                          ReReference(),
                          Resample(100)])

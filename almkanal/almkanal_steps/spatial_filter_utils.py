@@ -108,8 +108,9 @@ def preproc_empty_room(
     # do channel picking here -> we need to disallow dropping bad
     # channels as this can result in problems
     raw_er.pick(picks=picks)
+
     if 'Maxwell' in preproc_info:
-        if isinstance(data, mne.epochs.Epochs):
+        if isinstance(data, mne.BaseEpochs):
             raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
         elif isinstance(data, mne.io.fiff.raw.Raw):
             raw = data

@@ -3,7 +3,7 @@
 from almkanal.__version__ import __version__
 from almkanal.almkanal import AlmKanal, AlmKanalStep
 from almkanal.almkanal_steps.bio_utils import PhysioCleaner
-from almkanal.almkanal_steps.channel_utils import RANSAC, Maxwell, MultiBlockMaxwell, ReReference
+from almkanal.almkanal_steps.channel_utils import EEGRANSAC, Maxwell, MultiBlockMaxwell, ReReference
 from almkanal.almkanal_steps.epoch_utils import Epochs
 from almkanal.almkanal_steps.event_utils import Events
 from almkanal.almkanal_steps.filter_utils import Filter, Resample
@@ -22,7 +22,7 @@ __all__ = [
     'Maxwell',
     'MultiBlockMaxwell',
     'ReReference',
-    'RANSAC',
+    'EEGRANSAC',
     'ICA',
     'PhysioCleaner',
     'Events',

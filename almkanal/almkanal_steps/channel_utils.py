@@ -218,7 +218,7 @@ class MultiBlockMaxwell(AlmKanalStep):
 
 
 @define
-class RANSAC(AlmKanalStep):
+class EEGRANSAC(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
 
@@ -236,7 +236,7 @@ class RANSAC(AlmKanalStep):
         info: dict,
     ) -> dict:
         """
-        Apply RANSAC to discover bad channels and interpolate them using autorejects methods.
+        Apply RANSAC to discover bad EEG channels and interpolate them using autorejects methods.
 
         Parameters
         ----------
