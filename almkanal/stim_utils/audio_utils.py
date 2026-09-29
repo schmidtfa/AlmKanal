@@ -10,7 +10,13 @@ def resample_poly_exact(x: np.ndarray, fs_in: int | float, fs_out: int | float, 
     """Polyphase resample, then trim/pad to n_out = round(T * fs_out)."""
     t_in = x.shape[axis] / float(fs_in)  # exclusive end
     n_out = int(round(t_in * float(fs_out)))
-    r = Fraction(float(fs_out) / float(fs_in)).limit_denominator(1000)
+    r = Fraction(float(fs_out) / float(fs_in)).limit_denominator(100_000)
+    actual_fs = float(fs_in) * float(r)
+    resample_drift = 0.5
+    if r.numerator == 0 or abs(t_in * (actual_fs - fs_out)) >= resample_drift:
+        raise ValueError(
+            'Resampling-rate approximation would drift by at least half an output sample over this signal.'
+        )
     y = resample_poly(x, up=r.numerator, down=r.denominator, axis=axis)
     cur = y.shape[axis]
     if cur < n_out:  # pad at the tail to preserve t=0 alignment
