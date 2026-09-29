@@ -360,6 +360,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
                 meta[key] = list(value)
             else:
                 meta[key] = [value] * len(ep)
+
         ep.event_id = {label: label_code}
         ep.metadata = pd.DataFrame(meta)
         epochs_list.append(ep)
