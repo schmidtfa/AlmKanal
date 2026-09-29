@@ -414,10 +414,6 @@ class ForwardModel(AlmKanalStep):
         fs_dir = Path(self.subjects_dir) / 'freesurfer'
         fs_dir.mkdir(parents=True, exist_ok=True)
         mne.datasets.fetch_fsaverage(subjects_dir=fs_dir)
-        mne.datasets.fetch_hcp_mmp_parcellation(
-            subjects_dir=fs_dir,
-            accept=True,
-        )
 
         # This is run to ensure that appropriate template files exist that we can use for morphing
         if self.source == 'surface':
