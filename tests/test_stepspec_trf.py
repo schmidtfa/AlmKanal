@@ -73,6 +73,9 @@ def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: P
     assert 'positive values advance neural events relative to the WAV features to compensate playback-to-ear delay' in output
     assert 'The WAV feature channels were left unchanged.' in output
     assert 'sampling grid was 16.000 ms' in output
+    assert '\n#### Realignment\n\n' in output
+    assert 'normalized cross-correlation' in output
+    assert 'Without recorded audio' not in output
 
 
 def test_report_checks_configuration_but_allows_different_results(tmp_path: Path) -> None:
@@ -93,6 +96,7 @@ def test_old_or_disabled_alignment_reports_remain_supported(tmp_path: Path, info
     text = preprocessing_report([path], tmp_path / 'methods.md').read_text()
     assert 'Data were epoched in 5.0s long epochs.' in text
     assert 'clock drift' not in text
+    assert '#### Realignment' not in text
 
 
 def test_one_trial_summary_has_zero_sd(tmp_path: Path) -> None:
@@ -122,6 +126,9 @@ def test_inference_counts_and_priors_survive_truncation_and_pool_separately(tmp_
     methods = preprocessing_report(files, tmp_path / 'methods.md').read_text()
     assert 'Trial endpoints were inferred for 78 trials without end triggers' in methods
     assert '499.000 µs/s for 77 trials; 500.000 µs/s for 1 trial' in methods
+    assert 'normalized cross-correlation' in methods
+    assert 'using WAV duration multiplied by' not in methods
+    assert 'Without recorded audio' not in methods
 
 
 def test_inferred_end_report_without_audio_alignment(tmp_path: Path) -> None:
@@ -131,5 +138,68 @@ def test_inferred_end_report_without_audio_alignment(tmp_path: Path) -> None:
     }
     path = write_pipeline_json(tmp_path / 'unaligned.json', info)
     methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()
-    assert 'Trial endpoints were inferred for 1 trial without end triggers' in methods
-    assert 'actual alignment offset and drift' not in methods
+    assert methods.strip() == '### Preprocessing\n\nData were epoched in 5.0s long epochs.'
+
+
+@pytest.mark.parametrize('alignment_method', [None, 'audio', 'assumed_drift'])
+@pytest.mark.parametrize('resample_after_epochs', [False, True])
+def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resample_after_epochs: bool) -> None:
+    info = make_info([499.0])
+    info.update(
+        realign_audio=alignment_method is not None,
+        alignment_method=alignment_method,
+        fallback_drift_us_per_s=499.0,
+    )
+    info['alignment_info'].update(n_trials_end_inferred=1, end_inference_drift_counts={'499.0': 1})
+    if alignment_method == 'assumed_drift':
+        info['audio_channels'] = None
+        info['alignment_kwargs'] = {}
+        info['alignment_info']['summary'] = {}
+    ica_info = {
+        'method': 'fastica', 'n_components': 20,
+        'ica_hp_freq': 1.0, 'ica_lp_freq': None, 'resample_freq': None,
+        'eog': False, 'ecg': False, 'emg': False, 'train': False,
+        'eog_corr_thresh': None, 'ecg_corr_thresh': None, 'emg_thresh': None,
+        'train_freq': None, 'train_thresh': None,
+        'components_dict': {'eog': [1, 2]},
+    }
+    steps_info = {'ICA': {'ica_info': ica_info}}
+    epoch_step = {'EpochTRF': {'TRF_info': info}}
+    resample_step = {'Resample': {'resample_info': {'sfreq': 100.0}}}
+    for step in ([epoch_step, resample_step] if resample_after_epochs else [resample_step, epoch_step]):
+        steps_info.update(step)
+    pipeline = AlmKanal(steps=[])
+    pipeline.info = {'steps': list(steps_info), 'steps_info': steps_info}
+    path = tmp_path / 'pipeline.json'
+    pipeline.generate_json(str(path))
+    methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()
+    preprocessing = methods.split('### References')[0]
+    ica_section = preprocessing.split('#### Independent Component Analysis\n', 1)[1]
+    assert '2.00 components were rejected per subject' in ica_section
+    assert 'Data were resampled to 100.0 Hz.' in preprocessing
+    assert 'Data were epoched in 1.0s long epochs.' in preprocessing
+    if alignment_method is None:
+        assert '#### Realignment' not in methods
+        assert 'Trial endpoints' not in methods
+        assert 'physical-delay correction' not in methods
+        assert 'WAV-derived' not in methods
+        assert 'Data were epoched in 1.0s long epochs.' in ica_section
+        assert 'Data were resampled to 100.0 Hz.' in ica_section
+    else:
+        assert methods.count('\n#### Realignment\n\n') == 1
+        ica_section, realignment = ica_section.split('\n#### Realignment\n\n')
+        assert 'trials were successfully aligned' not in ica_section
+        assert '1 of 1 trials were successfully aligned' in realignment
+        assert 'Trial endpoints were inferred for 1 trial' in realignment
+        assert '499.000 µs/s for 1 trial' in realignment
+        assert 'Data were epoched in 1.0s long epochs.' in realignment
+        if alignment_method == 'audio':
+            assert 'normalized cross-correlation' in realignment
+            assert 'signed clock drift 499.000 ± 0.000 µs/s' in realignment
+            assert 'Without recorded audio' not in methods
+            assert 'using the original WAV duration' not in methods
+        else:
+            assert 'using the original WAV duration and an assumed signed drift of 499.000 µs/s' in realignment
+            assert 'zero offset' in realignment
+            assert 'normalized cross-correlation' not in methods
+            assert 'mean ± population SD' not in methods
