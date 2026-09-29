@@ -102,16 +102,13 @@ def preproc_empty_room(  # noqa: C901
 
     if 'Maxwell' in preproc_info:
         if isinstance(data, mne.BaseEpochs):
-            raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
+            raw = mne.io.RawArray(np.zeros((len(data.ch_names), 1)), info=data.info)
         elif isinstance(data, mne.io.BaseRaw):
             raw = data
 
         raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
         raw_er = run_maxwell(raw_er, **preproc_info['Maxwell']['maxwell_info'])
 
-    # picks = mne.pick_types(raw_er.info, **pick_dict)
-    # raw_er.pick(picks=picks)
-    # Add filtering here -> i.e. check if deviation between empty and real data and then filter
     highpass_diff = not np.isclose(
         data.info['highpass'],
         raw_er.info['highpass'],
@@ -335,13 +332,13 @@ def comp_spatial_filters(
 
 @define
 class SpatialFilter(AlmKanalStep):
-    fwd: mne.Forward = None
+    fwd: mne.Forward | None = None
     pick_dict: dict | None = None
     data_cov: None | mne.Covariance = None
     noise_cov: None | mne.Covariance = None
-    empty_room: None | str | mne.io.Raw = None
+    empty_room: None | str | mne.io.BaseRaw = None
     nearest_empty_room: bool = False
-    chans2keep: list | None = None
+    chans2keep: list[str] | None = None
     lcmv_reg: float = 0.05
     lcmv_pick_ori: str | None = 'max-power'
     lcmv_weight_norm: str | None = 'nai'
