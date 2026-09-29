@@ -2,26 +2,56 @@ import mne
 from almkanal import AlmKanal, SpatialFilter, SourceReconstruction, Epochs
 import numpy as np
 
-def test_src(gen_mne_data_epochs): 
-
+def test_src(gen_mne_data_epochs):
     data_path = mne.datasets.sample.data_path()
     meg_path = data_path / 'MEG' / 'sample'
+
     fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
     fwd = mne.read_forward_solution(fwd_fname)
-    
+
     pick_dict = {
-    'meg': 'mag',
-    'eog': False,
-    'ecg': False,
-    'eeg': False,
-    'stim': False,
-}
+        'meg': 'mag',
+        'eog': False,
+        'ecg': False,
+        'eeg': False,
+        'stim': False,
+    }
 
-    ak = AlmKanal(steps=[
-                         SpatialFilter(fwd=fwd, pick_dict=pick_dict),
-                         SourceReconstruction(source='volume',)])
+    spatial_filter = SpatialFilter(
+        fwd=fwd,
+        pick_dict=pick_dict,
+    )
+    spatial_result = spatial_filter.run(
+        gen_mne_data_epochs,
+        info={},
+    )
 
-    ak.run(gen_mne_data_epochs)
+    source_reconstruction = SourceReconstruction(
+        filters=spatial_result['spatial_filter_info']['filters'],
+        morph2fsaverage=False,
+    )
+
+    info = {
+        'ForwardModel': {
+            'fwd_info': {
+                'fwd': fwd,
+                'subject_id_freesurfer': 'sample',
+                'subjects_dir': str(data_path / 'subjects'),
+            },
+        },
+        'SpatialFilter': {
+            'spatial_filter_info': spatial_result[
+                'spatial_filter_info'
+            ],
+        },
+    }
+
+    result = source_reconstruction.run(
+        gen_mne_data_epochs,
+        info,
+    )
+
+    assert result['data']['label_tc'] is not None
 
 
 def test_epochs_explicit_events(

@@ -1,5 +1,10 @@
+"""Anatomy and source-reconstruction tests for the current API.
+
+No dataset downloads or expensive inverse computations are performed.
+"""
+
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import mne
 import numpy as np
@@ -11,60 +16,55 @@ from almkanal.almkanal_steps import src_recon_utils as sr
 
 @pytest.fixture
 def raw_small():
-    info = mne.create_info(
-        ['MEG 0111'],
-        100.0,
-        ch_types='mag',
-    )
-    return mne.io.RawArray(
-        np.zeros((1, 500)),
-        info,
+    info = mne.create_info(['MEG 0111'], 100.0, ch_types='mag')
+    return mne.io.RawArray(np.zeros((1, 500)), info, verbose=False)
+
+
+@pytest.fixture
+def epochs_small(raw_small):
+    return mne.EpochsArray(
+        np.zeros((2, 1, 20)),
+        raw_small.info,
         verbose=False,
     )
 
 
-def make_subject(path):
+def make_subject(path: Path) -> Path:
     for folder in ('mri', 'surf', 'bem', 'label'):
-        (path / folder).mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        (path / folder).mkdir(parents=True, exist_ok=True)
     return path
 
 
-def surface_example(subject):
-    vertices = [
-        np.array([0, 1]),
-        np.array([0, 1]),
-    ]
-
-    src = mne.SourceSpaces([
-        {
-            'type': 'surf',
-            'subject_his_id': subject,
-            'vertno': vertices[hemi],
-            'nuse': 2,
-            'nn': np.array([
-                [0.0, 0.0, 1.0],
-                [0.0, 0.0, 1.0],
-            ]),
-        }
-        for hemi in range(2)
-    ])
-
+def surface_example(subject: str):
+    vertices = [np.array([0, 1]), np.array([0, 1])]
+    src = mne.SourceSpaces(
+        [
+            {
+                'type': 'surf',
+                'subject_his_id': subject,
+                'vertno': vertices[hemi],
+                'nuse': 2,
+                'nn': np.array(
+                    [[0.0, 0.0, 1.0], [0.0, 0.0, 1.0]]
+                ),
+            }
+            for hemi in range(2)
+        ]
+    )
     stc = mne.SourceEstimate(
-        np.array([
-            [1., 2., 3.],
-            [3., 4., 5.],
-            [10., 11., 12.],
-            [14., 15., 16.],
-        ]),
+        np.array(
+            [
+                [1.0, 2.0, 3.0],
+                [3.0, 4.0, 5.0],
+                [10.0, 11.0, 12.0],
+                [14.0, 15.0, 16.0],
+            ]
+        ),
         vertices=vertices,
         tmin=0,
         tstep=0.01,
         subject=subject,
     )
-
     labels = [
         mne.Label(
             vertices[0],
@@ -79,570 +79,510 @@ def surface_example(subject):
             subject=subject,
         ),
     ]
-
     return src, stc, labels
 
 
-def test_existing_fsaverage_is_still_checked(
+@pytest.mark.parametrize('use_template_mri', [False, True])
+def test_compute_headmodel_keeps_real_and_template_subjects_separate(
+    raw_small,
+    tmp_path,
+    monkeypatch,
+    use_template_mri,
+):
+    subject = (
+        'recording_from_template'
+        if use_template_mri
+        else 'recording'
+    )
+    trans = mne.transforms.Transform('head', 'mri', np.eye(4))
+    coreg = Mock(trans=trans, scale=np.ones(3))
+    coreg.compute_dig_mri_distances.return_value = np.array([0.001])
+    factory = Mock(return_value=coreg)
+    scale = Mock()
+    plot = Mock(return_value='figure')
+
+    monkeypatch.setattr(hm, 'Coregistration', factory)
+    monkeypatch.setattr(mne.coreg, 'scale_mri', scale)
+    monkeypatch.setattr(hm, 'plot_head_model', plot)
+
+    result_trans, fig = hm.compute_headmodel(
+        raw_small.info,
+        subject,
+        tmp_path,
+        pick_dict=None,
+        use_template_mri=use_template_mri,
+        plot_coreg=False,
+    )
+
+    assert result_trans is trans
+    assert fig is None
+    assert factory.call_args.kwargs['subject'] == (
+        'fsaverage' if use_template_mri else subject
+    )
+    assert factory.call_args.kwargs['subjects_dir'] == (
+        tmp_path / 'freesurfer'
+    )
+    coreg.set_scale_mode.assert_called_once_with(
+        '3-axis' if use_template_mri else None
+    )
+    plot.assert_not_called()
+
+    if use_template_mri:
+        assert scale.call_args.args == ('fsaverage', subject)
+    else:
+        scale.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ('source', 'source_ico', 'volume_pos', 'expected_name'),
+    [
+        ('surface', 5, 5.0, 'fsaverage-ico-5-src.fif'),
+        ('volume', 4, 7.5, 'fsaverage-vol-7.5-src.fif'),
+    ],
+)
+def test_forward_model_prepares_fsaverage_morph_target(
+    raw_small,
+    tmp_path,
+    monkeypatch,
+    source,
+    source_ico,
+    volume_pos,
+    expected_name,
+):
+    fs_dir = tmp_path / 'freesurfer'
+    fsaverage = make_subject(fs_dir / 'fsaverage')
+
+    fetch = Mock()
+    monkeypatch.setattr(mne.datasets, 'fetch_fsaverage', fetch)
+    monkeypatch.setattr(
+        mne.datasets,
+        'fetch_hcp_mmp_parcellation',
+        Mock(),
+    )
+
+    setup_surface = Mock(return_value='surface-target')
+    setup_volume = Mock(return_value='volume-target')
+    monkeypatch.setattr(mne, 'setup_source_space', setup_surface)
+    monkeypatch.setattr(
+        mne,
+        'setup_volume_source_space',
+        setup_volume,
+    )
+    write_src = Mock()
+    monkeypatch.setattr(mne, 'write_source_spaces', write_src)
+
+    bem_model = Mock(return_value='model')
+    bem_solution = Mock(return_value='bem')
+    monkeypatch.setattr(mne, 'make_bem_model', bem_model)
+    monkeypatch.setattr(mne, 'make_bem_solution', bem_solution)
+
+    compute = Mock(return_value=('trans', None))
+    forward = Mock(return_value={'src': 'subject-src'})
+    monkeypatch.setattr(hm, 'compute_headmodel', compute)
+    monkeypatch.setattr(hm, 'make_fwd', forward)
+
+    step = hm.ForwardModel(
+        'recording',
+        tmp_path,
+        source=source,
+        source_ico=source_ico,
+        volume_pos=volume_pos,
+        use_template_mri=False,
+    )
+    result = step.run(raw_small, info={})
+
+    fetch.assert_called_once_with(subjects_dir=fs_dir)
+    expected_target = fsaverage / 'bem' / expected_name
+    assert Path(result['fwd_info']['template_src']) == expected_target
+
+    if source == 'surface':
+        setup_surface.assert_called_once_with(
+            subject='fsaverage',
+            spacing='ico5',
+            add_dist=False,
+            subjects_dir=fs_dir,
+        )
+        setup_volume.assert_not_called()
+    else:
+        setup_surface.assert_not_called()
+        bem_model.assert_called_once_with(
+            'fsaverage',
+            ico=4,
+            conductivity=(0.3,),
+            subjects_dir=fs_dir,
+        )
+        bem_solution.assert_called_once_with('model')
+        setup_volume.assert_called_once_with(
+            subject='fsaverage',
+            pos=7.5,
+            bem='bem',
+            mri=fsaverage / 'mri' / 'T1.mgz',
+            subjects_dir=fs_dir,
+            add_interpolator=True,
+        )
+
+    assert write_src.call_args.args[0] == expected_target
+
+
+def test_forward_model_passes_current_source_parameters(
     raw_small,
     tmp_path,
     monkeypatch,
 ):
-    """An existing directory does not mean a complete download."""
-
     fs_dir = tmp_path / 'freesurfer'
-    subject = make_subject(fs_dir / 'fsaverage')
+    fsaverage = make_subject(fs_dir / 'fsaverage')
+    (fsaverage / 'bem' / 'fsaverage-ico-5-src.fif').touch()
 
-    # This local ico4 file does not establish that the other
-    # fsaverage files exist.
-    (
-        subject
-        / 'bem'
-        / 'fsaverage-ico-4-src.fif'
-    ).touch()
-
-    fetch = Mock()
-
+    monkeypatch.setattr(mne.datasets, 'fetch_fsaverage', Mock())
     monkeypatch.setattr(
         mne.datasets,
-        'fetch_fsaverage',
-        fetch,
+        'fetch_hcp_mmp_parcellation',
+        Mock(),
     )
-    monkeypatch.setattr(
-        hm,
-        'compute_headmodel',
-        Mock(return_value=('trans', None)),
-    )
-    monkeypatch.setattr(
-        hm,
-        'make_fwd',
-        Mock(return_value={'src': 'src'}),
-    )
+    compute = Mock(return_value=('trans', None))
+    forward = Mock(return_value={'src': 'src'})
+    monkeypatch.setattr(hm, 'compute_headmodel', compute)
+    monkeypatch.setattr(hm, 'make_fwd', forward)
 
-    hm.ForwardModel(
+    step = hm.ForwardModel(
         'recording',
         tmp_path,
-    ).run(raw_small, info={})
+        use_template_mri=True,
+        spacing='oct5',
+        source_ico=5,
+        bem_conductivity=(0.3,),
+        volume_pos=6.0,
+        min_dist_src=3.0,
+        meg=True,
+        eeg=False,
+    )
+    result = step.run(raw_small, info={'Picks': {'meg': True}})
 
-    fetch.assert_called_once_with(
+    assert compute.call_args.kwargs['subject_id'] == (
+        'recording_from_template'
+    )
+    assert compute.call_args.kwargs['use_template_mri'] is True
+
+    assert forward.call_args.kwargs['subject_id'] == (
+        'recording_from_template'
+    )
+    assert forward.call_args.kwargs['mri_path'] == fs_dir
+    assert forward.call_args.kwargs['spacing'] == 'oct5'
+    assert forward.call_args.kwargs['source_ico'] == 5
+    assert forward.call_args.kwargs['bem_conductivity'] == (0.3,)
+    assert forward.call_args.kwargs['volume_pos'] == 6.0
+    assert forward.call_args.kwargs['min_dist_src'] == 3.0
+    assert forward.call_args.kwargs['meg'] is True
+    assert forward.call_args.kwargs['eeg'] is False
+
+    assert result['fwd_info']['subject_id_freesurfer'] == (
+        'recording_from_template'
+    )
+    assert Path(result['fwd_info']['subjects_dir']) == fs_dir
+
+
+@pytest.mark.parametrize(
+    ('source', 'expected_suffix'),
+    [
+        ('surface', 'ico-5'),
+        ('volume', 'vol-7.5'),
+    ],
+)
+def test_template_make_fwd_scales_missing_source_space(
+    raw_small,
+    tmp_path,
+    monkeypatch,
+    source,
+    expected_suffix,
+):
+    subject = 'recording_from_template'
+    fs_dir = tmp_path / 'freesurfer'
+    make_subject(fs_dir / subject)
+
+    model = Mock(return_value='model')
+    solution = Mock(return_value='bem')
+    scale_src = Mock()
+    forward = Mock(return_value='forward')
+    monkeypatch.setattr(mne, 'make_bem_model', model)
+    monkeypatch.setattr(mne, 'make_bem_solution', solution)
+    monkeypatch.setattr(mne, 'scale_source_space', scale_src)
+    monkeypatch.setattr(mne, 'make_forward_solution', forward)
+
+    result = hm.make_fwd(
+        raw_small.info,
+        source=source,
+        fname_trans='trans.fif',
+        mri_path=fs_dir,
+        subject_id=subject,
+        source_ico=5,
+        volume_pos=7.5,
+        bem_conductivity=(0.3,),
+        min_dist_src=3.0,
+        use_template_mri=True,
+        meg=True,
+        eeg=False,
+    )
+
+    assert result == 'forward'
+    model.assert_called_once_with(
+        subject,
+        ico=4,
+        conductivity=(0.3,),
+        subjects_dir=fs_dir,
+    )
+    solution.assert_called_once_with(
+        'model',
+        solver='mne',
+        verbose=True,
+    )
+    scale_src.assert_called_once_with(
+        subject_to=subject,
+        src_name=f'{{subject}}-{expected_suffix}-src.fif',
         subjects_dir=fs_dir,
     )
 
-
-@pytest.mark.parametrize(
-    'mode',
-    ['template', 'individual', 'local'],
-)
-def test_anatomy_routing_and_transform_reuse(
-    raw_small,
-    tmp_path,
-    monkeypatch,
-    mode,
-):
-    """Save with redo_hdm=True; reload the same transform with False."""
-
-    workspace = tmp_path / 'work'
-    explicit_mri = make_subject(
-        tmp_path / 'anatomy' / 'fs-recording'
+    expected_src = (
+        fs_dir
+        / subject
+        / 'bem'
+        / f'{subject}-{expected_suffix}-src.fif'
     )
-
-    mri_path = (
-        explicit_mri
-        if mode == 'individual'
-        else None
-    )
-    use_template = mode == 'template'
-
-    cache_id = (
-        'recording_from_template'
-        if use_template
-        else 'recording'
-    )
-
-    fs_dir = (
-        explicit_mri.parent
-        if mri_path
-        else workspace / 'freesurfer'
-    )
-    fs_subject = (
-        explicit_mri.name
-        if mri_path
-        else cache_id
-    )
-
-    if use_template:
-        average = make_subject(fs_dir / 'fsaverage')
-        (
-            average
-            / 'bem'
-            / 'fsaverage-ico-4-src.fif'
-        ).touch()
-    else:
-        make_subject(fs_dir / fs_subject)
-
-    matrix = np.eye(4)
-    matrix[0, 3] = 0.01
-
-    trans = mne.transforms.Transform(
-        'head',
-        'mri',
-        matrix,
-    )
-
-    coreg = Mock(
-        trans=trans,
-        scale=np.ones(3),
-    )
-    coreg.compute_dig_mri_distances.return_value = (
-        np.array([0.001])
-    )
-
-    factory = Mock(return_value=coreg)
-    scale = Mock()
-    fetch = Mock()
-    forward = Mock(
-        return_value={'src': 'source-space'}
-    )
-
-    monkeypatch.setattr(
-        hm,
-        'Coregistration',
-        factory,
-    )
-    monkeypatch.setattr(
-        mne.coreg,
-        'scale_mri',
-        scale,
-    )
-    monkeypatch.setattr(
-        mne.datasets,
-        'fetch_fsaverage',
-        fetch,
-    )
-    monkeypatch.setattr(
-        hm,
-        'plot_head_model',
-        Mock(return_value=None),
-    )
-    monkeypatch.setattr(
-        hm,
-        'make_fwd',
-        forward,
-    )
-
-    # Individual mode deliberately leaves template_mri=True:
-    # mri_path must override it.
-    step = hm.ForwardModel(
-        'recording',
-        workspace,
-        template_mri=(mode != 'local'),
-        mri_path=mri_path,
-    )
-
-    result = step.run(
-        raw_small,
-        info={'Picks': {'meg': True}},
-    )
-
-    assert factory.call_args.kwargs['subject'] == (
-        'fsaverage' if use_template else fs_subject
-    )
-    assert (
-        factory.call_args.kwargs['subjects_dir']
-        == fs_dir
-    )
-
-    coreg.set_scale_mode.assert_called_once_with(
-        '3-axis' if use_template else None
-    )
-
-    if use_template:
-        assert scale.call_args.args == (
-            'fsaverage',
-            fs_subject,
-        )
-    else:
-        scale.assert_not_called()
-        fetch.assert_not_called()
-
-    assert step.pick_dict is None
-
-    fwd_info = result['fwd_info']
-
-    assert (
-        fwd_info['subject_id_freesurfer']
-        == fs_subject
-    )
-    assert Path(fwd_info['subjects_dir']) == fs_dir
-    assert fwd_info['subject_dir'] == workspace
-    assert fwd_info['template_mri'] == use_template
-
-    trans_file = (
-        workspace
-        / 'headmodels'
-        / cache_id
-        / f'{cache_id}-trans.fif'
-    )
-
-    np.testing.assert_allclose(
-        mne.read_trans(trans_file)['trans'],
-        matrix,
-    )
-
-    assert (
-        forward.call_args.kwargs['subject_id']
-        == cache_id
-    )
-
-    # No optimization should be rerun, and the cached matrix
-    # must reach make_fwd.
-    factory.reset_mock()
-    step.redo_hdm = False
-
-    step.run(raw_small, info={})
-
-    factory.assert_not_called()
-
-    np.testing.assert_allclose(
-        forward.call_args.kwargs['fname_trans']['trans'],
-        matrix,
-    )
+    assert forward.call_args.kwargs['src'] == expected_src
+    assert forward.call_args.kwargs['mindist'] == 3.0
 
 
-@pytest.mark.parametrize(
-    'source',
-    ['surface', 'volume'],
-)
-def test_individual_forward_uses_individual_anatomy(
+@pytest.mark.parametrize('source', ['surface', 'volume'])
+def test_individual_make_fwd_uses_requested_source_resolution(
     raw_small,
     tmp_path,
     monkeypatch,
     source,
 ):
-    subject_path = make_subject(
-        tmp_path / 'anatomy' / 'fs-recording'
-    )
-    (
-        subject_path
-        / 'bem'
-        / 'inner_skull.surf'
-    ).touch()
+    fs_dir = tmp_path / 'freesurfer'
+    subject = 'recording'
+    make_subject(fs_dir / subject)
 
     model = Mock(return_value='model')
     solution = Mock(return_value='bem')
     surface = Mock(return_value='surface-src')
     volume = Mock(return_value='volume-src')
     forward = Mock(return_value='forward')
-
     monkeypatch.setattr(mne, 'make_bem_model', model)
     monkeypatch.setattr(mne, 'make_bem_solution', solution)
     monkeypatch.setattr(mne, 'setup_source_space', surface)
-    monkeypatch.setattr(
-        mne,
-        'setup_volume_source_space',
-        volume,
-    )
-    monkeypatch.setattr(
-        mne,
-        'make_forward_solution',
-        forward,
-    )
-
-    result = hm.make_fwd(
-        raw_small.info,
-        source,
-        'recording-trans.fif',
-        tmp_path / 'work',
-        'recording',
-        template_mri=True,
-        mri_path=subject_path,
-    )
-
-    assert result == 'forward'
-
-    model.assert_called_once_with(
-        'fs-recording',
-        ico=4,
-        conductivity=(0.3,),
-        subjects_dir=subject_path.parent,
-    )
-
-    setup = (
-        surface if source == 'surface' else volume
-    )
-
-    assert setup.call_args.args == ('fs-recording',)
-    assert (
-        setup.call_args.kwargs['subjects_dir']
-        == subject_path.parent
-    )
-
-    if source == 'volume':
-        surface.assert_not_called()
-
-        assert setup.call_args.kwargs['mri'] == (
-            subject_path / 'mri' / 'T1.mgz'
-        )
-        assert (
-            setup.call_args.kwargs['add_interpolator']
-            is True
-        )
-    else:
-        volume.assert_not_called()
-        assert (
-            setup.call_args.kwargs['spacing']
-            == 'oct6'
-        )
-
-    assert (
-        forward.call_args.kwargs['src']
-        == f'{source}-src'
-    )
-
-    # Preserve the existing individual-MRI MEG-only scope.
-    assert forward.call_args.kwargs['eeg'] is False
-
-
-@pytest.mark.parametrize(
-    'source,suffix',
-    [
-        ('surface', 'ico-4'),
-        ('volume', 'vol-5'),
-    ],
-)
-def test_template_forward_does_not_append_suffix_twice(
-    raw_small,
-    tmp_path,
-    monkeypatch,
-    source,
-    suffix,
-):
-    subject = 'recording_from_template'
-    bem_dir = (
-        tmp_path
-        / 'freesurfer'
-        / subject
-        / 'bem'
-    )
-
-    solution = Mock(return_value='bem')
-    forward = Mock(return_value='forward')
-
-    monkeypatch.setattr(
-        mne,
-        'make_bem_solution',
-        solution,
-    )
-    monkeypatch.setattr(
-        mne,
-        'make_forward_solution',
-        forward,
-    )
+    monkeypatch.setattr(mne, 'setup_volume_source_space', volume)
+    monkeypatch.setattr(mne, 'make_forward_solution', forward)
 
     hm.make_fwd(
         raw_small.info,
-        source,
-        'trans.fif',
-        tmp_path,
-        subject,
-        template_mri=True,
+        source=source,
+        fname_trans='trans.fif',
+        mri_path=fs_dir,
+        subject_id=subject,
+        spacing='oct5',
+        volume_pos=7.5,
+        use_template_mri=False,
     )
 
-    assert solution.call_args.args[0] == (
-        bem_dir
-        / f'{subject}-5120-5120-5120-bem.fif'
+    if source == 'surface':
+        surface.assert_called_once_with(
+            subject,
+            spacing='oct5',
+            surface='white',
+            subjects_dir=fs_dir,
+            add_dist=True,
+        )
+        volume.assert_not_called()
+    else:
+        surface.assert_not_called()
+        volume.assert_called_once_with(
+            subject,
+            pos=7.5,
+            bem='bem',
+            subjects_dir=fs_dir,
+            add_interpolator=True,
+        )
+
+
+def test_source_reconstruction_requires_forward_model(
+    raw_small,
+    monkeypatch,
+):
+    apply = Mock()
+    monkeypatch.setattr(mne.beamformer, 'apply_lcmv_raw', apply)
+
+    step = sr.SourceReconstruction(
+        filters=object(),
+        morph2fsaverage=False,
     )
 
-    assert forward.call_args.kwargs['src'] == (
-        bem_dir / f'{subject}-{suffix}-src.fif'
+    with pytest.raises(
+        ValueError,
+        match='requires a completed ForwardModel step',
+    ):
+        step.run(raw_small, info={})
+
+    apply.assert_not_called()
+
+
+def test_external_filters_do_not_require_spatial_filter(
+    raw_small,
+    tmp_path,
+    monkeypatch,
+):
+    src, _, _ = surface_example('recording')
+    filters = object()
+    estimate = object()
+    apply = Mock(return_value=estimate)
+    monkeypatch.setattr(mne.beamformer, 'apply_lcmv_raw', apply)
+
+    info = {
+        'ForwardModel': {
+            'fwd_info': {
+                'fwd': {'src': src},
+                'subject_id_freesurfer': 'recording',
+                'subjects_dir': str(tmp_path),
+                'template_src': str(
+                    tmp_path / 'fsaverage-ico-4-src.fif'
+                ),
+            }
+        }
+    }
+
+    step = sr.SourceReconstruction(
+        filters=filters,
+        morph2fsaverage=False,
     )
+    result = step.run(raw_small, info)
+
+    assert apply.call_args.args[1] is filters
+    assert result['data']['label_tc'] is estimate
+    assert result['stc_info']['subject_id'] == 'recording'
+    assert result['stc_info']['source'] == 'surface'
+    assert Path(result['stc_info']['subjects_dir']) == tmp_path
+    assert 'SpatialFilter' not in step.must_be_after
 
 
 @pytest.mark.parametrize('as_epochs', [False, True])
-def test_reconstruction_uses_current_forward_without_retaining_state(
+def test_source_reconstruction_morphs_to_fsaverage(
     raw_small,
+    epochs_small,
     tmp_path,
     monkeypatch,
     as_epochs,
 ):
-    data = raw_small
+    src_from, _, _ = surface_example('recording')
+    src_to, _, _ = surface_example('fsaverage')
+    filters = object()
 
     if as_epochs:
-        data = mne.EpochsArray(
-            np.zeros((2, 1, 20)),
-            raw_small.info,
-            verbose=False,
+        data = epochs_small
+        apply = Mock(return_value=['stc-1', 'stc-2'])
+        monkeypatch.setattr(
+            mne.beamformer,
+            'apply_lcmv_epochs',
+            apply,
+        )
+    else:
+        data = raw_small
+        apply = Mock(return_value='stc')
+        monkeypatch.setattr(
+            mne.beamformer,
+            'apply_lcmv_raw',
+            apply,
         )
 
-    estimates = (
-        ['estimate-1', 'estimate-2']
-        if as_epochs
-        else 'estimate'
-    )
-
-    apply = Mock(return_value=estimates)
-    method = (
-        'apply_lcmv_epochs'
-        if as_epochs
-        else 'apply_lcmv_raw'
-    )
-
+    target = tmp_path / 'fsaverage-ico-4-src.fif'
     monkeypatch.setattr(
-        mne.beamformer,
-        method,
-        apply,
+        mne,
+        'read_source_spaces',
+        Mock(return_value=src_to),
     )
 
-    parcellate = Mock(
-        side_effect=lambda stc, **kwargs: {
-            'label_tc': stc,
-            'fs': kwargs['fs'],
+    morph = Mock()
+    if as_epochs:
+        morph.apply.side_effect = ['morphed-1', 'morphed-2']
+    else:
+        morph.apply.return_value = 'morphed'
+    compute_morph = Mock(return_value=morph)
+    monkeypatch.setattr(mne, 'compute_source_morph', compute_morph)
+
+    info = {
+        'ForwardModel': {
+            'fwd_info': {
+                'fwd': {'src': src_from},
+                'subject_id_freesurfer': 'recording',
+                'subjects_dir': str(tmp_path),
+                'template_src': str(target),
+            }
         }
-    )
-    monkeypatch.setattr(
-        sr,
-        'src2parc',
-        parcellate,
-    )
+    }
 
-    step = sr.SourceReconstruction(
-        return_parc=True,
-        atlas='dk',
+    result = sr.SourceReconstruction(filters=filters).run(
+        data,
+        info,
     )
 
-    for subject, kind in [
-        ('fs-a', 'surface'),
-        ('fs-b', 'volume'),
-    ]:
-        if kind == 'surface':
-            src = surface_example(subject)[0]
-        else:
-            src = mne.SourceSpaces([
-                {
-                    'type': 'vol',
-                    'subject_his_id': subject,
-                },
-            ])
+    compute_morph.assert_called_once_with(
+        src_from,
+        subject_from='recording',
+        subject_to='fsaverage',
+        src_to=src_to,
+        subjects_dir=Path(tmp_path),
+    )
 
-        filters = object()
+    if as_epochs:
+        assert morph.apply.call_args_list == [
+            call('stc-1'),
+            call('stc-2'),
+        ]
+        assert result['data']['label_tc'] == [
+            'morphed-1',
+            'morphed-2',
+        ]
+    else:
+        morph.apply.assert_called_once_with('stc')
+        assert result['data']['label_tc'] == 'morphed'
 
-        info = {
-            'SpatialFilter': {
-                'spatial_filter_info': {
-                    'filters': filters,
-                },
-            },
-            'ForwardModel': {
-                'fwd_info': {
-                    'source_type': kind,
-                    'subject_id_freesurfer': subject,
-                    'subjects_dir': str(tmp_path),
-                    'fwd': {'src': src},
-                },
-            },
-        }
-
-        result = step.run(data, info)
-
-        assert apply.call_args.args[1] is filters
-        assert parcellate.call_args.args[0] is estimates
-        assert parcellate.call_args.kwargs['src'] is src
-        assert (
-            parcellate.call_args.kwargs['subject_id']
-            == subject
-        )
-        assert (
-            parcellate.call_args.kwargs['source']
-            == kind
-        )
-        assert (
-            result['stc_info']['subject_id']
-            == subject
-        )
-
-        if as_epochs:
-            assert (
-                result['data']['metadata']
-                is data.metadata
-            )
-
-    assert step.filters is None
-    assert step.subject_id is None
-    assert step.subjects_dir is None
-    assert step.source is None
-    assert step.src is None
+    assert result['stc_info']['subject_id'] == 'fsaverage'
+    assert result['stc_info']['source'] == 'surface'
 
 
 @pytest.mark.parametrize('as_list', [False, True])
-@pytest.mark.parametrize('use_workspace', [False, True])
 def test_surface_parcellation_uses_supplied_src(
     tmp_path,
     monkeypatch,
     as_list,
-    use_workspace,
 ):
-    subject = 'fs-a'
-    fs_dir = tmp_path / 'freesurfer'
-    subject_path = make_subject(fs_dir / subject)
-
+    subject = 'fsaverage'
+    subject_path = make_subject(tmp_path / subject)
     for hemi in ('lh', 'rh'):
         (
-            subject_path
-            / 'label'
-            / f'{hemi}.aparc.annot'
+            subject_path / 'label' / f'{hemi}.aparc.annot'
         ).touch()
 
     src, stc, labels = surface_example(subject)
-
-    read_labels = Mock(return_value=labels)
-    read_src = Mock(
-        side_effect=AssertionError(
-            'Must use the supplied source space.'
-        )
-    )
-
     monkeypatch.setattr(
         mne,
         'read_labels_from_annot',
-        read_labels,
-    )
-    monkeypatch.setattr(
-        mne,
-        'read_source_spaces',
-        read_src,
+        Mock(return_value=labels),
     )
 
-    estimates = (
-        [stc, stc * 2] if as_list else stc
-    )
-
+    estimates = [stc, stc * 2] if as_list else stc
     result = sr.src2parc(
         estimates,
-        100.0,
-        subject,
-        tmp_path if use_workspace else fs_dir,
-        source='surface',
+        src=src,
+        fs=100.0,
+        subject_id=subject,
+        subjects_dir=tmp_path,
         atlas='dk',
         label_mode='mean_flip',
-        src=src,
     )
 
-    read_src.assert_not_called()
-    read_labels.assert_called_once_with(
-        subject,
-        parc='aparc',
-        subjects_dir=fs_dir,
+    expected = np.array(
+        [[2.0, 3.0, 4.0], [12.0, 13.0, 14.0]]
     )
-
-    # Actual MNE mean_flip extraction with aligned normals.
-    expected = np.array([
-        [2., 3., 4.],
-        [12., 13., 14.],
-    ])
-
     if as_list:
-        assert len(result['label_tc']) == 2
-
         np.testing.assert_allclose(
             result['label_tc'][0],
             expected,
@@ -661,74 +601,29 @@ def test_surface_parcellation_uses_supplied_src(
     assert result['rh'] == [False, True]
 
 
-@pytest.mark.parametrize(
-    'mismatch',
-    ['subject', 'kind'],
-)
-def test_src2parc_rejects_inconsistent_anatomy(
-    tmp_path,
-    mismatch,
-):
-    make_subject(tmp_path / 'fs-a')
-
-    src, stc, _ = surface_example(
-        'fs-b' if mismatch == 'subject' else 'fs-a'
-    )
-
-    source = (
-        'volume' if mismatch == 'kind' else 'surface'
-    )
-    message = (
-        'Source space subjects'
-        if mismatch == 'subject'
-        else 'does not match'
-    )
-
-    with pytest.raises(ValueError, match=message):
-        sr.src2parc(
-            stc,
-            100.0,
-            'fs-a',
-            tmp_path,
-            source=source,
-            atlas='dk',
-            src=src,
-        )
-
-
-def test_volume_parcellation_keeps_subject_atlas_and_auto_mode(
+def test_volume_parcellation_uses_subject_atlas_and_auto_mode(
     tmp_path,
     monkeypatch,
 ):
-    subject_path = make_subject(tmp_path / 'fs-a')
-    atlas_path = (
-        subject_path / 'mri' / 'aparc+aseg.mgz'
-    )
+    subject = 'fsaverage'
+    subject_path = make_subject(tmp_path / subject)
+    atlas_path = subject_path / 'mri' / 'aparc+aseg.mgz'
     atlas_path.touch()
 
-    src = mne.SourceSpaces([
-        {
-            'type': 'vol',
-            'subject_his_id': 'fs-a',
-        },
-    ])
-
+    src = mne.SourceSpaces(
+        [{'type': 'vol', 'subject_his_id': subject}]
+    )
     names = [
         'Left-Thalamus-Proper',
         'ctx-lh-test',
         'ctx-rh-test',
     ]
-
-    read_labels = Mock(return_value=names)
-    extract = Mock(
-        return_value=np.zeros((3, 10))
-    )
-
     monkeypatch.setattr(
         mne,
         'get_volume_labels_from_aseg',
-        read_labels,
+        Mock(return_value=names),
     )
+    extract = Mock(return_value=np.zeros((3, 10)))
     monkeypatch.setattr(
         mne,
         'extract_label_time_course',
@@ -737,48 +632,15 @@ def test_volume_parcellation_keeps_subject_atlas_and_auto_mode(
 
     result = sr.src2parc(
         'stc',
-        100.0,
-        'fs-a',
-        tmp_path,
-        source='volume',
-        atlas='dk',
         src=src,
+        fs=100.0,
+        subject_id=subject,
+        subjects_dir=tmp_path,
+        atlas='dk',
     )
-
-    read_labels.assert_called_once_with(atlas_path)
 
     assert extract.call_args.args[1] == str(atlas_path)
     assert extract.call_args.args[2] is src
     assert extract.call_args.kwargs['mode'] == 'auto'
-
-    assert result['ctx_logical'] == [
-        False,
-        True,
-        True,
-    ]
-    assert result['sctx_labels'] == [
-        'Left-Thalamus-Proper',
-    ]
-
-
-def test_external_filters_without_parcellation_need_no_anatomy(
-    raw_small,
-    monkeypatch,
-):
-    filters = object()
-    estimate = object()
-
-    apply = Mock(return_value=estimate)
-    monkeypatch.setattr(
-        mne.beamformer,
-        'apply_lcmv_raw',
-        apply,
-    )
-
-    result = sr.SourceReconstruction(
-        filters=filters,
-    ).run(raw_small, info={})
-
-    assert apply.call_args.args[1] is filters
-    assert result['data']['label_tc'] is estimate
-    assert result['stc_info']['subject_id'] is None
+    assert result['ctx_logical'] == [False, True, True]
+    assert result['sctx_labels'] == ['Left-Thalamus-Proper']

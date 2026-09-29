@@ -8,13 +8,19 @@ import mne
 #@pytest.mark.parametrize('ch_picks', CH_PICKS, scope='session')
 
 def test_ransac(gen_mne_data_raw_eeg):
+    raw, _ = gen_mne_data_raw_eeg
 
-    raw, data_path = gen_mne_data_raw_eeg
+    # Smoke test: a short segment is enough to exercise the pipeline.
+    raw = raw.copy().crop(tmax=10)
 
-    ak = AlmKanal(steps=[EEGRANSAC(),
-                         Filter(),
-                         ReReference(),
-                         Resample(100)])
+    ak = AlmKanal(
+        steps=[
+            EEGRANSAC(),
+            Filter(),
+            ReReference(),
+            Resample(100),
+        ]
+    )
     ak.run(raw)
 
 
@@ -27,6 +33,8 @@ def test_ransac(gen_mne_data_raw_eeg):
 def test_ica(gen_mne_data_raw, train, eog, ecg):
 
     raw, data_path = gen_mne_data_raw
+
+    raw = raw.copy().crop(tmax=20)
 
     ak = AlmKanal(steps=[ICA(n_components=10,
                         train=train,
@@ -44,6 +52,8 @@ def test_ica(gen_mne_data_raw, train, eog, ecg):
 def test_fwd(gen_mne_data_raw, source, atlas):
     raw, data_path = gen_mne_data_raw
 
+    raw = raw.copy().crop(tmax=10)
+
     pick_dict = {
         'meg': 'mag',
         'eog': False,
@@ -57,11 +67,10 @@ def test_fwd(gen_mne_data_raw, source, atlas):
                                       subjects_dir='./data_old/',
                                       source=source),
                         SpatialFilter(pick_dict=pick_dict),
-                        SourceReconstruction(#subject_id = 'sample',
-                                            #subjects_dir = './data_old/',
-                                            #source=source,
+                        SourceReconstruction(
                                             atlas=atlas,
-                                            return_parc=True,)])
+                                            return_parc=True,
+                                            morph2fsaverage=False,)])
 
     ak.run(raw)
     
@@ -75,7 +84,7 @@ def test_src(): #, ch_picks
     #fwd_fname = meg_path / 'sample_audvis-meg-vol-7-fwd.fif'
 
     raw = mne.io.read_raw_fif(raw_fname, preload=True)#.crop(tmin=0, tmax=60)
-
+    raw.crop(tmax=20)
     #raw = raw.pick(picks=['meg', 'eog', 'stim'])
 
     
@@ -91,12 +100,14 @@ def test_src(): #, ch_picks
     
     ak = AlmKanal(pick_params=pick_dict,
                   steps=[Maxwell(),
-                         ICA(),
+                         ICA(n_components=10,
+                            resample_freq=100,),
                          ForwardModel(subject_id='sample', 
                                       subjects_dir='./data_old', 
-                                      redo_hdm=True),
+                                      redo_hdm=True,
+                                      source='volume'),
                          SpatialFilter( empty_room=raw.copy()),
-                         SourceReconstruction(source='volume'),
+                         SourceReconstruction(morph2fsaverage=False,),
                          ])
     
     ak.run(raw)
@@ -105,7 +116,7 @@ def test_src(): #, ch_picks
 @pytest.mark.parametrize('source, atlas', SOURCE_VOL, scope='session')
 def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
     raw, data_path = gen_mne_data_raw
-
+    raw.crop(tmax=20)
     pick_dict = {
         'meg': True,
         'eog': False,
@@ -118,13 +129,12 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, atlas):
                                 pick_dict=pick_dict,
                                 subject_id='sample',
                                 subjects_dir='./data_old/',
+                                redo_hdm=False,
                                 source=source),
                  SpatialFilter(pick_dict=pick_dict),
-                 SourceReconstruction(#subject_id = 'sample',
-                                       # subjects_dir = './data_old/',
-                                        #source=source,
-                                        atlas=atlas,
-                                        return_parc=True,)])
+                 SourceReconstruction(atlas=atlas,
+                                      return_parc=True,
+                                      morph2fsaverage=False)])
     ak.run(raw)
 
 
