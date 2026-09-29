@@ -1,4 +1,5 @@
 import pickle
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib
@@ -11,34 +12,14 @@ from mne.coreg import Coregistration
 from almkanal.almkanal import AlmKanalStep
 
 
-def _resolve_mri_paths(
-    subject_id: str,
-    subjects_dir: str | Path,
-    mri_path: str | Path | None = None,
-) -> tuple[Path, str]:
-    """Return the FreeSurfer subjects directory and actual MRI subject name."""
-    if mri_path is None:
-        return Path(subjects_dir).expanduser().resolve() / 'freesurfer', subject_id
-
-    subject_path = Path(mri_path).expanduser().resolve()
-    if not subject_path.is_dir():
-        raise ValueError(
-            f'mri_path must be an existing FreeSurfer subject directory, ' f'not a T1 image file: {subject_path}'
-        )
-    if not all((subject_path / folder).is_dir() for folder in ('mri', 'surf')):
-        raise ValueError(f'{subject_path} is not a FreeSurfer subject directory containing mri/ and surf/.')
-    return subject_path.parent, subject_path.name
-
-
 def compute_headmodel(
     info: mne.Info,
     subject_id: str,
     subjects_dir: str | Path,
     pick_dict: dict | None,
-    template_mri: bool = True,
-    *,
-    mri_path: str | Path | None = None,
-) -> tuple[mne.transforms.Transform, matplotlib.figure.Figure]:
+    use_template_mri: bool = True,
+    plot_coreg: bool = True,
+) -> tuple[mne.transforms.Transform, matplotlib.figure.Figure | None]:
     """Estimate head-to-MRI coregistration and return its transform and figure.
 
     For template anatomy, fit and scale fsaverage to the recording.
@@ -51,38 +32,37 @@ def compute_headmodel(
     When supplied, mri_path selects the FreeSurfer subject independently
     of the output/cache identifier.
     """
-    use_template = template_mri and mri_path is None
-    fs_dir, mri_subject = _resolve_mri_paths(subject_id, subjects_dir, mri_path)
-    out_folder = Path(subjects_dir).expanduser().resolve() / 'headmodels' / subject_id
+
+    mri_path = Path(subjects_dir) / 'freesurfer'
+    out_folder = Path(subjects_dir) / 'headmodels' / subject_id
 
     if pick_dict is not None:
         info = mne.pick_info(info, mne.pick_types(info, **pick_dict))
 
     coreg = Coregistration(
         info,
-        subject='fsaverage' if use_template else mri_subject,
-        subjects_dir=fs_dir,
+        subject='fsaverage' if use_template_mri else subject_id,
+        subjects_dir=mri_path,
         fiducials='auto',
     )
-    coreg.set_scale_mode('3-axis' if use_template else None)
+    coreg.set_scale_mode('3-axis' if use_template_mri else None)
     coreg.fit_fiducials(verbose=True)
     coreg.fit_icp(n_iterations=6, nasion_weight=2, verbose=True)
     coreg.omit_head_shape_points(distance=5 / 1000)
     coreg.fit_icp(n_iterations=20, nasion_weight=10, verbose=True)
 
     dists = coreg.compute_dig_mri_distances() * 1e3
-    if dists.size:
-        print(
-            f'Distance between HSP and MRI (mean/min/max):\n'
-            f'{np.mean(dists):.2f} mm / {np.min(dists):.2f} mm / {np.max(dists):.2f} mm'
-        )
+    print(
+        f'Distance between HSP and MRI (mean/min/max):\n'
+        f'{np.mean(dists):.2f} mm / {np.min(dists):.2f} mm / {np.max(dists):.2f} mm'
+    )
 
-    if use_template:
+    if use_template_mri:
         mne.coreg.scale_mri(
             'fsaverage',
-            mri_subject,
+            subject_id,
             scale=coreg.scale,
-            subjects_dir=fs_dir,
+            subjects_dir=mri_path,
             annot=True,
             overwrite=True,
         )
@@ -92,7 +72,8 @@ def compute_headmodel(
         pickle.dump(info, file)
     mne.write_trans(out_folder / f'{subject_id}-trans.fif', coreg.trans, overwrite=True)
 
-    fig = plot_head_model(coreg.trans, info, mri_subject, fs_dir)
+    fig = plot_head_model(coreg.trans, info, subject_id, mri_path) if plot_coreg else None
+
     return coreg.trans, fig
 
 
@@ -230,12 +211,16 @@ def make_fwd(
     info: mne.Info,
     source: str,
     fname_trans: str | Path | mne.transforms.Transform,
-    subjects_dir: str | Path,
+    mri_path: Path,
     subject_id: str,
-    template_mri: bool = False,
     spacing: str = 'oct6',
-    *,
-    mri_path: str | Path | None = None,
+    source_ico: int = 4,
+    bem_conductivity: float | Sequence[float] = (0.3,),  # fine for MEG should be changed for EEG
+    volume_pos: float = 5.0,
+    min_dist_src: float = 5,  # in mm
+    use_template_mri: bool = True,
+    meg: bool = True,
+    eeg: bool = False,
 ) -> mne.Forward:
     """
     Generate a forward model for MEG data.
@@ -260,44 +245,39 @@ def make_fwd(
     mne.Forward
         The computed forward model.
     """
-    if source not in ('surface', 'volume'):
-        raise ValueError("source must be 'surface' or 'volume'.")
 
-    use_template = template_mri and mri_path is None
-    fs_dir, mri_subject = _resolve_mri_paths(subject_id, subjects_dir, mri_path)
-    subject_path = fs_dir / mri_subject
+    model = mne.make_bem_model(
+        subject_id, ico=4, conductivity=bem_conductivity, subjects_dir=mri_path
+    )  # this ico is different from source ico
+    bem = mne.make_bem_solution(model, solver='mne', verbose=True)
 
-    if use_template:
-        bem_file = subject_path / 'bem' / f'{mri_subject}-5120-5120-5120-bem.fif'
-        suffix = 'ico-4' if source == 'surface' else 'vol-5'
-        src_file = subject_path / 'bem' / f'{mri_subject}-{suffix}-src.fif'
-        bem = mne.make_bem_solution(bem_file, solver='mne', verbose=True)
-        return mne.make_forward_solution(info=info, trans=fname_trans, src=src_file, bem=bem)
-
-    inner_skull = subject_path / 'bem' / 'inner_skull.surf'
-    if not inner_skull.is_file():
-        raise FileNotFoundError(
-            f'Missing BEM surface: {inner_skull}. Prepare BEM surfaces first, '
-            'for example with mne.bem.make_watershed_bem().'
+    if use_template_mri:
+        suffix = f'ico-{int(source_ico)}' if source == 'surface' else f'vol-{volume_pos:g}'
+        src_file = mri_path / subject_id / 'bem' / f'{subject_id}-{suffix}-src.fif'
+        if not src_file.is_file():
+            mne.scale_source_space(
+                subject_to=subject_id,
+                src_name=f'{{subject}}-{suffix}-src.fif',
+                subjects_dir=mri_path,
+            )
+        return mne.make_forward_solution(
+            info=info, trans=fname_trans, src=src_file, bem=bem, meg=meg, eeg=eeg, mindist=min_dist_src
         )
-    model = mne.make_bem_model(mri_subject, ico=4, conductivity=(0.3,), subjects_dir=fs_dir)
-    bem = mne.make_bem_solution(model)
 
     if source == 'surface':
         src = mne.setup_source_space(
-            mri_subject,
+            subject_id,
             spacing=spacing,
             surface='white',
-            subjects_dir=fs_dir,
+            subjects_dir=mri_path,
             add_dist=True,
         )
     else:
         src = mne.setup_volume_source_space(
-            mri_subject,
-            pos=5.0,
-            mri=subject_path / 'mri' / 'T1.mgz',
+            subject_id,
+            pos=volume_pos,
             bem=bem,
-            subjects_dir=fs_dir,
+            subjects_dir=mri_path,
             add_interpolator=True,
         )
 
@@ -306,37 +286,97 @@ def make_fwd(
         trans=fname_trans,
         src=src,
         bem=bem,
-        meg=True,
-        eeg=False,
-        mindist=5.0,
+        meg=meg,
+        eeg=eeg,
+        mindist=min_dist_src,
     )
 
 
 @define
 class ForwardModel(AlmKanalStep):
     """
-    Build a forward model for source reconstruction.
+    Build an MEG forward model for source reconstruction.
+
+    The forward model combines the sensor geometry, MEG-to-MRI
+    coregistration, source space, and boundary-element model (BEM).
+
+    Individual FreeSurfer reconstructions are expected under
+    ``subjects_dir / 'freesurfer' / subject_id``. When template anatomy is
+    used, ``fsaverage`` is scaled to the participant and stored as
+    ``<subject_id>_from_template``.
 
     Parameters
     ----------
     subject_id : str
         Subject identifier.
-    subjects_dir : str | Path
-        AlmKanal working directory. Template anatomy is stored under
-        ``subjects_dir / 'freesurfer'`` and headmodel outputs under
-        ``subjects_dir / 'headmodels'``.
-    mri_path : str | Path | None, optional
-        Path to one prepared FreeSurfer subject directory, not a raw
-        MRI image file and not the parent directory containing subjects.
-        When provided, individual anatomy is used regardless of
-        ``template_mri``. Defaults to None.
-    source : str, optional
-        Type of source space ('surface' or 'volume'). Defaults to 'surface'.
-    template_mri : bool, optional
-        Whether to use a template MRI. Defaults to True.
-    redo_hdm : bool, optional
-        Whether to recompute the head model. Defaults to True.
 
+    subjects_dir : str | Path
+        AlmKanal working directory. FreeSurfer subjects are stored under
+        ``subjects_dir / 'freesurfer'`` and coregistration outputs under
+        ``subjects_dir / 'headmodels'``.
+
+    pick_dict : dict | None, optional
+        Channel selection passed to :func:`mne.pick_types` before
+        coregistration. If None, channel picks are taken from the pipeline
+        information when available.
+
+    source : {'surface', 'volume'}, optional
+        Type of source space used for the forward model. Default is
+        ``'surface'``.
+
+    redo_hdm : bool, optional
+        If True, recompute the MEG-to-MRI coregistration and, when using
+        template anatomy, rescale ``fsaverage``. If False, use the
+        previously saved transform. Default is True.
+
+    spacing : str, optional
+        Source-space spacing used for surface source spaces based on an
+        individual MRI, for example ``'oct6'`` or ``'ico5'``. Default is
+        ``'oct6'``.
+
+    source_ico : int, optional
+        Icosahedral subdivision level of the ``fsaverage`` surface source
+        space used for template-based forward models and as the common
+        surface source space for morphing. This controls source-space
+        density and is independent of the BEM surface resolution.
+        Default is 4.
+
+    bem_conductivity : float | Sequence[float], optional
+        Conductivity value or values passed to :func:`mne.make_bem_model`.
+        A one-layer BEM is typically used for MEG, whereas EEG requires a
+        three-layer BEM. Default is ``(0.3,)``.
+
+    volume_pos : float, optional
+        Grid spacing in millimetres for volume source spaces. The same
+        spacing is used when preparing the corresponding ``fsaverage``
+        volume source space for morphing. Default is 5.0.
+
+    min_dist_src : float, optional
+        Minimum distance in millimetres between sources and the inner skull
+        used when computing the forward solution. Default is 5.0.
+
+    use_template_mri : bool, optional
+        If True, use a participant-specific scaling of ``fsaverage`` as the
+        anatomical model. If False, use the participant's existing
+        FreeSurfer reconstruction. Default is True.
+
+    meg : bool, optional
+        Include MEG channels in the forward solution. Default is True.
+
+    eeg : bool, optional
+        Include EEG channels in the forward solution. EEG forward models
+        require a three-layer BEM conductivity specification. Default is
+        False.
+
+    Notes
+    -----
+    The BEM surface resolution is fixed internally and is independent of
+    ``source_ico``. ``source_ico`` controls the number of cortical source
+    locations, not the resolution of the BEM geometry.
+
+    An ``fsaverage`` source space corresponding to the requested surface or
+    volume resolution is prepared so that later source estimates can be
+    morphed to a common source space.
 
     Returns
     -------
@@ -349,58 +389,93 @@ class ForwardModel(AlmKanalStep):
     must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ('Maxwell', 'ICA')
     source: str = 'surface'
-    template_mri: bool = True
     redo_hdm: bool = True
-    mri_path: str | Path | None = None
+    spacing: str = 'oct6'
+    source_ico: int = 4
+    bem_conductivity: float | Sequence[float] = (0.3,)  # fine for MEG should be changed for EEG
+    volume_pos: float = 5.0
+    use_template_mri: bool = True
+    min_dist_src: float = 5.0
+    meg: bool = True
+    eeg: bool = False
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
         if self.source not in ('surface', 'volume'):
             raise ValueError("source must be 'surface' or 'volume'.")
 
         pick_dict = self.pick_dict if self.pick_dict is not None else info.get('Picks')
-        use_template = self.template_mri and self.mri_path is None
-        cache_id = f'{self.subject_id}_from_template' if use_template else self.subject_id
-        fs_dir, mri_subject = _resolve_mri_paths(cache_id, self.subjects_dir, self.mri_path)
+        cache_id = f'{self.subject_id}_from_template' if self.use_template_mri else self.subject_id
 
-        if use_template:
-            fs_dir.mkdir(parents=True, exist_ok=True)
-            mne.datasets.fetch_fsaverage(subjects_dir=fs_dir)
+        if self.eeg and np.size(self.bem_conductivity) == 1:
+            raise ValueError(
+                'EEG forward models require a three-layer BEM. ' 'Set bem_conductivity to three conductivity values.'
+            )
 
-            # This must also run when fsaverage was downloaded previously.
-            template_src = fs_dir / 'fsaverage' / 'bem' / 'fsaverage-ico-4-src.fif'
+        fs_dir = Path(self.subjects_dir) / 'freesurfer'
+        fs_dir.mkdir(parents=True, exist_ok=True)
+        mne.datasets.fetch_fsaverage(subjects_dir=fs_dir)
+
+        # This is run to ensure that appropriate template files exist that we can use for morphing
+        if self.source == 'surface':
+            template_src = fs_dir / 'fsaverage' / 'bem' / f'fsaverage-ico-{self.source_ico}-src.fif'
             if not template_src.is_file():
                 src = mne.setup_source_space(
                     subject='fsaverage',
-                    spacing='ico4',
+                    spacing=f'ico{self.source_ico}',
                     add_dist=False,
                     subjects_dir=fs_dir,
                 )
                 mne.write_source_spaces(template_src, src, overwrite=True)
+        else:
+            template_src = fs_dir / 'fsaverage' / 'bem' / f'fsaverage-vol-{self.volume_pos:g}-src.fif'
+            if not template_src.is_file():
+                fsaverage_model = mne.make_bem_model(
+                    'fsaverage',
+                    ico=4,
+                    conductivity=(0.3,),
+                    subjects_dir=fs_dir,
+                )  # Use the fsaverage inner-skull BEM as the volume source-space boundary.
+                fsaverage_bem = mne.make_bem_solution(fsaverage_model)
+                src = mne.setup_volume_source_space(
+                    subject='fsaverage',
+                    pos=self.volume_pos,
+                    bem=fsaverage_bem,
+                    mri=fs_dir / 'fsaverage' / 'mri' / 'T1.mgz',
+                    subjects_dir=fs_dir,
+                    add_interpolator=True,
+                )
+                mne.write_source_spaces(template_src, src, overwrite=True)
 
-        trans_file = Path(self.subjects_dir).expanduser().resolve() / 'headmodels' / cache_id / f'{cache_id}-trans.fif'
+        trans_file = Path(self.subjects_dir) / 'headmodels' / cache_id / f'{cache_id}-trans.fif'
         if self.redo_hdm:
             trans, fig = compute_headmodel(
                 info=data.info,
                 subject_id=cache_id,
                 subjects_dir=self.subjects_dir,
                 pick_dict=pick_dict,
-                template_mri=use_template,
-                mri_path=self.mri_path,
+                use_template_mri=self.use_template_mri,
+                plot_coreg=self.meg,
             )
         else:
             if not trans_file.is_file():
                 raise FileNotFoundError(f'No saved transform at {trans_file}. Run with redo_hdm=True first.')
             trans = mne.read_trans(trans_file)
-            fig = plot_head_model(trans, data.info, subject_id=mri_subject, subjects_dir=fs_dir)
+            fig = plot_head_model(trans, data.info, subject_id=cache_id, subjects_dir=fs_dir) if self.meg else None
 
         fwd = make_fwd(
             data.info,
             source=self.source,
             fname_trans=trans,
-            subjects_dir=self.subjects_dir,
+            mri_path=fs_dir,
             subject_id=cache_id,
-            template_mri=use_template,
-            mri_path=self.mri_path,
+            spacing=self.spacing,
+            min_dist_src=self.min_dist_src,
+            use_template_mri=self.use_template_mri,
+            bem_conductivity=self.bem_conductivity,
+            source_ico=self.source_ico,
+            volume_pos=self.volume_pos,
+            meg=self.meg,
+            eeg=self.eeg,
         )
         return {
             'data': data,
@@ -408,18 +483,21 @@ class ForwardModel(AlmKanalStep):
                 'coreg_fig': fig,
                 'fwd': fwd,
                 'source_type': self.source,
-                'subject_id_freesurfer': mri_subject,
+                'subject_id_freesurfer': cache_id,
                 'subjects_dir': str(fs_dir),
+                'template_src': str(template_src),
                 'subject_dir': self.subjects_dir,  # Legacy workspace metadata.
-                'template_mri': use_template,
+                'template_mri': self.use_template_mri,
             },
         }
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        report.add_figure(
-            fig=info['ForwardModel']['fwd_info']['coreg_fig'],
-            title='Coregistration',
-            image_format='PNG',
-            caption='',
-        )
+        fig = info['ForwardModel']['fwd_info']['coreg_fig']
+        if fig is not None:
+            report.add_figure(
+                fig=fig,
+                title='Coregistration',
+                image_format='PNG',
+                caption='',
+            )
         report.add_forward(info['ForwardModel']['fwd_info']['fwd'], title='ForwardModel')

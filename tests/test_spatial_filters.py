@@ -10,41 +10,24 @@ from almkanal.almkanal_steps import (
     spatial_filter_utils as sfu,
 )
 
-def test_nearest_empty_room_skips_invalid_and_supine(
-    tmp_path,
-):
+def test_nearest_empty_room_skips_invalid_directory(tmp_path):
     # Invalid directory name should be ignored.
-    (
-        tmp_path / 'notes'
-    ).mkdir()
+    (tmp_path / 'notes').mkdir()
 
-    nearest = (
-        tmp_path / '260920'
-    )
+    nearest = tmp_path / '260920'
     nearest.mkdir()
-
-    (
-        nearest
-        / 'empty_supine.fif'
-    ).touch()
-
-    fallback = (
-        tmp_path / '260922'
-    )
-    fallback.mkdir()
-
-    expected = (
-        fallback
-        / 'empty_room.fif'
-    )
+    expected = nearest / 'empty_room.fif'
     expected.touch()
+
+    fallback = tmp_path / '260922'
+    fallback.mkdir()
+    (fallback / 'empty_room.fif').touch()
 
     info = mne.create_info(
         ['MEG 0111'],
         100,
         'mag',
     )
-
     info.set_meas_date(
         datetime(
             2026,
@@ -581,17 +564,10 @@ def test_spatial_filter_requires_picks():
 
 def test_spatial_filter_report_with_noise_cov():
     data = _raw()
-
-    report = Mock(
-        spec=mne.Report
-    )
+    report = Mock(spec=mne.Report)
 
     data_cov = object()
-
-    noise_cov = Mock()
-    noise_cov._as_square.return_value = (
-        'noise-square'
-    )
+    noise_cov = object()
 
     info = {
         'SpatialFilter': {
@@ -608,9 +584,15 @@ def test_spatial_filter_report_with_noise_cov():
         info,
     )
 
-    assert (
-        report.add_covariance.call_count
-        == 2
-    )
+    assert report.add_covariance.call_count == 2
 
-    noise_cov._as_square.assert_called_once()
+    report.add_covariance.assert_any_call(
+        data_cov,
+        info=data.info,
+        title='Data Covariance Matrix',
+    )
+    report.add_covariance.assert_any_call(
+        noise_cov,
+        info=data.info,
+        title='Noise Covariance Matrix',
+    )

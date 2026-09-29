@@ -1,5 +1,4 @@
 # %%imports
-import os
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -7,8 +6,6 @@ from pathlib import Path
 import mne
 import numpy as np
 from attrs import define
-from mne._fiff.pick import _contains_ch_type
-from numpy.typing import NDArray
 
 from almkanal import AlmKanalStep
 from almkanal.almkanal_steps.channel_utils import run_maxwell
@@ -19,21 +16,21 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
     """
     Find the empty room recording closest in date to the current measurement.
 
-    This function looks for subdirectories (named as dates in '%y%m%d' format) in the given
-    empty_room_dir. It then selects the directory with a date nearest to the measurement date
-    (from info['meas_date']) and returns the path to its first file that meets the criteria.
+    This function looks for subdirectories named as dates in '%y%m%d' format
+    in the given empty_room_dir. It selects the directory closest to the
+    measurement date and returns the first file it contains.
 
     Parameters
     ----------
     info : mne.Info
-        The MEG data information structure, including measurement date.
+        MEG data information containing the measurement date.
     empty_room_dir : str
-        Directory containing subdirectories named with dates of empty room recordings.
+        Directory containing dated empty room subdirectories.
 
     Returns
     -------
     Path
-        Path to the nearest empty room file.
+        Path to the nearest empty room recording.
 
     Raises
     ------
@@ -41,86 +38,77 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
         If no valid empty room recording is found.
     """
     # Build list of valid dates from directory names
-    valid_dates = []
-    for entry in os.listdir(empty_room_dir):
+    empty_room_path = Path(empty_room_dir)
+
+    dated_dirs = []
+    for directory in empty_room_path.iterdir():
+        if not directory.is_dir():
+            continue
+
         try:
-            valid_dates.append(datetime.strptime(entry, '%y%m%d'))
+            date = datetime.strptime(directory.name, '%y%m%d')
         except ValueError:
             continue  # Skip entries that don't match the date format
-    if not valid_dates:
-        raise ValueError(f'No valid empty room directories found in {empty_room_dir}')
 
+        dated_dirs.append((date, directory))
+
+    if not dated_dirs:
+        raise ValueError(f'No valid empty room directories found in {empty_room_path}')
     # Truncate measurement date to day resolution
     meas_date = info['meas_date']
-    meas_date_trunc = datetime(meas_date.year, meas_date.month, meas_date.day)
+    meas_date = datetime(meas_date.year, meas_date.month, meas_date.day)
 
-    # Loop until a matching recording is found or no dates remain
-    while valid_dates:
-        # Find the date closest to the measurement date
-        nearest_date = min(valid_dates, key=lambda d: abs(d - meas_date_trunc))
-        date_str = nearest_date.strftime('%y%m%d')
-        cur_empty_dir = Path(empty_room_dir) / date_str
-        files = os.listdir(cur_empty_dir)
-        if not files:
-            valid_dates.remove(nearest_date)
-            continue
+    dated_dirs.sort(key=lambda item: abs(item[0] - meas_date))
 
-        file_name = files[0]
-        # Skip directories with unwanted file characteristics
-        if 'supine' in file_name:
-            valid_dates.remove(nearest_date)
-            continue
-        if '68' in file_name and 'sss' not in file_name.lower():
-            return cur_empty_dir / file_name
+    for _, directory in dated_dirs:
+        files = sorted(path for path in directory.iterdir() if path.is_file())
 
-        # Fallback: return the file if no specific condition applies
-        return cur_empty_dir / file_name
+        if files:
+            return files[0]
 
-    raise ValueError('No appropriate empty room recording found.')
+    raise ValueError(f'No empty room recordings found in {empty_room_path}')
 
 
-def preproc_empty_room(
+def preproc_empty_room(  # noqa: C901
     raw_er: mne.io.Raw,
     data: mne.io.Raw | mne.Epochs,
     preproc_info: dict,
-    picks: dict | None,
+    picks: list[str] | None,
 ) -> mne.io.Raw:
     """
-    Preprocess an empty room recording to match the preprocessing of the original MEG data.
+    Preprocess an empty room recording to match the preprocessing of the
+    experimental data.
 
     Parameters
     ----------
-    raw_er : mne.io.Raw
-        The raw empty room MEG data.
-    data : mne.io.Raw | mne.Epochs
-        The original MEG data or epochs for comparison and preprocessing alignment.
+    raw_er : mne.io.BaseRaw
+        The raw empty room recording.
+    data : mne.io.BaseRaw | mne.BaseEpochs
+        The experimental data whose preprocessing should be matched.
     preproc_info : dict
-        Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
-    pick_dict : PickDictClass
-        Dictionary specifying channel selection criteria.
+        Information about preprocessing steps already applied to the data.
+    picks : list[str] | None
+        Channel names to retain in the empty room recording. If None,
+        no channel selection is applied.
 
     Returns
     -------
-    mne.io.Raw
-        The preprocessed empty room MEG data.
+    mne.io.BaseRaw
+        The preprocessed empty room recording.
     """
 
-    # do channel picking here -> we need to disallow dropping bad
-    # channels as this can result in problems
-    raw_er.pick(picks=picks)
+    if picks is not None:
+        raw_er.pick(picks)
 
     if 'Maxwell' in preproc_info:
         if isinstance(data, mne.BaseEpochs):
-            raw = mne.io.RawArray(np.empty([len(data.info.ch_names), 100]), info=data.info)
+            raw = mne.io.RawArray(np.zeros((len(data.ch_names), 1)), info=data.info)
         elif isinstance(data, mne.io.BaseRaw):
             raw = data
 
         raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
         raw_er = run_maxwell(raw_er, **preproc_info['Maxwell']['maxwell_info'])
 
-    # picks = mne.pick_types(raw_er.info, **pick_dict)
-    # raw_er.pick(picks=picks)
-    # Add filtering here -> i.e. check if deviation between empty and real data and then filter
     highpass_diff = not np.isclose(
         data.info['highpass'],
         raw_er.info['highpass'],
@@ -151,15 +139,11 @@ def preproc_empty_room(
             h_freq=data.info['lowpass'],
         )
 
-    else:
-        print('No filtering applied')
-
     if not np.isclose(
         data.info['sfreq'],
         raw_er.info['sfreq'],
-        atol=0.9,
+        atol=0.01,
     ):
-        # adjust for small floating point differences
         raw_er.resample(data.info['sfreq'])
 
     if 'ICA' in preproc_info:
@@ -174,44 +158,47 @@ def preproc_empty_room(
 
 
 def process_empty_room(
-    data: mne.io.Raw | mne.Epochs,
+    data: mne.io.BaseRaw | mne.BaseEpochs,
     info: mne.Info,
-    picks: dict | None,
+    picks: list[str] | None,
     preproc_info: dict,
-    empty_room: str | mne.io.Raw,
+    empty_room: str | mne.io.BaseRaw,
     get_nearest: bool = False,
-) -> tuple[NDArray, NDArray]:
+) -> tuple[dict, mne.Covariance]:
     """
-    Process the empty room MEG data for noise covariance estimation.
+    Process empty room data for noise covariance estimation.
 
     Parameters
     ----------
-    data : mne.io.Raw | mne.Epochs
-        The original MEG data or epochs for alignment with the empty room data.
+    data : mne.io.BaseRaw | mne.BaseEpochs
+        Experimental data whose preprocessing should be matched.
     info : mne.Info
-        The MEG data information structure, including measurement metadata.
-    pick_dict : PickDictClass
-        Dictionary specifying channel selection criteria.
-    preproc_info : InfoClass
-        Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
-    empty_room : str | mne.io.Raw
-        Path to the empty room recording or preloaded empty room raw data.
+        Measurement information used to identify the nearest empty room.
+    picks : list[str] | None
+        Channel names to retain in the empty room recording.
+    preproc_info : dict
+        Information about preprocessing applied to the experimental data.
+    empty_room : str | mne.io.BaseRaw
+        Path to an empty room recording, directory containing dated empty
+        room recordings, or preloaded empty room data.
     get_nearest : bool, optional
-        If True, finds the nearest empty room recording based on the measurement date. Defaults to False.
+        Find the recording closest to the measurement date when
+        ``empty_room`` is a directory.
 
     Returns
     -------
-    tuple[NDArray, NDArray]
-        - `true_rank`: The true rank of the noise covariance matrix.
-        - `noise_cov`: The computed noise covariance matrix.
+    true_rank : dict
+        Estimated rank of the noise covariance.
+    noise_cov : mne.Covariance
+        Noise covariance computed from the empty room recording.
     """
 
-    if np.logical_and(get_nearest, isinstance(empty_room, str)):
+    if get_nearest and isinstance(empty_room, str):
         fname_empty_room = get_nearest_empty_room(info, empty_room_dir=empty_room)
         raw_er = mne.io.read_raw(fname_empty_room, preload=True)
-    elif np.logical_and(not get_nearest, isinstance(empty_room, str)):
+    elif not get_nearest and isinstance(empty_room, str):
         raw_er = mne.io.read_raw(empty_room, preload=True)
-    elif isinstance(empty_room, mne.io.Raw):
+    elif isinstance(empty_room, mne.io.BaseRaw):
         raw_er = empty_room
 
     raw_er = preproc_empty_room(
@@ -221,34 +208,31 @@ def process_empty_room(
         picks=picks,
     )
 
-    # if isinstance(data, mne.io.fiff.raw.Raw):
     noise_cov = mne.compute_raw_covariance(raw_er, rank=None, method='auto')
-
-    # TODO: This seems unecessary think about whether i can just drop this elif
-    # elif isinstance(data, mne.epochs.Epochs):
-    #     t_length = np.abs(data.epoched.tmax - data.epoched.tmin)
-    #     raw_er = mne.make_fixed_length_epochs(raw_er, duration=t_length)
-    #     noise_cov = mne.compute_covariance(raw_er, rank=None, method='auto')
-    # when using noise cov rank should be based on noise cov
-    true_rank = mne.compute_rank(noise_cov, info=raw_er.info)  # inferring true rank
+    true_rank = mne.compute_rank(noise_cov, info=raw_er.info)
 
     return true_rank, noise_cov
 
 
 def comp_spatial_filters(
-    data: mne.io.Raw | mne.Epochs,
+    data: mne.io.BaseRaw | mne.BaseEpochs,
     fwd: mne.Forward,
     pick_dict: dict | None,
     preproc_info: dict,
-    data_cov: None | NDArray = None,
-    noise_cov: None | NDArray = None,
-    empty_room: None | str | mne.io.Raw = None,
+    data_cov: None | mne.Covariance = None,
+    noise_cov: None | mne.Covariance = None,
+    empty_room: None | str | mne.io.BaseRaw = None,
     nearest_empty_room: bool = False,
     lcmv_reg: float = 0.05,
     lcmv_pick_ori: None | str = 'max-power',
     lcmv_weight_norm: str | None = 'nai',
     lcmv_reduce_rank: bool = False,
-) -> mne.beamformer.Beamformer:
+) -> tuple[
+    mne.beamformer.Beamformer,
+    dict,
+    mne.Covariance | None,
+    mne.Covariance,
+]:
     """
     Compute spatial filters for source reconstruction using LCMV beamformers.
 
@@ -292,28 +276,22 @@ def comp_spatial_filters(
     info = data.info
 
     # check if multiple channel types are present after picking
-    n_ch_types = np.sum([_contains_ch_type(data.info, ch_type) for ch_type in ['mag', 'grad', 'eeg']])
+    n_ch_types = len({'mag', 'grad', 'eeg'} & set(data.get_channel_types(unique=True)))
 
     # compute a data covariance matrix
-    if np.logical_and(data_cov is None, isinstance(data, mne.io.BaseRaw)):
-        data_cov = mne.compute_raw_covariance(data, rank=None, method='auto')
-    elif np.logical_and(data_cov is None, isinstance(data, mne.BaseEpochs)):
-        data_cov = mne.compute_covariance(data, rank=None, method='auto')
-    else:
-        print('Data covariance matrix not computed as it was supplied by the analyst.')
+    if data_cov is None:
+        if isinstance(data, mne.io.BaseRaw):
+            data_cov = mne.compute_raw_covariance(data, rank=None, method='auto')
+        elif isinstance(data, mne.BaseEpochs):
+            data_cov = mne.compute_covariance(data, rank=None, method='auto')
 
     # if you have mixed sensor types we need a noise covariance matrix
     # per default we take this from an empty room recording
     # importantly this should be preprocessed similarly to the actual data
     if noise_cov is not None:
-        true_rank = mne.compute_rank(
-            noise_cov,
-            info=info,
-        )
-    elif np.logical_and(
-        n_ch_types > 1,
-        np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.BaseRaw)),
-    ):
+        true_rank = mne.compute_rank(noise_cov, info=info)
+
+    elif n_ch_types > 1 and isinstance(empty_room, str | mne.io.BaseRaw):
         # assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
         # supply either a mne.io.raw object, a path that leads directly
         #  to an empty_room recording or a folder with a bunch of empty room recordings"""
@@ -326,16 +304,14 @@ def comp_spatial_filters(
             get_nearest=nearest_empty_room,
         )
 
-    elif np.logical_and(n_ch_types > 1, empty_room is None):
+    elif n_ch_types > 1 and empty_room is None:
         warnings.warn("""You have multiple sensor types, but did neither specify a noise covariance
                       matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix!""")
 
         noise_cov = mne.make_ad_hoc_cov(info)
-
         true_rank = mne.compute_rank(data_cov, info=info)
 
     elif n_ch_types == 1:
-        # when we dont have a noise cov we just use the data cov for rank comp
         true_rank = mne.compute_rank(data_cov, info=info)
         noise_cov = None
 
@@ -356,13 +332,17 @@ def comp_spatial_filters(
 
 @define
 class SpatialFilter(AlmKanalStep):
-    fwd: mne.Forward = None
+    fwd: mne.Forward | None = None
     pick_dict: dict | None = None
-    data_cov: None | NDArray = None
-    noise_cov: None | NDArray = None
-    empty_room: None | str | mne.io.Raw = None
+    data_cov: None | mne.Covariance = None
+    noise_cov: None | mne.Covariance = None
+    empty_room: None | str | mne.io.BaseRaw = None
     nearest_empty_room: bool = False
-    chans2keep: list | None = None
+    chans2keep: list[str] | None = None
+    lcmv_reg: float = 0.05
+    lcmv_pick_ori: str | None = 'max-power'
+    lcmv_weight_norm: str | None = 'nai'
+    lcmv_reduce_rank: bool = False
 
     must_be_before: tuple = ('SourceReconstruction',)
     must_be_after: tuple = (
@@ -371,7 +351,7 @@ class SpatialFilter(AlmKanalStep):
         'ForwardModel',
     )
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> mne.beamformer.Beamformer:
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
         """
         Compute spatial filters for source projection using LCMV beamformers.
 
@@ -418,6 +398,10 @@ class SpatialFilter(AlmKanalStep):
             preproc_info=info,
             empty_room=self.empty_room,
             nearest_empty_room=self.nearest_empty_room,
+            lcmv_reg=self.lcmv_reg,
+            lcmv_pick_ori=self.lcmv_pick_ori,
+            lcmv_weight_norm=self.lcmv_weight_norm,
+            lcmv_reduce_rank=self.lcmv_reduce_rank,
         )
         return {
             'data': data,
@@ -431,15 +415,17 @@ class SpatialFilter(AlmKanalStep):
         }
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+        spatial_info = info['SpatialFilter']['spatial_filter_info']
+
         report.add_covariance(
-            info['SpatialFilter']['spatial_filter_info']['data_cov'],
+            spatial_info['data_cov'],
             info=data.info,
             title='Data Covariance Matrix',
         )
 
-        if info['SpatialFilter']['spatial_filter_info']['noise_cov'] is not None:  # shouldnt be an ad-hoc noise cov
+        if spatial_info['noise_cov'] is not None:
             report.add_covariance(
-                info['SpatialFilter']['spatial_filter_info']['noise_cov']._as_square(),
+                spatial_info['noise_cov'],
                 info=data.info,
                 title='Noise Covariance Matrix',
             )
