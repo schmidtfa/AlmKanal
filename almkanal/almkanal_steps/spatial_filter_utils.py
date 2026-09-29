@@ -1,5 +1,4 @@
 # %%imports
-import os
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -19,21 +18,21 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
     """
     Find the empty room recording closest in date to the current measurement.
 
-    This function looks for subdirectories (named as dates in '%y%m%d' format) in the given
-    empty_room_dir. It then selects the directory with a date nearest to the measurement date
-    (from info['meas_date']) and returns the path to its first file that meets the criteria.
+    This function looks for subdirectories named as dates in '%y%m%d' format
+    in the given empty_room_dir. It selects the directory closest to the
+    measurement date and returns the first file it contains.
 
     Parameters
     ----------
     info : mne.Info
-        The MEG data information structure, including measurement date.
+        MEG data information containing the measurement date.
     empty_room_dir : str
-        Directory containing subdirectories named with dates of empty room recordings.
+        Directory containing dated empty room subdirectories.
 
     Returns
     -------
     Path
-        Path to the nearest empty room file.
+        Path to the nearest empty room recording.
 
     Raises
     ------
@@ -41,73 +40,67 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
         If no valid empty room recording is found.
     """
     # Build list of valid dates from directory names
-    valid_dates = []
-    for entry in os.listdir(empty_room_dir):
+    empty_room_path = Path(empty_room_dir)
+
+    dated_dirs = []
+    for directory in empty_room_path.iterdir():
+        if not directory.is_dir():
+            continue
+
         try:
-            valid_dates.append(datetime.strptime(entry, '%y%m%d'))
+            date = datetime.strptime(directory.name, '%y%m%d')
         except ValueError:
             continue  # Skip entries that don't match the date format
-    if not valid_dates:
-        raise ValueError(f'No valid empty room directories found in {empty_room_dir}')
 
+        dated_dirs.append((date, directory))
+
+    if not dated_dirs:
+        raise ValueError(f'No valid empty room directories found in {empty_room_path}')
     # Truncate measurement date to day resolution
     meas_date = info['meas_date']
-    meas_date_trunc = datetime(meas_date.year, meas_date.month, meas_date.day)
+    meas_date = datetime(meas_date.year, meas_date.month, meas_date.day)
 
-    # Loop until a matching recording is found or no dates remain
-    while valid_dates:
-        # Find the date closest to the measurement date
-        nearest_date = min(valid_dates, key=lambda d: abs(d - meas_date_trunc))
-        date_str = nearest_date.strftime('%y%m%d')
-        cur_empty_dir = Path(empty_room_dir) / date_str
-        files = os.listdir(cur_empty_dir)
-        if not files:
-            valid_dates.remove(nearest_date)
-            continue
+    dated_dirs.sort(key=lambda item: abs(item[0] - meas_date))
 
-        file_name = files[0]
-        # Skip directories with unwanted file characteristics
-        if 'supine' in file_name:
-            valid_dates.remove(nearest_date)
-            continue
-        if '68' in file_name and 'sss' not in file_name.lower():
-            return cur_empty_dir / file_name
+    for _, directory in dated_dirs:
+        files = sorted(path for path in directory.iterdir() if path.is_file())
 
-        # Fallback: return the file if no specific condition applies
-        return cur_empty_dir / file_name
+        if files:
+            return files[0]
 
-    raise ValueError('No appropriate empty room recording found.')
+    raise ValueError(f'No empty room recordings found in {empty_room_path}')
 
 
-def preproc_empty_room(
+def preproc_empty_room(  # noqa: C901
     raw_er: mne.io.Raw,
     data: mne.io.Raw | mne.Epochs,
     preproc_info: dict,
-    picks: dict | None,
+    picks: list[str] | None,
 ) -> mne.io.Raw:
     """
-    Preprocess an empty room recording to match the preprocessing of the original MEG data.
+    Preprocess an empty room recording to match the preprocessing of the
+    experimental data.
 
     Parameters
     ----------
-    raw_er : mne.io.Raw
-        The raw empty room MEG data.
-    data : mne.io.Raw | mne.Epochs
-        The original MEG data or epochs for comparison and preprocessing alignment.
+    raw_er : mne.io.BaseRaw
+        The raw empty room recording.
+    data : mne.io.BaseRaw | mne.BaseEpochs
+        The experimental data whose preprocessing should be matched.
     preproc_info : dict
-        Configuration object containing preprocessing details (e.g., Maxwell filter settings, ICA).
-    pick_dict : PickDictClass
-        Dictionary specifying channel selection criteria.
+        Information about preprocessing steps already applied to the data.
+    picks : list[str] | None
+        Channel names to retain in the empty room recording. If None,
+        no channel selection is applied.
 
     Returns
     -------
-    mne.io.Raw
-        The preprocessed empty room MEG data.
+    mne.io.BaseRaw
+        The preprocessed empty room recording.
     """
 
-    # do channel picking here -> we need to disallow dropping bad
-    # channels as this can result in problems
-    raw_er.pick(picks=picks)
+    if picks is not None:
+        raw_er.pick(picks)
 
     if 'Maxwell' in preproc_info:
         if isinstance(data, mne.BaseEpochs):
@@ -174,13 +167,13 @@ def preproc_empty_room(
 
 
 def process_empty_room(
-    data: mne.io.Raw | mne.Epochs,
+    data: mne.io.BaseRaw | mne.BaseEpochs,
     info: mne.Info,
-    picks: dict | None,
+    picks: list[str] | None,
     preproc_info: dict,
-    empty_room: str | mne.io.Raw,
+    empty_room: str | mne.io.BaseRaw,
     get_nearest: bool = False,
-) -> tuple[NDArray, NDArray]:
+) -> tuple[dict, mne.Covariance]:
     """
     Process the empty room MEG data for noise covariance estimation.
 
@@ -211,7 +204,7 @@ def process_empty_room(
         raw_er = mne.io.read_raw(fname_empty_room, preload=True)
     elif np.logical_and(not get_nearest, isinstance(empty_room, str)):
         raw_er = mne.io.read_raw(empty_room, preload=True)
-    elif isinstance(empty_room, mne.io.Raw):
+    elif isinstance(empty_room, mne.io.BaseRaw):
         raw_er = empty_room
 
     raw_er = preproc_empty_room(
@@ -431,15 +424,17 @@ class SpatialFilter(AlmKanalStep):
         }
 
     def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+        spatial_info = info['SpatialFilter']['spatial_filter_info']
+
         report.add_covariance(
-            info['SpatialFilter']['spatial_filter_info']['data_cov'],
+            spatial_info['data_cov'],
             info=data.info,
             title='Data Covariance Matrix',
         )
 
-        if info['SpatialFilter']['spatial_filter_info']['noise_cov'] is not None:  # shouldnt be an ad-hoc noise cov
+        if spatial_info['noise_cov'] is not None:
             report.add_covariance(
-                info['SpatialFilter']['spatial_filter_info']['noise_cov']._as_square(),
+                spatial_info['noise_cov'],
                 info=data.info,
                 title='Noise Covariance Matrix',
             )
