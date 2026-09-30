@@ -1,10 +1,11 @@
 import mne
 import numpy as np
-from attrs import define
+from attrs import define, field
 from autoreject import Ransac
 from numpy.typing import ArrayLike
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 def run_maxwell(
@@ -64,6 +65,7 @@ def run_maxwell(
 class Maxwell(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
 
     mw_coord_frame: str = 'head'
     mw_destination: None | ArrayLike = None
@@ -74,7 +76,7 @@ class Maxwell(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
         """
         Apply Maxwell filtering to the raw MEG data.
@@ -120,7 +122,7 @@ class Maxwell(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
 
 
@@ -128,6 +130,7 @@ class Maxwell(AlmKanalStep):
 class MultiBlockMaxwell(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
 
     mw_coord_frame: str = 'head'
     mw_destination: None | ArrayLike = None
@@ -138,7 +141,7 @@ class MultiBlockMaxwell(AlmKanalStep):
     def run(
         self,
         data: list[mne.io.BaseRaw],
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
         """
         Apply Maxwell filtering to the raw MEG data.
@@ -200,7 +203,7 @@ class MultiBlockMaxwell(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
 
 
@@ -208,6 +211,7 @@ class MultiBlockMaxwell(AlmKanalStep):
 class EEGRANSAC(AlmKanalStep):
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = True
 
     ransac_epoch_duration: int | float = 4
     n_resample: int = 50
@@ -220,7 +224,7 @@ class EEGRANSAC(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
         """
         Apply RANSAC to discover bad EEG channels and interpolate them using autorejects methods.
@@ -305,7 +309,7 @@ class EEGRANSAC(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_ransac')
 
 
@@ -324,7 +328,7 @@ class ReReference(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
         """
         Does ReReferencing of your EEG, ECoG or sEEG channels.
@@ -401,5 +405,5 @@ class ReReference(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_reref')

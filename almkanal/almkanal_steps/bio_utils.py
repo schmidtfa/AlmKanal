@@ -1,9 +1,10 @@
 import mne
 import neurokit2 as nk
 import numpy as np
-from attrs import define
+from attrs import define, field
 
 from almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 def run_bio_preproc(
@@ -97,7 +98,11 @@ class PhysioCleaner(AlmKanalStep):
     eog: None | str | list = None
     emg: None | str | list = None
 
-    def run(self, data: mne.io.BaseRaw, info: dict) -> mne.io.Raw:
+    must_be_before: tuple = ('ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
+
+    def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> mne.io.Raw:
         """
         Preprocess physiological signals (ECG, EOG, RESP, EMG) in an MNE raw object.
 
@@ -158,5 +163,6 @@ class PhysioCleaner(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        pass  # maybe let this function plot ECG ERP etc.
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
+        pass
+        # maybe let this function plot ECG ERP etc.

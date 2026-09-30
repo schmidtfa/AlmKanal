@@ -173,7 +173,7 @@ def test_epoch_trf_realigns_audio_and_records_diagnostics(
     original = raw.get_data().copy()
     pipeline = AlmKanal(steps=[step])
     epochs, report = pipeline.run(raw)
-    trf_info = pipeline.info['steps_info']['EpochTRF']['TRF_info']
+    trf_info = pipeline.info.get_step_info('EpochTRF', required=True)['TRF_info']
     alignment = trf_info['alignment_info']
 
     assert len(epochs) == 8

@@ -12,6 +12,7 @@ import pytest
 
 from almkanal.almkanal_steps import headmodel_utils as hm
 from almkanal.almkanal_steps import src_recon_utils as sr
+from almkanal.info import AlmKanalInfo, StepInfo
 
 
 @pytest.fixture
@@ -189,7 +190,7 @@ def test_forward_model_prepares_fsaverage_morph_target(
         volume_pos=volume_pos,
         use_template_mri=False,
     )
-    result = step.run(raw_small, info={})
+    result = step.run(raw_small, AlmKanalInfo())
 
     fetch.assert_called_once_with(subjects_dir=fs_dir)
     expected_target = fsaverage / 'bem' / expected_name
@@ -256,7 +257,9 @@ def test_forward_model_passes_current_source_parameters(
         meg=True,
         eeg=False,
     )
-    result = step.run(raw_small, info={'Picks': {'meg': True}})
+    result = step.run(raw_small, info=AlmKanalInfo(
+        pick_params={'meg': True},
+    ),)
 
     assert compute.call_args.kwargs['subject_id'] == (
         'recording_from_template'
@@ -420,7 +423,7 @@ def test_source_reconstruction_requires_forward_model(
         ValueError,
         match='requires a completed ForwardModel step',
     ):
-        step.run(raw_small, info={})
+        step.run(raw_small, info=AlmKanalInfo())
 
     apply.assert_not_called()
 
@@ -436,18 +439,24 @@ def test_external_filters_do_not_require_spatial_filter(
     apply = Mock(return_value=estimate)
     monkeypatch.setattr(mne.beamformer, 'apply_lcmv_raw', apply)
 
-    info = {
-        'ForwardModel': {
-            'fwd_info': {
-                'fwd': {'src': src},
-                'subject_id_freesurfer': 'recording',
-                'subjects_dir': str(tmp_path),
-                'template_src': str(
-                    tmp_path / 'fsaverage-ico-4-src.fif'
-                ),
-            }
-        }
-    }
+    info = AlmKanalInfo()
+
+    info.add(
+        StepInfo(
+            step='ForwardModel',
+            info={
+                'fwd_info': {
+                    'fwd': {'src': src},
+                    'subject_id_freesurfer': 'recording',
+                    'subjects_dir': str(tmp_path),
+                    'template_src': str(
+                        tmp_path / 'fsaverage-ico-4-src.fif'
+                    ),
+                }
+            },
+        )
+    )
+        
 
     step = sr.SourceReconstruction(
         filters=filters,
@@ -507,16 +516,21 @@ def test_source_reconstruction_morphs_to_fsaverage(
     compute_morph = Mock(return_value=morph)
     monkeypatch.setattr(mne, 'compute_source_morph', compute_morph)
 
-    info = {
-        'ForwardModel': {
-            'fwd_info': {
-                'fwd': {'src': src_from},
-                'subject_id_freesurfer': 'recording',
-                'subjects_dir': str(tmp_path),
-                'template_src': str(target),
-            }
-        }
-    }
+    info = AlmKanalInfo()
+
+    info.add(
+        StepInfo(
+            step='ForwardModel',
+            info={
+                'fwd_info': {
+                    'fwd': {'src': src_from},
+                    'subject_id_freesurfer': 'recording',
+                    'subjects_dir': str(tmp_path),
+                    'template_src': str(target),
+                }
+            },
+        )
+    )
 
     result = sr.SourceReconstruction(filters=filters).run(
         data,

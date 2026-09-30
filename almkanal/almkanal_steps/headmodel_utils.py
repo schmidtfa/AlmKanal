@@ -6,10 +6,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
-from attrs import define
+from attrs import define, field
 from mne.coreg import Coregistration
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 def compute_headmodel(
@@ -386,8 +387,6 @@ class ForwardModel(AlmKanalStep):
     subject_id: str
     subjects_dir: str | Path
     pick_dict: dict | None = None
-    must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
-    must_be_after: tuple = ('Maxwell', 'ICA')
     source: str = 'surface'
     redo_hdm: bool = True
     spacing: str = 'oct6'
@@ -399,11 +398,15 @@ class ForwardModel(AlmKanalStep):
     meg: bool = True
     eeg: bool = False
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
+    must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ('Maxwell', 'ICA')
+    allow_repeated: bool = field(default=False, init=False)
+
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
         if self.source not in ('surface', 'volume'):
             raise ValueError("source must be 'surface' or 'volume'.")
 
-        pick_dict = self.pick_dict if self.pick_dict is not None else info.get('Picks')
+        pick_dict = self.pick_dict if self.pick_dict is not None else info.pick_params
         cache_id = f'{self.subject_id}_from_template' if self.use_template_mri else self.subject_id
 
         if self.eeg and np.size(self.bem_conductivity) == 1:
@@ -491,8 +494,8 @@ class ForwardModel(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        fig = info['ForwardModel']['fwd_info']['coreg_fig']
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
+        fig = info.get_step_info('ForwardModel', required=True)['fwd_info']['coreg_fig']
         if fig is not None:
             report.add_figure(
                 fig=fig,
@@ -500,4 +503,4 @@ class ForwardModel(AlmKanalStep):
                 image_format='PNG',
                 caption='',
             )
-        report.add_forward(info['ForwardModel']['fwd_info']['fwd'], title='ForwardModel')
+        report.add_forward(info.get_step_info('ForwardModel', required=True)['fwd_info']['fwd'], title='ForwardModel')

@@ -1,9 +1,10 @@
 import mne
 import pandas as pd
-from attrs import define
+from attrs import define, field
 from numpy.typing import ArrayLike
 
 from almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 @define
@@ -13,6 +14,7 @@ class Epochs(AlmKanalStep):
         'Maxwell',
         'ICA',
     )
+    allow_repeated: bool = field(default=False, init=False)
 
     tmin: float = -0.15
     tmax: float = 0.5
@@ -84,13 +86,13 @@ class Epochs(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
         events = self.events
 
         if events is None:
             try:
-                events = info['Events']['event_info']['events']
+                events = info.get_step_info('Events', occurrence=-1, required=True)['event_info']['events']
             except KeyError:
                 raise ValueError(
                     'You need to either supply `events` to epochs or select them in a previous '
@@ -144,7 +146,7 @@ class Epochs(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.BaseEpochs, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
         base_corr = data.copy()
 
         evokeds = base_corr.average(by_event_type=True)

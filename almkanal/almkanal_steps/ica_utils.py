@@ -7,8 +7,7 @@ from pyrasa.irasa import irasa
 from pyrasa.utils.peak_utils import get_band_info
 
 from almkanal.almkanal import AlmKanalStep
-
-# from almkanal.data_utils.data_classes import ICAInfoDict
+from almkanal.info import AlmKanalInfo
 
 
 def eog_ica_from_meg(
@@ -305,6 +304,7 @@ def find_train_ica(
 class ICA(AlmKanalStep):
     must_be_before: tuple = ()
     must_be_after: tuple = ('Maxwell',)
+    allow_repeated: bool = True
 
     fit_only: bool = False
     n_components: None | int | float = None
@@ -330,7 +330,7 @@ class ICA(AlmKanalStep):
     def run(
         self,
         data: mne.io.Raw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> mne.io.BaseRaw:
         """
         Perform ICA to identify and remove peripheral physiological signals like
@@ -429,21 +429,20 @@ class ICA(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
-        # if info['ICA']['ica_info']['eog_scores'] is not None and info['ICA']['ica_info']['ecg_scores'] is not None:
+    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
         titles = {}
-        for key, vals in info['ICA']['ica_info']['components_dict'].items():
+        cur_ica_info = info.get_step_info('ICA', occurrence=-1, required=True)
+        for key, vals in cur_ica_info['ica_info']['components_dict'].items():
             for val in vals:
                 titles.update({int(val): f'{key}'})
 
-        # if info['ICA']['ica_info']['ica'] is not None:
         if len(titles) > 0:
             report.add_ica(
-                info['ICA']['ica_info']['ica'],
+                cur_ica_info['ica_info']['ica'],
                 inst=data,
                 title='ICA',
-                ecg_scores=info['ICA']['ica_info']['ecg_scores'],
-                eog_scores=info['ICA']['ica_info']['eog_scores'],
+                ecg_scores=cur_ica_info['ica_info']['ecg_scores'],
+                eog_scores=cur_ica_info['ica_info']['eog_scores'],
                 picks=list(titles.keys()),
                 tags=list(titles.values()),
             )

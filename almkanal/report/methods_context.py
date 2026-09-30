@@ -75,47 +75,66 @@ class MethodsContext:
 def build_context_from_files(
     files: Sequence[str | Path],
     *,
-    step_packages: Sequence[str] = ('almkanal.report.stepspecs',),  # packages to auto-load
-    extra_specs: dict[str, StepSpec] | None = None,  # programmatic overrides
+    step_packages: Sequence[str] = ('almkanal.report.stepspecs',),
+    extra_specs: dict[str, StepSpec] | None = None,
 ) -> MethodsContext:
-    # 1) load all step packages (import side-effects register specs)
+    # 1) load all step packages
     for pkg in step_packages:
         load_stepspec_package(pkg)
 
-    # 2) compose registry (global + extras override)
+    # 2) compose registry
     specs = get_registry()
     if extra_specs:
         specs.update(extra_specs)
 
-    # 3) load JSONs & enforce same ordered steps
+    # 3) load JSONs & enforce same ordered processing history
     loaded = load_jsons(files)
     first_path, first_data = loaded[0]
-    ordered_steps = list(first_data.keys())
+
+    first_history = first_data['processing_history']
+    ordered_steps = [entry['step'] for entry in first_history]
+
     for p, data in loaded[1:]:
-        steps_here = list(data.keys())
+        steps_here = [entry['step'] for entry in data['processing_history']]
+
         if steps_here != ordered_steps:
             raise ValueError(
                 'Subjects do not share the same ordered steps.\n'
-                f'- {first_path.name}: {ordered_steps}\n- {p.name}: {steps_here}'
+                f'- {first_path.name}: {ordered_steps}\n'
+                f'- {p.name}: {steps_here}'
             )
 
-    # 4) gather per-steps
-    per_step_pairs: dict[str, list[tuple[str, dict[str, Any]]]] = {s: [] for s in ordered_steps}
-    per_step_infos: dict[str, list[dict[str, Any]]] = {s: [] for s in ordered_steps}
-    for p, data in loaded:
-        for step in ordered_steps:
-            info = first_info_dict(step, data.get(step))
-            per_step_pairs[step].append((p.name, info))
-            per_step_infos[step].append(info)
-
-    # 5) build StepContext list using specs
+    # 4) build StepContext list in processing order
     steps_ctx: list[StepContext] = []
-    for step in ordered_steps:
-        spec = specs.get(step, StepSpec(settings_fn=lambda info: dict(info)))  # fallback: all fields
-        settings_pairs = [(fn, spec.settings_fn(info)) for fn, info in per_step_pairs[step]]
-        canon = require_identical(step, settings_pairs)  # enforce identical settings
-        results = spec.summarize_fn(per_step_infos[step])
-        steps_ctx.append(StepContext(step, canon, results))
+
+    for index, step in enumerate(ordered_steps):
+        spec = specs.get(
+            step,
+            StepSpec(settings_fn=lambda info: dict(info)),
+        )
+
+        info_pairs = []
+        infos = []
+
+        for path, data in loaded:
+            raw_info = data['processing_history'][index]['info']
+            info = first_info_dict(step, raw_info)
+
+            info_pairs.append((path.name, info))
+            infos.append(info)
+
+        settings_pairs = [(filename, spec.settings_fn(info)) for filename, info in info_pairs]
+
+        canon = require_identical(step, settings_pairs)
+        results = spec.summarize_fn(infos)
+
+        steps_ctx.append(
+            StepContext(
+                step,
+                canon,
+                results,
+            )
+        )
 
     return MethodsContext(
         n_subjects=len(loaded),

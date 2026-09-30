@@ -5,6 +5,7 @@ import numpy as np
 from attrs import define
 
 from almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 def src2parc(  # noqa: C901, PLR0912
@@ -138,18 +139,25 @@ class SourceReconstruction(AlmKanalStep):
     must_be_before: tuple = ()
     must_be_after: tuple = ('Maxwell', 'ICA', 'ForwardModel')
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:  # noqa: C901, PLR0912
-        fwd_info = info.get('ForwardModel', {}).get('fwd_info')
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:  # noqa: C901, PLR0912
+        fwd_info = info.get_step('ForwardModel')
         if fwd_info is None:
             raise ValueError(
                 'SourceReconstruction requires a completed ForwardModel step. '
                 'Run ForwardModel before SourceReconstruction.'
             )
-        spatial_info = info.get('SpatialFilter', {}).get('spatial_filter_info', {})
+        fwd_info = info.get_step_info('ForwardModel', required=True)['fwd_info']
 
-        filters = self.filters if self.filters is not None else spatial_info.get('filters')
+        spatial_info = {}
+        filters = self.filters
+
         if filters is None:
-            raise ValueError('Provide filters or run SpatialFilter before SourceReconstruction.')
+            spatial_info = info.get_step_info('SpatialFilter', required=True)
+            if spatial_info is None:
+                raise ValueError('Provide filters or run SpatialFilter before SourceReconstruction.')
+
+            spatial_info = spatial_info['spatial_filter_info']
+            filters = spatial_info.get('filters')
 
         fwd = fwd_info['fwd']
         src = fwd['src']
@@ -213,11 +221,16 @@ class SourceReconstruction(AlmKanalStep):
             },
         }
 
-    def reports(self, data: dict | mne.SourceEstimate | mne.VolSourceEstimate, report: mne.Report, info: dict) -> None:
+    def reports(
+        self, data: dict | mne.SourceEstimate | mne.VolSourceEstimate, report: mne.Report, info: AlmKanalInfo
+    ) -> None:
         import matplotlib.pyplot as plt
         import scipy.signal as dsp
 
-        if self.return_parc and info['SourceReconstruction']['stc_info']['orig_data_type'] == 'raw':
+        if (
+            self.return_parc
+            and info.get_step_info('SourceReconstruction', required=True)['stc_info']['orig_data_type'] == 'raw'
+        ):
             freq, psd = dsp.welch(
                 data['label_tc'], fs=data['fs'], nperseg=round(data['fs'] * 4), noverlap=round(data['fs'] * 2)
             )

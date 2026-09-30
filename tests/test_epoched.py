@@ -1,6 +1,9 @@
 import mne
-from almkanal import AlmKanal, SpatialFilter, SourceReconstruction, Epochs
 import numpy as np
+
+from almkanal import Epochs, SourceReconstruction, SpatialFilter
+from almkanal.info import AlmKanalInfo, StepInfo
+
 
 def test_src(gen_mne_data_epochs):
     data_path = mne.datasets.sample.data_path()
@@ -23,7 +26,7 @@ def test_src(gen_mne_data_epochs):
     )
     spatial_result = spatial_filter.run(
         gen_mne_data_epochs,
-        info={},
+        info=AlmKanalInfo(),
     )
 
     source_reconstruction = SourceReconstruction(
@@ -31,20 +34,31 @@ def test_src(gen_mne_data_epochs):
         morph2fsaverage=False,
     )
 
-    info = {
-        'ForwardModel': {
-            'fwd_info': {
-                'fwd': fwd,
-                'subject_id_freesurfer': 'sample',
-                'subjects_dir': str(data_path / 'subjects'),
+    info = AlmKanalInfo()
+
+    info.add(
+        StepInfo(
+            step='ForwardModel',
+            info={
+                'fwd_info': {
+                    'fwd': fwd,
+                    'subject_id_freesurfer': 'sample',
+                    'subjects_dir': str(data_path / 'subjects'),
+                }
             },
-        },
-        'SpatialFilter': {
-            'spatial_filter_info': spatial_result[
-                'spatial_filter_info'
-            ],
-        },
-    }
+        )
+    )
+
+    info.add(
+        StepInfo(
+            step='SpatialFilter',
+            info={
+                'spatial_filter_info': spatial_result[
+                    'spatial_filter_info'
+                ],
+            },
+        )
+    )
 
     result = source_reconstruction.run(
         gen_mne_data_epochs,
@@ -69,7 +83,7 @@ def test_epochs_explicit_events(
 
     result = step.run(
         raw,
-        info={},
+        info=AlmKanalInfo(),
     )
 
     assert isinstance(
@@ -90,13 +104,17 @@ def test_epochs_from_previous_events(
 
     events = mne.find_events(raw)
 
-    info = {
-        'Events': {
-            'event_info': {
-                'events': events,
-            }
-        }
-    }
+    info = AlmKanalInfo()
+    info.add(
+        StepInfo(
+            step='Events',
+            info={
+                'event_info': {
+                    'events': events,
+                }
+            },
+        )
+    )
 
     step = Epochs(
         tmin=-0.1,
@@ -127,26 +145,38 @@ def test_epochs_step_can_be_reused(
         tmax=0.2,
     )
 
-    result_1 = step.run(
-        raw.copy(),
-        info={
-            'Events': {
+    info_1 = AlmKanalInfo()
+    info_1.add(
+        StepInfo(
+            step='Events',
+            info={
                 'event_info': {
                     'events': events_1,
                 }
-            }
-        },
+            },
+        )
+    )
+
+    info_2 = AlmKanalInfo()
+    info_2.add(
+        StepInfo(
+            step='Events',
+            info={
+                'event_info': {
+                    'events': events_2,
+                }
+            },
+        )
+    )
+
+    result_1 = step.run(
+        raw.copy(),
+        info=info_1,
     )
 
     result_2 = step.run(
         raw.copy(),
-        info={
-            'Events': {
-                'event_info': {
-                    'events': events_2,
-                }
-            }
-        },
+        info=info_2,
     )
 
     np.testing.assert_array_equal(
@@ -159,4 +189,4 @@ def test_epochs_step_can_be_reused(
         events_2,
     )
 
-    assert step.events is None    
+    assert step.events is None

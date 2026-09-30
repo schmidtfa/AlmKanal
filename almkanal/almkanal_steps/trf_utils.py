@@ -4,7 +4,7 @@ import warnings
 from collections.abc import Callable, Mapping, Sequence
 from inspect import Parameter, signature
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import attrs
 import mne
@@ -22,6 +22,9 @@ from almkanal.stim_utils.alignment_utils import (
     summarize_alignments,
 )
 from almkanal.stim_utils.audio_utils import prepare_audio
+
+if TYPE_CHECKING:
+    from almkanal.info import AlmKanalInfo
 
 Spans = dict[str, tuple[int, int | None]]
 MetaMap = dict[str, Mapping[str, Any]]
@@ -494,7 +497,7 @@ class EpochTRF(AlmKanalStep):
     must_be_before: tuple = ()
     must_be_after: tuple = ()
 
-    def run(self, data: mne.io.BaseRaw, info: dict) -> dict:
+    def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> dict:
         spec: TRFSpanSpec = self.gen_span_spec(data)
         sfreq = float(data.info['sfreq'])
         epochs, alignment_info = _build_trf_epochs(
@@ -549,9 +552,9 @@ class EpochTRF(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.BaseEpochs, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_epochs(data, title='Epoched (TRF)')
-        trf_info = info['EpochTRF']['TRF_info']
+        trf_info = info.get_step_info('EpochTRF', required=True)['TRF_info']
         if trf_info['realign_audio']:
             alignment = trf_info['alignment_info']
             columns = {

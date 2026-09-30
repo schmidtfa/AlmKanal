@@ -1,7 +1,8 @@
 import mne
-from attrs import define
+from attrs import define, field
 
 from almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 @define
@@ -17,10 +18,14 @@ class Events(AlmKanalStep):
     initial_event: bool = False
     verbose: bool | str | int | None = None
 
+    must_be_before: tuple = ('Epochs', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
+
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
         """
         Extract events from the raw MEG data.
@@ -84,6 +89,6 @@ class Events(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        events = info['Events']['event_info']['events']
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
+        events = info.get_step_info('Events', occurrence=-1, required=True)['event_info']['events']
         report.add_events(events=events, sfreq=data.info['sfreq'], title='events')

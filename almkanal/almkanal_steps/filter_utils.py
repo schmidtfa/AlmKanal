@@ -10,6 +10,8 @@ from almkanal import AlmKanalStep
 if TYPE_CHECKING:
     import numpy.typing as npt
 
+    from almkanal.info import AlmKanalInfo
+
 
 @define
 class Filter(AlmKanalStep):
@@ -30,8 +32,9 @@ class Filter(AlmKanalStep):
 
     must_be_before: tuple[str, ...] = ()
     must_be_after: tuple[str, ...] = ()
+    allow_repeated: bool = True
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict[str, Any]) -> dict[str, Any]:
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict[str, Any]:
         # --- compute transition bandwidths for REPORT (floats) and for API call (float | 'auto')
         l_tb_report: float | None = None
         h_tb_report: float | None = None
@@ -105,7 +108,7 @@ class Filter(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict[str, Any]) -> None:
+    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='Raw (filtered)')
         elif isinstance(data, mne.BaseEpochs):
@@ -123,8 +126,9 @@ class Resample(AlmKanalStep):
     method: str = 'fft'
     must_be_before: tuple[str, ...] = ()
     must_be_after: tuple[str, ...] = ('Epochs',)
+    allow_repeated: bool = True
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict[str, Any]) -> dict[str, Any]:
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict[str, Any]:
         if not (self.sfreq / 2 >= float(data.info['lowpass'])):
             lowpass = float(data.info['lowpass'])
             raise ValueError(
@@ -155,7 +159,7 @@ class Resample(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict[str, Any]) -> None:
+    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
         if isinstance(data, mne.io.BaseRaw):
             report.add_raw(data, butterfly=False, psd=True, title='RawResample')
         elif isinstance(data, mne.BaseEpochs):
