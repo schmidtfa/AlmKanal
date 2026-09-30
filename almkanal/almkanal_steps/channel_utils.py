@@ -2,7 +2,6 @@ import mne
 import numpy as np
 from attrs import define
 from autoreject import Ransac
-from autoreject.utils import interpolate_bads
 from numpy.typing import ArrayLike
 
 from almkanal.almkanal import AlmKanalStep
@@ -285,15 +284,14 @@ class EEGRANSAC(AlmKanalStep):
         )
 
         eeg_ch_names = {data.ch_names[pick] for pick in eeg_picks}
-        non_eeg_bads = list(set(previous_bads).difference(eeg_ch_names))
+        non_eeg_bads = [ch for ch in previous_bads if ch not in eeg_ch_names]
 
-        previous_eeg_bads = [ch for ch in previous_bads if ch in eeg_ch_names]
+        data.info['bads'] = list(dict.fromkeys(previous_bads + bad_chs_eeg))
 
-        data.info['bads'] = list(dict.fromkeys(previous_eeg_bads + bad_chs_eeg))
-
-        raw_ransac = interpolate_bads(data, data.info['bads'])
-
-        raw_ransac.info['bads'] = non_eeg_bads
+        raw_ransac = data.interpolate_bads(
+            reset_bads=True,
+            exclude=non_eeg_bads,
+        )
 
         return {
             'data': raw_ransac,
