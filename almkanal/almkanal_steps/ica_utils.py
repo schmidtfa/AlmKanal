@@ -71,7 +71,7 @@ def eog_ica_from_meg(
     return eog_indices
 
 
-def run_ica(  # noqa: C901, PLR0912
+def run_ica(  # noqa: C901, PLR0912, PLR0915
     raw: mne.io.Raw,
     fit_only: bool = False,
     n_components: None | int | float = None,
@@ -174,8 +174,13 @@ def run_ica(  # noqa: C901, PLR0912
         bads.append(eog_idcs)
 
     if ecg:
-        # take ecg based on correlation
         if len(ch_dict['ecg']) == 0:
+            if (len(ch_dict['mag']) + len(ch_dict['grad'])) == 0:
+                raise ValueError(
+                    'No ECG or MEG channels detected. ECG component detection '
+                    'requires either an ECG channel or MEG data.'
+                )
+
             warnings.warn('No ECG channels detected. ECG channel is constructed from MEG data.')
 
         ecg_epochs = mne.preprocessing.create_ecg_epochs(raw_copy)

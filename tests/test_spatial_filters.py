@@ -567,7 +567,9 @@ def test_spatial_filter_report_with_noise_cov():
     report = Mock(spec=mne.Report)
 
     data_cov = object()
-    noise_cov = object()
+    noise_cov = mne.make_ad_hoc_cov(data.info)
+
+    assert noise_cov.data.ndim == 1
 
     info = {
         'SpatialFilter': {
@@ -591,8 +593,9 @@ def test_spatial_filter_report_with_noise_cov():
         info=data.info,
         title='Data Covariance Matrix',
     )
-    report.add_covariance.assert_any_call(
-        noise_cov,
-        info=data.info,
-        title='Noise Covariance Matrix',
-    )
+
+    reported_noise_cov = report.add_covariance.call_args_list[1].args[0]
+
+    assert isinstance(reported_noise_cov, mne.Covariance)
+    assert reported_noise_cov.data.ndim == 2
+    assert noise_cov.data.ndim == 1

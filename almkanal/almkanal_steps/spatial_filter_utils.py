@@ -424,8 +424,12 @@ class SpatialFilter(AlmKanalStep):
         )
 
         if spatial_info['noise_cov'] is not None:
+            noise_cov = spatial_info['noise_cov']
+
+            if noise_cov.data.ndim == 1:
+                noise_cov = noise_cov.copy()._as_square()
             report.add_covariance(
-                spatial_info['noise_cov'],
+                noise_cov,
                 info=data.info,
                 title='Noise Covariance Matrix',
             )
