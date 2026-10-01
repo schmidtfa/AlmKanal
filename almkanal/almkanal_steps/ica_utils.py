@@ -302,6 +302,97 @@ def find_train_ica(
 
 @define
 class ICA(AlmKanalStep):
+    """Identify and optionally remove artifacts using independent component analysis.
+
+    ``ICA`` fits an independent component analysis model to continuous raw data and
+    identifies components associated with physiological or environmental artifacts.
+    Supported artifact classes include eye movements (EOG), cardiac activity (ECG),
+    muscle activity (EMG), and the approximately 16 Hz train-related artifact
+    encountered in recordings acquired in Salzburg.
+
+    The data used to fit ICA can be filtered and resampled independently of the
+    original recording. Identified components can either be removed immediately or
+    retained for inspection by setting ``fit_only=True``.
+
+    Parameters
+    ----------
+    fit_only : bool, default=False
+        If ``True``, fit ICA and identify artifact-related components without
+        removing them from the data. If ``False``, identified components are
+        excluded and ICA is applied to the original recording.
+    n_components : int | float | None, default=None
+        Number of ICA components to estimate. The interpretation follows
+        :class:`mne.preprocessing.ICA`: an integer specifies an explicit number of
+        components, while a float specifies the fraction of explained variance.
+    method : str, default='picard'
+        ICA fitting method passed to :class:`mne.preprocessing.ICA`.
+    random_state : int | None, default=42
+        Random seed used during ICA fitting.
+    fit_params : dict | None, default=None
+        Additional method-specific parameters passed to the ICA fitting procedure.
+    ica_hp_freq : float | None, default=1.0
+        High-pass cutoff frequency, in Hz, applied to the copy of the data used for
+        ICA fitting. ``None`` disables high-pass filtering.
+    ica_lp_freq : float | None, default=None
+        Low-pass cutoff frequency, in Hz, applied to the copy of the data used for
+        ICA fitting. ``None`` disables low-pass filtering.
+    resample_freq : int, default=200
+        Sampling frequency, in Hz, used for the data on which ICA is fitted.
+    eog : bool, default=True
+        Whether to identify components associated with ocular artifacts.
+    surrogate_eog_chs : dict | None, default=None
+        Definition of surrogate EOG channels used when dedicated EOG channels are
+        unavailable.
+    eog_corr_thresh : float, default=0.5
+        Correlation threshold used to classify components as EOG-related.
+    ecg : bool, default=True
+        Whether to identify components associated with cardiac artifacts.
+    ecg_corr_thresh : float, default=0.5
+        Correlation threshold used to classify components as ECG-related.
+    emg : bool, default=False
+        Whether to identify components associated with muscle activity.
+    emg_thresh : float, default=0.5
+        Threshold used to classify components as EMG-related.
+    train : bool, default=True
+        Whether to identify components associated with the train-related artifact.
+    train_freq : int, default=16
+        Frequency, in Hz, around which the train-related artifact is detected.
+    train_thresh : float, default=2.0
+        Threshold used to classify components as train-related.
+    img_path : str | None, default=None
+        Optional image-output path retained as part of the ICA step configuration.
+    fname : str | None, default=None
+        Optional filename retained as part of the ICA step configuration.
+
+    Notes
+    -----
+    ICA preprocessing is performed on a working copy of the recording. Filtering
+    and resampling controlled by ``ica_hp_freq``, ``ica_lp_freq``, and
+    ``resample_freq`` therefore do not replace the corresponding preprocessing of
+    the pipeline data itself.
+
+    When ``fit_only=False``, components identified as artifacts are excluded and
+    the fitted ICA solution is applied to the original data. When
+    ``fit_only=True``, the fitted ICA model and identified components are returned
+    without modifying the input signal through component removal.
+
+    The processing metadata returned by :meth:`run` is stored under ``'ica_info'``.
+    It contains the fitted ICA object, identified components grouped by artifact
+    type, the applied exclusion list, EOG and ECG scores, and the effective ICA
+    configuration.
+
+    Multiple ``ICA`` steps are permitted in a pipeline. Reporting uses the most
+    recent occurrence.
+
+    See Also
+    --------
+    run_ica
+        Fit ICA, identify artifact-related components, and optionally apply the
+        resulting exclusions.
+    mne.preprocessing.ICA
+        MNE-Python implementation of independent component analysis.
+    """
+
     must_be_before: tuple = ()
     must_be_after: tuple = ('Maxwell',)
     allow_repeated: bool = True
@@ -331,52 +422,8 @@ class ICA(AlmKanalStep):
         self,
         data: mne.io.Raw,
         info: AlmKanalInfo,
-    ) -> mne.io.BaseRaw:
-        """
-        Perform ICA to identify and remove peripheral physiological signals like
-        EOG and ECG as well as an artifact caused by our local train in Salzburg.
+    ) -> dict:
 
-        Parameters
-        ----------
-        n_components : int | float | None, optional
-            Number of ICA components to compute. Defaults to None.
-        method : str, optional
-            ICA method to use ('picard', etc.). Defaults to 'picard'.
-        random_state : int | None, optional
-            Random seed for reproducibility. Defaults to 42.
-        fit_params : dict | None, optional
-            Additional fitting parameters for ICA. Defaults to None.
-        ica_hp_freq : float | None, optional
-            High-pass filter frequency for ICA preprocessing. Defaults to 1.0 Hz.
-        ica_lp_freq : float | None, optional
-            Low-pass filter frequency for ICA preprocessing. Defaults to None.
-        resample_freq : int, optional
-            Downsampling frequency before ICA. Defaults to 200 Hz.
-        eog : bool, optional
-            Whether to detect and remove EOG artifacts. Defaults to True.
-        eog_corr_thresh : float, optional
-            Correlation threshold for EOG artifact detection. Defaults to 0.5.
-        ecg : bool, optional
-            Whether to detect and remove ECG artifacts. Defaults to True.
-        ecg_corr_thresh : float, optional
-            Correlation threshold for ECG artifact detection. Defaults to 0.5.
-        emg : bool,
-            Whether to detect and remove EMG artifacts. Defaults to False.
-        emg_thresh:
-            Value above which a component should be marked as muscle-related, relative to a typical muscle component.
-        train : bool, optional
-            Whether to detect and remove train-related artifacts. Defaults to True.
-        train_freq : int, optional
-            Frequency for train artifact detection. Defaults to 16 Hz.
-        img_path : str | None, optional
-            Path to save ICA plots. Defaults to None.
-        fname : str | None, optional
-            Filename for ICA plots. Defaults to None.
-
-        Returns
-        -------
-        None
-        """
 
         raw, ica, components_dict, eog_scores, ecg_scores = run_ica(
             data,

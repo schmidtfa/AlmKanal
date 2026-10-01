@@ -308,6 +308,85 @@ def comp_spatial_filters(
 
 @define
 class SpatialFilter(AlmKanalStep):
+    """Compute LCMV spatial filters for source reconstruction.
+
+    ``SpatialFilter`` computes data and noise covariance matrices as needed and
+    constructs an LCMV beamformer for subsequent source reconstruction. The
+    forward model and channel-selection parameters can either be supplied
+    directly or obtained from preceding pipeline configuration.
+
+    If an empty-room recording is used to estimate the noise covariance, the
+    relevant preprocessing history is passed along so that compatible
+    preprocessing can be applied to the empty-room data before covariance
+    estimation.
+
+    Parameters
+    ----------
+    fwd : mne.Forward | None, default=None
+        Forward model used to construct the spatial filter. If ``None``, the
+        forward solution produced by a preceding ``ForwardModel`` step is used.
+    pick_dict : dict | None, default=None
+        Channel-selection parameters used for spatial filtering. If ``None``,
+        the pipeline-level ``pick_params`` stored in :class:`AlmKanalInfo` are
+        used. A value must be available from one of these sources.
+    data_cov : mne.Covariance | None, default=None
+        Precomputed data covariance matrix. If ``None``, it is computed from
+        the input data.
+    noise_cov : mne.Covariance | None, default=None
+        Precomputed noise covariance matrix. If provided, it is used directly.
+        Otherwise, a covariance can be derived from ``empty_room`` or, when no
+        empty-room data are supplied, according to the fallback behaviour of
+        :func:`comp_spatial_filters`.
+    empty_room : str | mne.io.BaseRaw | None, default=None
+        Empty-room recording used to estimate the noise covariance. May be a
+        path to a recording or an already loaded :class:`mne.io.BaseRaw`
+        instance.
+    nearest_empty_room : bool, default=False
+        Whether an empty-room recording nearest in acquisition date should be
+        selected when resolving empty-room data.
+    chans2keep : list of str | None, default=None
+        Channels to preserve separately before spatial-filter channel selection,
+        for example stimulus features, ECG, EOG, or eye-tracking channels.
+        Their data are stored in the returned spatial-filter metadata.
+    lcmv_reg : float, default=0.05
+        Regularization parameter passed to the LCMV beamformer computation.
+    lcmv_pick_ori : str | None, default='max-power'
+        Source-orientation selection passed to the LCMV beamformer.
+    lcmv_weight_norm : str | None, default='nai'
+        Weight-normalization method passed to the LCMV beamformer.
+    lcmv_reduce_rank : bool, default=False
+        Whether to reduce the rank during LCMV filter construction.
+
+    Notes
+    -----
+    ``pick_dict`` takes precedence over pipeline-level ``pick_params``. If
+    neither is available, :meth:`run` raises a :class:`ValueError`.
+
+    Likewise, an explicitly supplied ``fwd`` takes precedence over the forward
+    model stored by a preceding ``ForwardModel`` step.
+
+    The input data are returned unchanged. Computed spatial-filter information
+    is stored under ``'spatial_filter_info'`` and contains the beamformer
+    filters, effective LCMV settings, data covariance, noise covariance, and any
+    channels preserved through ``chans2keep``.
+
+    When empty-room data are used, the pipeline's ordered processing history is
+    passed to the empty-room preprocessing machinery so that relevant previous
+    preprocessing steps can be replayed before estimating the noise covariance.
+
+    ``SpatialFilter`` is intended to precede ``SourceReconstruction`` and can
+    occur only once in a pipeline.
+
+    See Also
+    --------
+    comp_spatial_filters
+        Compute the covariance matrices and LCMV beamformer.
+    SourceReconstruction
+        Apply the resulting spatial filters to reconstruct source activity.
+    ForwardModel
+        Produce the forward solution used for spatial filtering.
+    """
+    
     fwd: mne.Forward | None = None
     pick_dict: dict | None = None
     data_cov: None | mne.Covariance = None
@@ -329,26 +408,6 @@ class SpatialFilter(AlmKanalStep):
     allow_repeated: bool = field(default=False, init=False)
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
-        """
-        Compute spatial filters for source projection using LCMV beamformers.
-
-        Parameters
-        ----------
-        fwd : mne.Forward | None, optional
-            The forward model. Defaults to None.
-        data_cov : NDArray | None, optional
-            Data covariance matrix. Defaults to None.
-        noise_cov : NDArray | None, optional
-            Noise covariance matrix. Defaults to None.
-        empty_room : str | mne.io.Raw | None, optional
-            Path to or preloaded empty room recording. Defaults to None.
-        get_nearest_empty_room : bool, optional
-            Whether to find the nearest empty room recording. Defaults to False.
-
-        Returns
-        -------
-        None
-        """
 
         pick_dict = self.pick_dict
 
