@@ -291,10 +291,10 @@ def find_train_ica(
     )
 
     train_peaks = get_band_info(
-        irasa_out.get_peaks(peak_threshold=peak_threshold),
+        irasa_out.get_peaks(peak_threshold=peak_threshold, smooth=False,),
         freq_range=(train_freq - 0.5, train_freq + 0.5),  # type: ignore[arg-type]
         ch_names=ch_names,
-        smooth=False,
+
     ).dropna()
 
     bad_ics = train_peaks['ch_name'].astype(int).tolist()
