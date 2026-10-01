@@ -1,4 +1,6 @@
+import os
 import pickle
+import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -11,6 +13,66 @@ from mne.coreg import Coregistration
 
 from almkanal.almkanal import AlmKanalStep
 from almkanal.info import AlmKanalInfo
+
+
+def _check_freesurfer() -> None:
+    """Check that FreeSurfer is available for BEM generation."""
+    if shutil.which('mri_watershed') is None:
+        raise RuntimeError(
+            'Individual MRI BEM surfaces need to be generated, but '
+            'FreeSurfer was not found. Make sure FreeSurfer is installed '
+            'and its environment has been sourced.'
+        )
+
+    fs_license = os.getenv('FS_LICENSE')
+
+    if fs_license is not None:
+        if not Path(fs_license).is_file():
+            raise RuntimeError(f'FS_LICENSE points to a file that does not exist: ' f'{fs_license}')
+        return
+
+    freesurfer_home = os.getenv('FREESURFER_HOME')
+
+    if freesurfer_home is not None:
+        default_license = Path(freesurfer_home) / 'license.txt'
+
+        if default_license.is_file():
+            return
+
+    raise RuntimeError(
+        'FreeSurfer was found, but no license was found. '
+        'Set FS_LICENSE to your FreeSurfer license file or place '
+        'license.txt in $FREESURFER_HOME.'
+    )
+
+
+def _ensure_individual_bem(
+    subject_id: str,
+    subjects_dir: str | Path,
+) -> None:
+    """Ensure that watershed BEM surfaces exist for an individual MRI."""
+    subjects_dir = Path(subjects_dir)
+    subject_dir = subjects_dir / subject_id
+    bem_dir = subject_dir / 'bem'
+
+    required_surfaces = (
+        bem_dir / 'inner_skull.surf',
+        bem_dir / 'outer_skull.surf',
+        bem_dir / 'outer_skin.surf',
+    )
+
+    if all(path.is_file() for path in required_surfaces):
+        return
+
+    _check_freesurfer()
+
+    mne.bem.make_watershed_bem(
+        subject=subject_id,
+        subjects_dir=subjects_dir,
+        overwrite=False,
+        show=False,
+        copy=True,
+    )
 
 
 def compute_headmodel(
@@ -397,6 +459,7 @@ class ForwardModel(AlmKanalStep):
     min_dist_src: float = 5.0
     meg: bool = True
     eeg: bool = False
+    redo_bem: bool = False
 
     must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ('Maxwell', 'ICA')
@@ -416,6 +479,13 @@ class ForwardModel(AlmKanalStep):
 
         fs_dir = Path(self.subjects_dir) / 'freesurfer'
         fs_dir.mkdir(parents=True, exist_ok=True)
+
+        if not self.use_template_mri:
+            _ensure_individual_bem(
+                subject_id=self.subject_id,
+                subjects_dir=fs_dir,
+            )
+
         mne.datasets.fetch_fsaverage(subjects_dir=fs_dir)
 
         # This is run to ensure that appropriate template files exist that we can use for morphing
