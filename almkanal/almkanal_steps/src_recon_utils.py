@@ -63,6 +63,7 @@ def src2parc(  # noqa: C901, PLR0912
                     'the individual FreeSurfer subject before parcellation.'
                 )
         labels_mne = mne.read_labels_from_annot(subject_id, parc=surf_atlas, subjects_dir=subjects_dir)
+        labels_mne = [label for label in labels_mne if label.name not in ('unknown-lh', 'unknown-rh')]
         return {
             'lh': [label.hemi == 'lh' for label in labels_mne],
             'rh': [label.hemi == 'rh' for label in labels_mne],
