@@ -228,10 +228,10 @@ def find_train_ica(
     raw: mne.io.Raw,
     ica: mne.preprocessing.ICA,
     train_freq: int,
-    duration: int = 4,
+    duration: int = 8,
     overlap: float = 0.5,
     hmax: float = 2,
-    peak_threshold: float = 2,
+    peak_threshold: float = 3,
 ) -> list:
     """
     Detect ICA components associated with train artifacts in MEG data.
@@ -292,7 +292,7 @@ def find_train_ica(
 
     train_peaks = get_band_info(
         irasa_out.get_peaks(peak_threshold=peak_threshold),
-        freq_range=(train_freq - 1, train_freq + 1),
+        freq_range=(train_freq - 0.5, train_freq + 0.5),
         ch_names=ch_names,
     ).dropna()
 
