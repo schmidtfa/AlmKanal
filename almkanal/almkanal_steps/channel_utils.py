@@ -315,8 +315,9 @@ class EEGRANSAC(AlmKanalStep):
 
 @define
 class ReReference(AlmKanalStep):
-    must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    must_be_before: tuple = ('ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = True
 
     ref_channels: str | list[str] | dict = 'average'
     projection: bool = False

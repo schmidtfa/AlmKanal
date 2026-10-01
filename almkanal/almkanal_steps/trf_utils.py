@@ -496,6 +496,7 @@ class EpochTRF(AlmKanalStep):
 
     must_be_before: tuple = ()
     must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
 
     def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> dict:
         spec: TRFSpanSpec = self.gen_span_spec(data)

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import mne
 import numpy as np
-from attrs import define
+from attrs import define, field
 
 from almkanal import AlmKanalStep
 from almkanal.info import AlmKanalInfo
@@ -138,6 +138,7 @@ class SourceReconstruction(AlmKanalStep):
 
     must_be_before: tuple = ()
     must_be_after: tuple = ('Maxwell', 'ICA', 'ForwardModel')
+    allow_repeated: bool = field(default=False, init=False)
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:  # noqa: C901, PLR0912
         fwd_info = info.get_step('ForwardModel')
