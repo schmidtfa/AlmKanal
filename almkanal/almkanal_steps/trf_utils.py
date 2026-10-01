@@ -446,37 +446,117 @@ def build_trf_epochs(
 
 @define
 class EpochTRF(AlmKanalStep):
-    """Attach WAV features and epoch trials, with optional audio realignment.
+    """Create TRF epochs and attach stimulus features from WAV files.
 
-    audio_channels=None retains fixed-delay-only processing unless
-    realign_without_audio=True. That opt-in mode uses the original WAV duration
-    and fallback_drift_us_per_s (default +499 us/s) to resample neural data,
-    assuming WAV time zero at each trial onset: t_raw = (1 + drift / 1e6) * t_wav.
-    It cannot measure an onset offset or confirm the assumed drift. The original
-    end sample does not determine the drift; the WAV defines output duration.
-    Recorded audio takes precedence when audio_channels are supplied and must
-    still be present with sufficient bandwidth for alignment. Failed audio fits
-    follow on_alignment_error without falling back to an assumed drift.
-    Each trial is first corrected to WAV time, then hw_delay_s is applied to
-    neural data before attaching the unchanged WAV feature channels. Positive
-    values advance neural events relative to those features; the default
-    +0.0165 s compensates the 16.5 ms playback-to-ear delay when the audio
-    reference precedes the air tubes, preserving the brain's response latency.
-    Use zero if the reference already captures sound arrival at the ears.
-    Negative values add lag and emit a warning for this sign convention.
-    Physical delays are rounded to the nearest sample on the corrected clock.
-    Realignment retains recording margins to preserve the full WAV duration;
-    insufficient recording coverage is an alignment error.
+    ``EpochTRF`` extracts trial spans from a continuous recording, loads the
+    corresponding WAV files, computes stimulus features, and returns fixed-length
+    epochs containing both the neural data and the WAV-derived feature channels.
 
-    The alignment search uses a fixed +/-max_lag_s range around zero for each
-    window. Set alignment_kwargs['max_lag_s'] large enough for the initial
-    offset plus accumulated drift over the FULL stimulus: 1260 s at +500 us/s
-    adds 0.63 s, so a 1.0 s search is more appropriate than the 0.25 s default
-    for a small initial offset. Missing-end inference does not adapt this range.
-    Potentially unreliable fits emit RuntimeWarning, including with
-    verbose=False, but are still applied; on_alignment_error only handles errors.
-    alignment_kwargs['warn_residual_rms_ms'] sets the residual RMS warning
-    threshold (default 10 ms). See estimate_raw_wav_alignment for all checks.
+    Neural data can optionally be realigned to the stimulus clock using either
+    recorded audio or an assumed clock drift when no recorded audio is available.
+    A fixed physical-delay correction can subsequently be applied to the neural
+    data.
+
+    Parameters
+    ----------
+    gen_span_spec : Callable
+        Function that receives the input :class:`mne.io.BaseRaw` object and
+        returns a :class:`TRFSpanSpec` describing the trial spans and associated
+        WAV files.
+    base_audio_path : str | pathlib.Path
+        Base directory used to locate WAV files referenced by the generated
+        :class:`TRFSpanSpec`.
+    feature : str, default='envelope'
+        WAV feature to compute and append to the neural data.
+    audio_cutoff_hz : float, default=80.0
+        Low-pass cutoff frequency, in Hz, used when constructing the audio
+        feature.
+    hw_delay_s : float, default=0.0165
+        Physical-delay correction, in seconds, applied to the neural data after
+        clock realignment. Positive values advance neural events relative to the
+        WAV feature channels. The default of 16.5 ms compensates the typical
+        playback-to-ear delay when the recorded audio reference precedes sound
+        arrival at the ears. Use zero when the reference already represents
+        sound arrival at the ears. Negative values add lag and emit a warning.
+    epoch_len_s : float, default=5.0
+        Length of the generated epochs, in seconds.
+    audio_channels : sequence of str | None, default=None
+        Recorded audio channels used to estimate the temporal relationship
+        between the recording and the WAV files. When provided, audio-based
+        alignment takes precedence over assumed-drift alignment. When ``None``,
+        no clock realignment is performed unless ``realign_without_audio=True``.
+    alignment_kwargs : mapping | None, default=None
+        Additional keyword arguments passed to
+        :func:`estimate_raw_wav_alignment`. These override that function's
+        defaults.
+    preserve_annotations : bool, default=True
+        Whether annotations from the original recording are retained in the
+        realigned data.
+    on_alignment_error : {'raise', 'skip'}, default='raise'
+        Behaviour when alignment of a trial fails. ``'raise'`` propagates the
+        alignment error; ``'skip'`` records the failure and continues with the
+        remaining trials.
+    verbose : bool, default=True
+        Whether to emit informational output during processing.
+    realign_without_audio : bool, default=False
+        If ``True`` and ``audio_channels`` is ``None``, realign neural data using
+        the original WAV duration and ``fallback_drift_us_per_s`` instead of
+        estimating offset and drift from recorded audio.
+    fallback_drift_us_per_s : float, default=DEFAULT_FALLBACK_DRIFT_US_PER_S
+        Assumed clock drift, in microseconds per second, used when
+        ``realign_without_audio=True``. The default is +499 µs/s.
+
+    Notes
+    -----
+    Audio-based realignment estimates both onset offset and clock drift from the
+    recorded audio. The channels specified by ``audio_channels`` must therefore
+    be present and contain sufficient signal bandwidth for reliable alignment.
+
+    When ``realign_without_audio=True``, the mapping between WAV time and raw
+    time is assumed to be
+
+    ``t_raw = (1 + drift / 1e6) * t_wav``.
+
+    WAV time zero is assumed to coincide with the trial onset. This mode cannot
+    estimate an onset offset or verify the assumed drift. The original trial-end
+    sample does not determine the drift; instead, the WAV duration determines
+    the duration of the corrected trial.
+
+    If recorded audio is supplied, failed audio-based fits follow
+    ``on_alignment_error`` and do not fall back to the assumed-drift method.
+
+    Clock realignment is performed before ``hw_delay_s`` is applied. The WAV
+    feature channels themselves are not shifted. Physical delays are rounded to
+    the nearest sample on the corrected sampling grid.
+
+    Realignment retains sufficient recording margins to preserve the complete
+    WAV duration. Insufficient recording coverage is treated as an alignment
+    error.
+
+    Audio alignment searches within ``alignment_kwargs['max_lag_s']`` around
+    zero for each analysis window. The search range must accommodate both the
+    initial offset and drift accumulated over the full stimulus duration. For
+    example, a drift of +500 µs/s accumulates to 0.63 s over a 1260 s stimulus,
+    so a 1 s search range can be more appropriate than the default 0.25 s.
+    Missing-end inference does not expand this range automatically.
+
+    Potentially unreliable alignment fits emit :class:`RuntimeWarning` even when
+    ``verbose=False`` but are still applied. ``on_alignment_error`` controls
+    actual alignment failures, not quality warnings. The residual-RMS warning
+    threshold can be configured with
+    ``alignment_kwargs['warn_residual_rms_ms']`` and defaults to 10 ms.
+
+    The processing metadata returned by :meth:`run` is stored under
+    ``'TRF_info'`` and includes the effective alignment method, alignment
+    settings, applied physical delay, per-trial diagnostics, and inferred trial
+    endpoints.
+
+    See Also
+    --------
+    estimate_raw_wav_alignment
+        Estimate clock offset and drift from recorded and reference audio.
+    TRFSpanSpec
+        Description of trial spans and their associated WAV files.
     """
 
     gen_span_spec: Callable
