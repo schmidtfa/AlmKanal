@@ -88,7 +88,7 @@ def run_ica(  # noqa: C901, PLR0912, PLR0915
     emg: bool = False,
     emg_thresh: float = 0.5,
     train: bool = True,
-    train_freq: int = 16,
+    train_freq: float = 16.666,
     train_thresh: float = 2,
 ) -> tuple[mne.io.Raw, mne.preprocessing.ICA, dict, list, list]:
     """
@@ -227,7 +227,7 @@ def run_ica(  # noqa: C901, PLR0912, PLR0915
 def find_train_ica(
     raw: mne.io.Raw,
     ica: mne.preprocessing.ICA,
-    train_freq: int,
+    train_freq: float,
     duration: int = 8,
     overlap: float = 0.5,
     hmax: float = 2,
@@ -292,7 +292,7 @@ def find_train_ica(
 
     train_peaks = get_band_info(
         irasa_out.get_peaks(peak_threshold=peak_threshold),
-        freq_range=(train_freq - 0.5, train_freq + 0.5),
+        freq_range=(train_freq - 0.5, train_freq + 0.5),  # type: ignore[arg-type]
         ch_names=ch_names,
     ).dropna()
 
@@ -413,7 +413,7 @@ class ICA(AlmKanalStep):
     emg: bool = False
     emg_thresh: float = 0.5
     train: bool = True
-    train_freq: int = 16
+    train_freq: float = 16.666
     train_thresh: float = 2.0
     img_path: None | str = None
     fname: None | str = None
