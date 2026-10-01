@@ -423,8 +423,6 @@ class ICA(AlmKanalStep):
         data: mne.io.Raw,
         info: AlmKanalInfo,
     ) -> dict:
-
-
         raw, ica, components_dict, eog_scores, ecg_scores = run_ica(
             data,
             fit_only=self.fit_only,

@@ -98,6 +98,7 @@ class Filter(AlmKanalStep):
     mne.Epochs.filter
         Filter epoched M/EEG data.
     """
+
     highpass: float | None = 0.1
     lowpass: float | None = 40.0
     picks: str | npt.ArrayLike | slice | None = None
@@ -253,6 +254,7 @@ class Resample(AlmKanalStep):
     mne.Epochs.resample
         Resample epoched data.
     """
+
     sfreq: int
     npad: str = 'auto'
     window: str = 'auto'

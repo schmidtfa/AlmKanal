@@ -386,7 +386,7 @@ class SpatialFilter(AlmKanalStep):
     ForwardModel
         Produce the forward solution used for spatial filtering.
     """
-    
+
     fwd: mne.Forward | None = None
     pick_dict: dict | None = None
     data_cov: None | mne.Covariance = None
@@ -408,7 +408,6 @@ class SpatialFilter(AlmKanalStep):
     allow_repeated: bool = field(default=False, init=False)
 
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
-
         pick_dict = self.pick_dict
 
         if pick_dict is None:
