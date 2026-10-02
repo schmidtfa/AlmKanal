@@ -90,10 +90,18 @@ def test_surface_source_pipeline(gen_mne_data_raw, source, monkeypatch, tmp_path
     _mock_forward_step(monkeypatch, tmp_path)
     _mock_source_application(monkeypatch)
 
-    fake_filters = object()
+    # MNE Beamformer and Covariance objects are mapping-like. Keep the test
+    # doubles mapping-like as well so reporting/provenance code can use .get().
+    fake_filters = {
+        'kind': 'LCMV',
+        'pick_ori': 'max-power',
+        'weight_norm': 'nai',
+    }
+    data_cov = {'method': 'empirical'}
+
     monkeypatch.setattr(
         'almkanal.almkanal_steps.spatial_filter_utils.comp_spatial_filters',
-        lambda **kwargs: (fake_filters, {}, None, object()),
+        lambda **kwargs: (fake_filters, {}, None, data_cov),
     )
 
     pick_dict = {
@@ -131,9 +139,15 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, monkeypatch, tmp_path):
     _mock_forward_step(monkeypatch, tmp_path)
     _mock_source_application(monkeypatch)
 
-    data_cov = object()
-    noise_cov = object()
-    fake_filters = object()
+    # Covariance and Beamformer objects in MNE are dict-like, so use minimal
+    # mapping stand-ins rather than opaque object() instances.
+    data_cov = {'method': 'empirical'}
+    noise_cov = {'method': 'ad_hoc'}
+    fake_filters = {
+        'kind': 'LCMV',
+        'pick_ori': 'max-power',
+        'weight_norm': 'nai',
+    }
     make_ad_hoc_cov = Mock(return_value=noise_cov)
 
     monkeypatch.setattr(mne, 'compute_raw_covariance', lambda *args, **kwargs: data_cov)

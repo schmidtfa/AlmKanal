@@ -39,38 +39,18 @@ def forward_model_spec() -> StepSpec:
 # ---------- SpatialFilter (e.g., LCMV beamformer)
 
 
-def _select_spatial_filter(info: dict[str, Any]) -> dict[str, Any]:
-    filt = info.get('filters') or {}
-    lcmv = info.get('lcmv_settings') or {}
-
-    # detect empty-room provenance if you log it at either top or inside noise_cov
-    noise_cov = filt.get('noise_cov') or {}
-    noise_src = info.get('noise_cov_source') or noise_cov.get('source')
-
-    return {
-        'kind': (filt.get('kind') or 'LCMV'),
-        'pick_ori': (filt.get('pick_ori') or lcmv.get('pick_ori')),
-        'weight_norm': (filt.get('weight_norm') or lcmv.get('weight_norm')),
-        #'rank': (filt.get('rank') or lcmv.get('rank')),
-        'is_free_ori': bool(filt.get('is_free_ori')),
-        'n_sources': filt.get('n_sources')
-        or _get(info, 'filters', 'vertices')
-        and sum(
-            _get(info, 'filters', 'vertices')[i]['size'] for i in (0, 1) if len(_get(info, 'filters', 'vertices')) > i
-        )
-        or None,
-        'src_type': filt.get('src_type'),
-        # covariance book-keeping
-        'has_data_cov': bool(filt.get('data_cov')),
-        'has_noise_cov': bool(filt.get('noise_cov')),
-        'noise_cov_source': noise_src,  # e.g. "empty_room", "pre-stimulus", etc.
-        'reg': lcmv.get('reg'),
-    }
-
-
 @register_step('SpatialFilter')
 def spatial_filter_spec() -> StepSpec:
-    return StepSpec(settings_fn=_select_spatial_filter)
+    return StepSpec(
+        settings_fn=keys_selector(
+            'reg',
+            'pick_ori',
+            'weight_norm',
+            'reduce_rank',
+            'data_cov_source',
+            'noise_cov_source',
+        )
+    )
 
 
 # ---------- SourceReconstruction / parcellation

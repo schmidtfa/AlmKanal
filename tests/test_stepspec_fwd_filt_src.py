@@ -45,27 +45,33 @@ def test_forward_model_selection_extracts_key_fields() -> None:
 def test_spatial_filter_selection_extracts_cov_and_norm() -> None:
     load_stepspec_package('almkanal.report.stepspecs')
     spec = get_registry()['SpatialFilter']
+
     info = {
-        'filters': {
-            'kind': 'LCMV',
-            'pick_ori': 'max-power',
-            'weight_norm': 'nai',
-            'rank': 56,
-            'is_free_ori': False,
-            'n_sources': 5124,
-            'src_type': 'surface',
-            'data_cov': {'data': {}},
-            'noise_cov': {'data': {}, 'source': 'empty_room'},
-        },
-        'lcmv_settings': {'reg': 0.05, 'rank': {'mag': 56}},
+        'reg': 0.05,
+        'pick_ori': 'max-power',
+        'weight_norm': 'nai',
+        'reduce_rank': False,
+        'data_cov_source': 'continuous',
+        'noise_cov_source': 'empty_room',
+
+        # Provenance that should not enter report settings.
+        'filters': object(),
+        'data_cov': object(),
+        'noise_cov': object(),
+        'extra_data': None,
     }
+
     out = spec.settings_fn(info)
-    assert out['kind'] == 'LCMV'
-    assert out['pick_ori'] == 'max-power'
-    assert out['weight_norm'] == 'nai'
-    assert out['has_data_cov'] is True
-    assert out['has_noise_cov'] is True
-    assert out['noise_cov_source'] == 'empty_room'
+
+    assert out == {
+        'reg': 0.05,
+        'pick_ori': 'max-power',
+        'weight_norm': 'nai',
+        'reduce_rank': False,
+        'data_cov_source': 'continuous',
+        'noise_cov_source': 'empty_room',
+    }
+
     json.dumps(out)
 
 
