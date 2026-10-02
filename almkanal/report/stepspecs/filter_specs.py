@@ -12,9 +12,14 @@ def filter_spec() -> StepSpec:
             'phase',
             'fir_window',
             'fir_design',
-            'pad',
+            'filter_length',
+            'filter_length_samples',
+            'filter_length_seconds',
+            'filter_order',
             'l_trans_bandwidth',
             'h_trans_bandwidth',
+            'applied_to',
+            'pad',
         )
     )
 

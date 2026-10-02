@@ -19,8 +19,8 @@ classifiers = [
 
 keywords = ['preprocessing', 'M/EEG', 'MNE Python', 'source analysis']
 requires-python = ">=3.11"
-dependencies = ["mne>=1.8", "pyrasa @ git+https://github.com/schmidtfa/pyrasa.git@8a65a6d", 
-                "autoreject>=0.4.3",
+dependencies = ["mne>=1.13.2", "pyrasa @ git+https://github.com/schmidtfa/pyrasa.git@8a65a6d", 
+                "autoreject>=0.4.3", 
                 "attrs", "neurokit2", 'ipyevents', "jinja2>=3.1,<4",
                 "pandoc", "librosa", "python-picard>=0.8", "nibabel>=5.3.2",
                 "dipy>=1.9", "pandoc"]
@@ -43,7 +43,7 @@ platforms = ["linux-64", "osx-64", "win-64", "osx-arm64"]
 almkanal = { path = ".", editable = true }
 
 [tool.pixi.feature.jupyter.dependencies]
-mne = ">=1.8.0,<1.9"
+mne = ">=1.13.2"
 jupyter = ">=1.0.0,<1.1"
 ipython = ">=8.26.0,<8.27"
 ipykernel = ">=6.29.5,<6.30"
