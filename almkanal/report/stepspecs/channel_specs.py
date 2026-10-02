@@ -17,11 +17,18 @@ def mulit_maxwell_spec() -> StepSpec:
     # return StepSpec(settings_fn=lambda info: dict(info))
 
 
-@register_step('RANSAC')
+@register_step('EEGRANSAC')
 def ransac_spec() -> StepSpec:
     return StepSpec(settings_fn=lambda info: dict(info))
 
 
 @register_step('ReReference')
-def reref_spec() -> StepSpec:
-    return StepSpec(settings_fn=keys_selector('reference', 'ref_channels', 'projection'))
+def rereference_spec() -> StepSpec:
+    return StepSpec(
+        settings_fn=keys_selector(
+            'ref_channels',
+            'projection',
+            'resolved_ch_type',
+            'joint',
+        )
+    )

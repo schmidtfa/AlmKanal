@@ -488,6 +488,14 @@ class ReReference(AlmKanalStep):
         data: mne.io.BaseRaw,
         info: AlmKanalInfo,
     ) -> dict:
+        supported_types = ('eeg', 'ecog', 'seeg', 'dbs')
+
+        if self.ch_type == 'auto':
+            present_types = set(data.get_channel_types())
+            resolved_ch_type: str | list[str] = next(ch_type for ch_type in supported_types if ch_type in present_types)
+        else:
+            resolved_ch_type = self.ch_type
+
         reref = data.set_eeg_reference(
             ref_channels=self.ref_channels,
             projection=self.projection,
@@ -504,6 +512,7 @@ class ReReference(AlmKanalStep):
                 'projection': self.projection,
                 'ch_type': self.ch_type,
                 'forward': self.forward,
+                'resolved_ch_type': resolved_ch_type,
                 'joint': self.joint,
                 'verbose': self.verbose,
             },

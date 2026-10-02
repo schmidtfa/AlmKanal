@@ -7,6 +7,8 @@
 {% set npad = s.settings.npad %}
 {% set pad = s.settings.pad %}
 
+#### Resampling
+
 {% if method == 'fft' %}
 The {{ applied_to }} data were resampled from {{ original_sfreq }} Hz to {{ sfreq }} Hz using FFT-based resampling with a {{ window }} frequency-domain window.
 {% elif method == 'polyphase' %}
