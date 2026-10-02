@@ -8,21 +8,21 @@ Signal-space separation (SSS)
 implemented in MNE-Python
 ({{ ref('Gramfort2014', 'Gramfort, A., Luessi, M., Larson, E., Engemann, D. A., Strohmeier, D., Brodbeck, C., ... & Hämäläinen, M. S. (2014). MNE software for processing MEG and EEG data. *NeuroImage*, 86, 446–460. doi:10.1016/j.neuroimage.2013.10.027') }}),
 was applied separately to each recording block to identify bad MEG channels, reconstruct them during SSS, and suppress external magnetic interference.
-
 {% if s.settings.destination_source == 'median_block_translation' %}
 All recording blocks were transformed to a common head position defined by the median device-to-head translation across blocks before concatenation.
 {% elif s.settings.destination_source == 'explicit' %}
-All recording blocks were transformed to a predefined common head position {{ s.settings.destination }} before concatenation.
+All recording blocks were transformed to a predefined common head position {% if s.settings.destination is sequence %}
+({{ s.settings.destination | join(', ') }}).
+{% else %}
+({{ s.settings.destination }}).
+{% endif %} before concatenation.
 {% endif %}
-
 {% if s.settings.st_duration is not none %}
 Temporal SSS (tSSS) was applied using a {{ s.settings.st_duration }} s buffer and a correlation threshold of {{ s.settings.st_correlation }}.
 {% endif %}
-
 {% if s.settings.calibration_applied %}
 Fine-calibration information was applied.
 {% endif %}
-
 {% if s.settings.cross_talk_applied %}
 Cross-talk compensation was applied.
 {% endif %}
