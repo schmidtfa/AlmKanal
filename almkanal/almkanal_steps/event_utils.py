@@ -64,7 +64,7 @@ class Events(AlmKanalStep):
         Create epochs from explicitly supplied or previously detected events.
     """
 
-    stim_channel: None | str = None
+    stim_channel: str | list[str] | None = None
     output: str = 'onset'
     consecutive: bool | str = 'increasing'
     min_duration: float = 0.0

@@ -7,8 +7,19 @@ from .registry import StepSpec, keys_selector, register_step
 
 @register_step('Events')
 def events_spec() -> StepSpec:
-    return StepSpec(settings_fn=keys_selector('event_id', 'stim_channel', 'min_duration', 'consecutive'))
-
+    return StepSpec(
+        settings_fn=keys_selector(
+            'stim_channel',
+            'output',
+            'consecutive',
+            'min_duration',
+            'shortest_event',
+            'mask',
+            'uint_cast',
+            'mask_type',
+            'initial_event',
+        )
+    )
 
 @register_step('Epochs')
 def epochs_spec() -> StepSpec:
