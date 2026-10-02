@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .registry import StepSpec, register_step
+from .registry import StepSpec, keys_selector, register_step
 
 # ---------- helpers
 
@@ -16,56 +16,24 @@ def _get(d: dict, *path: str, default: Any = None) -> Any:
     return cur
 
 
-def _ico_level_from_nuse(n: int | None) -> str | None:
-    """Rough helper: map nuse per hemi -> ico level (surf)."""
-    if n is None:
-        return None
-    # classic fsaverage ico grids per hemi
-    mapping = {642: 'ico-3', 2562: 'ico-4', 10242: 'ico-5', 40962: 'ico-6'}
-    return mapping.get(int(n))
-
-
 # ---------- ForwardModel
-
-
-def _select_forward_model(info: dict[str, Any]) -> dict[str, Any]:
-    fwd = info.get('fwd') or {}
-    src_list = _get(fwd, 'src', default=[])
-    # try to read per-hemi nuse and subject id
-    nuse_l = _get(src_list[0], 'nuse') if len(src_list) > 0 else None
-    nuse_r = _get(src_list[1], 'nuse') if len(src_list) > 1 else None
-    ico = _ico_level_from_nuse(nuse_l) if isinstance(nuse_l, int) else None
-
-    return {
-        # surface/volume model
-        'source_type': info.get('source_type') or _get(fwd, 'src_type'),
-        # orientation mode
-        'free_orientation': bool(_get(fwd, 'is_free_ori', default=False))
-        or (str(_get(fwd, 'source_ori', default='')) in {'2', 'free', 'FIFFV_MNE_FREE_ORI'}),
-        # number of sources
-        'n_per_hemi': [int(nuse_l)]
-        if nuse_r is None and nuse_l is not None
-        else ([int(nuse_l), int(nuse_r)] if (nuse_l and nuse_r) else None),
-        'n_total': int(
-            _get(fwd, 'nsource', default=nuse_l + nuse_r if isinstance(nuse_l, int) and isinstance(nuse_r, int) else 0)
-        )
-        or None,
-        # grid / spacing hints
-        'ico_level': ico,  # e.g., "ico-4" if surface decimated
-        # frames / subject template
-        'coord_frame': _get(fwd, 'coord_frame') or _get(src_list[0] or {}, 'coord_frame'),
-        #'template_subject': info.get('subject_id_freesurfer') or _get(src_list[0] or {}, 'subject_his_id'),
-        'subjects_dir': info.get('subject_dir'),
-        # bem summary if you log it (optional—will render if present)
-        'bem_model': info.get('bem_model'),
-        'bem_layers': info.get('bem_layers'),
-        'bem_conductivity': info.get('bem_conductivity'),
-    }
 
 
 @register_step('ForwardModel')
 def forward_model_spec() -> StepSpec:
-    return StepSpec(settings_fn=_select_forward_model)
+    return StepSpec(
+        settings_fn=keys_selector(
+            'source_type',
+            'source_spacing',
+            'volume_spacing_mm',
+            'anatomy',
+            'bem_layers',
+            'bem_conductivity',
+            'min_dist_src_mm',
+            'meg',
+            'eeg',
+        )
+    )
 
 
 # ---------- SpatialFilter (e.g., LCMV beamformer)
