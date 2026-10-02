@@ -17,24 +17,29 @@ def maxwell_spec() -> StepSpec:
     )
 
 
+def multiblock_maxwell_settings(info: dict) -> dict:
+    settings = {
+        'coord_frame': info['coord_frame'],
+        'destination_source': info['destination_source'],
+        'st_duration': info['st_duration'],
+        'st_correlation': info['st_correlation'],
+        'calibration_file': info['calibration_file'],
+        'cross_talk_file': info['cross_talk_file'],
+        'calibration_applied': info['calibration_applied'],
+        'cross_talk_applied': info['cross_talk_applied'],
+    }
+
+    if info['destination_source'] == 'explicit':
+        settings['destination'] = info['destination']
+
+    return settings
+
+
 @register_step('MultiBlockMaxwell')
-def mulit_maxwell_spec() -> StepSpec:
-    # Expand/limit keys as your JSON stabilizes
+def multiblock_maxwell_spec() -> StepSpec:
     return StepSpec(
-        settings_fn=keys_selector(
-            'coord_frame',
-            'destination',
-            'destination_source',
-            'n_blocks',
-            'st_duration',
-            'st_correlation',
-            'calibration_file',
-            'cross_talk_file',
-            'calibration_applied',
-            'cross_talk_applied',
-        )  #'destination',
+        settings_fn=multiblock_maxwell_settings,
     )
-    # return StepSpec(settings_fn=lambda info: dict(info))
 
 
 @register_step('EEGRANSAC')
