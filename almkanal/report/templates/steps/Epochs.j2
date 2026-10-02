@@ -1,17 +1,9 @@
 #### Epoching
 
-Continuous data were segmented into epochs extending from {{ s.settings.tmin }} to {{ s.settings.tmax }} s relative to event onset
-{%- if s.settings.event_id is mapping and s.settings.event_id %}
-, using the event mapping
-{%- for k, v in s.settings.event_id.items() %}
- {{ k }}={{ v }}{{ ", " if not loop.last else "" }}
-{%- endfor %}
-{%- endif %}.
-
+Continuous data were segmented into epochs ranging from {{ s.settings.tmin }} to {{ s.settings.tmax }} s relative to event onset.
 {% if s.settings.baseline is not none %}
 Baseline correction was performed using the interval {{ s.settings.baseline }} s.
 {% endif %}
-
 {% if s.settings.reject is not none %}
 Epochs exceeding the specified peak-to-peak amplitude thresholds {{ s.settings.reject }}
 {%- if s.settings.reject_tmin is not none or s.settings.reject_tmax is not none %}
@@ -19,15 +11,12 @@ Epochs exceeding the specified peak-to-peak amplitude thresholds {{ s.settings.r
 {%- endif %}
  were discarded.
 {% endif %}
-
 {% if s.settings.flat is not none %}
 Epochs with peak-to-peak amplitudes below the flatness thresholds {{ s.settings.flat }} were discarded.
 {% endif %}
-
 {% if s.settings.reject_by_annotation %}
 Epochs overlapping data segments annotated as bad were excluded.
 {% endif %}
-
 {% if s.settings.detrend == 0 %}
 A constant offset was removed from each epoch.
 {% elif s.settings.detrend == 1 %}

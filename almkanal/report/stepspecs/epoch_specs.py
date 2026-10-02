@@ -26,7 +26,6 @@ def events_spec() -> StepSpec:
 def epochs_spec() -> StepSpec:
     return StepSpec(
         settings_fn=keys_selector(
-            'event_id',
             'tmin',
             'tmax',
             'baseline',
