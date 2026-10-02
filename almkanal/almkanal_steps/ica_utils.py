@@ -231,7 +231,7 @@ def find_train_ica(
     duration: int = 8,
     overlap: float = 0.5,
     hmax: float = 2,
-    peak_threshold: float = 3,
+    peak_threshold: float = 5,
 ) -> list:
     """
     Detect ICA components associated with train artifacts in MEG data.
@@ -417,7 +417,7 @@ class ICA(AlmKanalStep):
     emg_thresh: float = 0.5
     train: bool = True
     train_freq: float = 16.666
-    train_thresh: float = 2.0
+    train_thresh: float = 5
     img_path: None | str = None
     fname: None | str = None
 

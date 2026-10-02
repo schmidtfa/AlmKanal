@@ -290,7 +290,6 @@ class Resample(AlmKanalStep):
                 'sfreq': self.sfreq,
                 'npad': self.npad,
                 'window': self.window,
-                'n_jobs': self.n_jobs,
                 'pad': self.pad,
                 'method': self.method,
             },
