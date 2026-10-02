@@ -44,8 +44,6 @@ class Epochs(AlmKanalStep):
         Minimum acceptable peak-to-peak amplitudes by channel type.
     proj : bool | str, default=True
         Projection handling passed to :class:`mne.Epochs`.
-    decim : int, default=1
-        Decimation factor applied when constructing the epochs.
     reject_tmin : float | None, default=None
         Start of the time interval used for rejection, in seconds relative to the
         event.
@@ -111,7 +109,6 @@ class Epochs(AlmKanalStep):
     reject: dict | None = None
     flat: dict | None = None
     proj: bool | str = True
-    decim: int = 1
     reject_tmin: float | None = None
     reject_tmax: float | None = None
     detrend: int | None = None
@@ -151,7 +148,6 @@ class Epochs(AlmKanalStep):
             reject=self.reject,
             flat=self.flat,
             proj=self.proj,
-            decim=self.decim,
             reject_tmin=self.reject_tmin,
             reject_tmax=self.reject_tmax,
             detrend=self.detrend,
@@ -175,7 +171,6 @@ class Epochs(AlmKanalStep):
                 'reject': self.reject,
                 'flat': self.flat,
                 'proj': self.proj,
-                'decim': self.decim,
                 'reject_tmin': self.reject_tmin,
                 'reject_tmax': self.reject_tmax,
                 'detrend': self.detrend,

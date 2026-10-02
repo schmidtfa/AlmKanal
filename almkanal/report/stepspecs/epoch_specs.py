@@ -21,9 +21,27 @@ def events_spec() -> StepSpec:
         )
     )
 
+
 @register_step('Epochs')
 def epochs_spec() -> StepSpec:
-    return StepSpec(settings_fn=keys_selector('tmin', 'tmax', 'baseline', 'reject', 'flat', 'preload'))
+    return StepSpec(
+        settings_fn=keys_selector(
+            'event_id',
+            'tmin',
+            'tmax',
+            'baseline',
+            'picks',
+            'reject',
+            'flat',
+            'proj',
+            'reject_tmin',
+            'reject_tmax',
+            'detrend',
+            'reject_by_annotation',
+            'on_missing',
+            'event_repeated',
+        )
+    )
 
 
 def _summarize_trf(infos: list[dict[str, Any]]) -> dict[str, Any]:
