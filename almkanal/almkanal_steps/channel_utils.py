@@ -15,7 +15,7 @@ def run_maxwell(
     calibration_file: None | bool | str = None,
     cross_talk_file: None | bool | str = None,
     st_duration: float | None = None,
-    st_correlation: float = 0.98
+    st_correlation: float = 0.98,
 ) -> mne.io.Raw:
     """
     Perform Maxwell filtering on raw MEG data.

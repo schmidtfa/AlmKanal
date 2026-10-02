@@ -4,7 +4,16 @@ from .registry import StepSpec, keys_selector, register_step
 @register_step('Maxwell')
 def maxwell_spec() -> StepSpec:
     return StepSpec(
-        settings_fn=keys_selector('coord_frame', 'destination', 'calibration_file', 'cross_talk_file', 'st_duration')
+        settings_fn=keys_selector(
+            'coord_frame',
+            'destination',
+            'st_duration',
+            'st_correlation',
+            'calibration_file',
+            'cross_talk_file',
+            'calibration_applied',
+            'cross_talk_applied',
+        )
     )
 
 
