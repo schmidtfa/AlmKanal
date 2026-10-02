@@ -400,6 +400,7 @@ class EEGRANSAC(AlmKanalStep):
     unbroken_time: float = 0.4
     n_jobs: int = 1
     verbose: bool = False
+    random_state: int | None = 435656
 
     def run(
         self,
@@ -417,6 +418,7 @@ class EEGRANSAC(AlmKanalStep):
             min_corr=self.min_corr,
             unbroken_time=self.unbroken_time,
             n_jobs=self.n_jobs,
+            random_state=self.random_state,
             verbose=self.verbose,
         )
 
@@ -441,6 +443,7 @@ class EEGRANSAC(AlmKanalStep):
         raw_ransac = data.interpolate_bads(
             reset_bads=True,
             exclude=non_eeg_bads,
+            method=dict(eeg='spline'),
         )
 
         return {
@@ -452,6 +455,8 @@ class EEGRANSAC(AlmKanalStep):
                 'min_channels': self.min_channels,
                 'min_corr': self.min_corr,
                 'unbroken_time': self.unbroken_time,
+                'random_state': self.random_state,
+                'interpolation_method': 'spline',
                 'n_jobs': self.n_jobs,
             },
         }

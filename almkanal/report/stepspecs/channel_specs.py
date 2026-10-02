@@ -44,7 +44,17 @@ def multiblock_maxwell_spec() -> StepSpec:
 
 @register_step('EEGRANSAC')
 def ransac_spec() -> StepSpec:
-    return StepSpec(settings_fn=lambda info: dict(info))
+    return StepSpec(
+        settings_fn=keys_selector(
+            'ransac_epoch_duration',
+            'n_resample',
+            'min_channels',
+            'min_corr',
+            'unbroken_time',
+            'random_state',
+            'interpolation_method',
+        )
+    )
 
 
 @register_step('ReReference')
