@@ -79,14 +79,10 @@ A band-stop filter ({{ hf }}–{{ lf }} Hz)
 A high-pass filter at {{ lf }} Hz
 {% elif kind == 'low-pass' %}
 A low-pass filter at {{ hf }} Hz
-{% else %}
-Temporal filtering
 {% endif %}
 was applied to the {% if applied_to %}{{ applied_to }} {% endif %}data.
-
 {% if method == 'fir' %}
 The finite impulse response (FIR) filter was designed using {{ design }} with a {{ win }} window.
-
 {% if phase == 'zero' %}
 A symmetric linear-phase filter with delay compensation was used, resulting in zero-phase, non-causal filtering.
 {% elif phase == 'zero-double' %}
@@ -96,11 +92,9 @@ A minimum-phase FIR filter was used.
 {% elif phase == 'minimum-half' %}
 A minimum-phase FIR filter with the legacy half-length implementation was used.
 {% endif %}
-
 {% if filter_length_samples is not none %}
 The realized filter length was {{ filter_length_samples }} samples{% if filter_length_seconds is not none %} ({{ filter_length_seconds | round(3) }} s){% endif %}{% if filter_order is not none %}, corresponding to FIR order {{ filter_order }}{% endif %}.
 {% endif %}
-
 {% if kind == 'band-pass' %}
 The lower and upper transition bandwidths were {{ ltb | round(3) }} Hz and {{ htb | round(3) }} Hz, respectively.
 {% elif kind == 'high-pass' %}
@@ -110,7 +104,6 @@ The transition bandwidth was {{ htb | round(3) }} Hz.
 {% elif kind == 'band-stop' %}
 The two transition bandwidths were {{ ltb | round(3) }} Hz and {{ htb | round(3) }} Hz.
 {% endif %}
-
 {% if cut_low is not none and cut_high is not none %}
 The −6 dB cutoff frequencies were {{ cut_low | round(3) }} Hz and {{ cut_high | round(3) }} Hz, located at the midpoints of the lower and upper transition bands.
 {% elif cut_low is not none %}
@@ -118,16 +111,13 @@ The −6 dB cutoff frequency was {{ cut_low | round(3) }} Hz, located at the mid
 {% elif cut_high is not none %}
 The −6 dB cutoff frequency was {{ cut_high | round(3) }} Hz, located at the midpoint of the transition band.
 {% endif %}
-
 {% elif method == 'iir' %}
 The infinite impulse response (IIR) filter was a {{ iir_name }} filter{% if iir_order is not none %} of order {{ iir_order }}{% endif %}.
-
 {% if phase in ['zero', 'zero-double'] %}
 The filter was applied forward and backward, resulting in zero-phase, non-causal filtering.
 {% elif phase == 'forward' %}
 The filter was applied once in the forward direction, resulting in causal filtering.
 {% endif %}
-
 {% if kind == 'band-pass' %}
 The cutoff frequencies were {{ lf }} Hz and {{ hf }} Hz.
 {% elif kind == 'band-stop' %}
@@ -138,7 +128,6 @@ The cutoff frequency was {{ lf }} Hz.
 The cutoff frequency was {{ hf }} Hz.
 {% endif %}
 {% endif %}
-
 Filter design and reporting followed recommended practices for electrophysiological data
 ({{ ref('Widmann2015', 'Widmann, A., Schröger, E., & Maess, B. (2015). Digital filter design for electrophysiological data: A practical approach. Journal of Neuroscience Methods, 250, 34–46. doi:10.1016/j.jneumeth.2014.08.002') }},
 {{ ref('Keil2014', 'Keil, A., Debener, S., Gratton, G., Junghöfer, M., Kappenman, E. S., Luck, S. J., Luu, P., Miller, G. A., & Yee, C. M. (2014). Committee report: Publication guidelines and recommendations for studies using EEG and MEG. Psychophysiology, 51(1), 1–21. https://doi.org/10.1111/psyp.12147') }}).
