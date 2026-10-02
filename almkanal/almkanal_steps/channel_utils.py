@@ -12,9 +12,10 @@ def run_maxwell(
     raw: mne.io.Raw,
     coord_frame: str = 'head',
     destination: None | ArrayLike = None,
-    calibration_file: None | str = None,
-    cross_talk_file: None | str = None,
+    calibration_file: None | bool | str = None,
+    cross_talk_file: None | bool | str = None,
     st_duration: float | None = None,
+    st_correlation: float = 0.98
 ) -> mne.io.Raw:
     """
     Perform Maxwell filtering on raw MEG data.
@@ -55,6 +56,7 @@ def run_maxwell(
         calibration=calibration_file,
         cross_talk=cross_talk_file,
         coord_frame=coord_frame,
+        st_correlation=st_correlation,
         destination=destination,
     )
 
@@ -79,13 +81,26 @@ class Maxwell(AlmKanalStep):
     mw_destination : array-like | None, default=None
         Destination head position used during Maxwell filtering. ``None`` keeps the
         destination behavior defined by the underlying Maxwell-filtering routine.
-    mw_calibration_file : str | None, default=None
-        Path to the fine-calibration file used during Maxwell filtering.
-    mw_cross_talk_file : str | None, default=None
-        Path to the cross-talk compensation file used during Maxwell filtering.
     mw_st_duration : float | None, default=None
         Temporal Signal Space Separation (tSSS) buffer duration, in seconds.
         ``None`` disables temporal SSS.
+    mw_calibration_file : str | bool | None, default=None
+        Fine-calibration information passed to Maxwell filtering. A path
+        specifies an external calibration file. With ``None``, calibration
+        embedded in ``data.info`` is used when available. ``True`` requires
+        embedded calibration information, whereas ``False`` disables fine
+        calibration.
+
+    mw_cross_talk_file : str | bool | None, default=None
+        Cross-talk compensation passed to Maxwell filtering. A path specifies
+        an external cross-talk file. With ``None``, cross-talk information
+        embedded in ``data.info`` is used when available. ``True`` requires
+        embedded cross-talk information, whereas ``False`` disables it.
+
+    mw_st_correlation : float, default=0.98
+        Correlation threshold used by temporal Signal Space Separation (tSSS).
+        Only relevant when ``mw_st_duration`` is not ``None``.
+
 
     Notes
     -----
@@ -118,15 +133,23 @@ class Maxwell(AlmKanalStep):
 
     mw_coord_frame: str = 'head'
     mw_destination: None | ArrayLike = None
-    mw_calibration_file: None | str = None
-    mw_cross_talk_file: None | str = None
+    mw_calibration_file: str | bool | None = None
+    mw_cross_talk_file: str | bool | None = None
     mw_st_duration: float | None = None
+    mw_st_correlation: float = 0.98
 
     def run(
         self,
         data: mne.io.BaseRaw,
         info: AlmKanalInfo,
     ) -> dict:
+        calibration_applied = self.mw_calibration_file is not False and (
+            self.mw_calibration_file is not None or data.info.get('fine_calibration') is not None
+        )
+
+        cross_talk_applied = self.mw_cross_talk_file is not False and (
+            self.mw_cross_talk_file is not None or data.info.get('cross_talk') is not None
+        )
         raw_max = run_maxwell(
             raw=data,
             coord_frame=self.mw_coord_frame,
@@ -134,6 +157,7 @@ class Maxwell(AlmKanalStep):
             calibration_file=self.mw_calibration_file,
             cross_talk_file=self.mw_cross_talk_file,
             st_duration=self.mw_st_duration,
+            st_correlation=self.mw_st_correlation,
         )
 
         return {
@@ -144,6 +168,9 @@ class Maxwell(AlmKanalStep):
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
+                'st_correlation': self.mw_st_correlation,
+                'calibration_applied': calibration_applied,
+                'cross_talk_applied': cross_talk_applied,
             },
         }
 
