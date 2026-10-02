@@ -208,17 +208,22 @@ class SourceReconstruction(AlmKanalStep):
         result['extra_data'] = spatial_info.get('extra_data')
         if isinstance(data, mne.BaseEpochs):
             result['metadata'] = data.metadata
+
+        effective_label_mode = None
+        if self.return_parc:
+            effective_label_mode = 'auto' if src.kind == 'volume' else self.label_mode
         return {
             'data': result,
             'stc_info': {
-                'orig_data_type': 'raw' if isinstance(data, mne.io.BaseRaw) else 'epochs',
+                # methodological settings
+                'orig_data_type': ('raw' if isinstance(data, mne.io.BaseRaw) else 'epochs'),
+                'morph2fsaverage': self.morph2fsaverage,
+                'return_parc': self.return_parc,
+                'atlas': self.atlas if self.return_parc else None,
+                'effective_label_mode': effective_label_mode,
+                # provenance
                 'subject_id': subject_id,
-                'subjects_dir': subjects_dir,
-                'label_mode': self.label_mode,
-                'effective_label_mode': (
-                    ('auto' if src.kind == 'volume' else self.label_mode) if self.return_parc else None
-                ),
-                'atlas': self.atlas,
+                'subjects_dir': str(subjects_dir),
                 'source': src.kind,
             },
         }

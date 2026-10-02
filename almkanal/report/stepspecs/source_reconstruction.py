@@ -57,16 +57,17 @@ def spatial_filter_spec() -> StepSpec:
 
 
 def _select_source_recon(info: dict[str, Any]) -> dict[str, Any]:
-    return {
-        'orig_data_type': info.get('orig_data_type'),
-        'source': info.get('source'),  # "surface"|"volume" if you log it here
-        'atlas': info.get('atlas'),  # e.g., "glasser" (HCP-MMP1)
-        'label_mode': info.get('label_mode'),  # e.g., "pca_flip"
-        'subjects_dir': info.get('subjects_dir'),
-        #'subject_id': info.get('subject_id'),
-        # optional: number of labels if you log it
-        'n_labels': info.get('n_labels'),
+    settings = {
+        'orig_data_type': info['orig_data_type'],
+        'morph2fsaverage': info['morph2fsaverage'],
+        'return_parc': info['return_parc'],
     }
+
+    if info['return_parc']:
+        settings['atlas'] = info['atlas']
+        settings['effective_label_mode'] = info['effective_label_mode']
+
+    return settings
 
 
 @register_step('SourceReconstruction')

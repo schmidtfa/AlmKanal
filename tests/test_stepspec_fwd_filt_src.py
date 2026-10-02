@@ -78,17 +78,47 @@ def test_spatial_filter_selection_extracts_cov_and_norm() -> None:
 def test_source_reconstruction_selection_extracts_parcellation() -> None:
     load_stepspec_package('almkanal.report.stepspecs')
     spec = get_registry()['SourceReconstruction']
+
     info = {
         'orig_data_type': 'raw',
-        'source': 'surface',
+        'morph2fsaverage': True,
+        'return_parc': True,
         'atlas': 'glasser',
-        'label_mode': 'pca_flip',
-        'subjects_dir': '/subjects',
+        'effective_label_mode': 'pca_flip',
+
+        # provenance only
         'subject_id': 'fsaverage',
-        'n_labels': 360,
+        'subjects_dir': '/tmp/freesurfer',
+        'source': 'surface',
     }
+
     out = spec.settings_fn(info)
-    assert out['atlas'] == 'glasser'
-    assert out['label_mode'] == 'pca_flip'
-    assert out['n_labels'] == 360
+
+    assert out == {
+        'orig_data_type': 'raw',
+        'morph2fsaverage': True,
+        'return_parc': True,
+        'atlas': 'glasser',
+        'effective_label_mode': 'pca_flip',
+    }
+
     json.dumps(out)
+
+
+def test_source_reconstruction_omits_parcellation_settings_when_disabled() -> None:
+    load_stepspec_package('almkanal.report.stepspecs')
+    spec = get_registry()['SourceReconstruction']
+
+    info = {
+        'orig_data_type': 'epochs',
+        'morph2fsaverage': False,
+        'return_parc': False,
+        'atlas': None,
+        'effective_label_mode': None,
+    }
+
+    assert spec.settings_fn(info) == {
+        'orig_data_type': 'epochs',
+        'morph2fsaverage': False,
+        'return_parc': False,
+    }
