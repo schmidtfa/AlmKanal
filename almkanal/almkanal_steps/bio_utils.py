@@ -1,9 +1,10 @@
 import mne
 import neurokit2 as nk
 import numpy as np
-from attrs import define
+from attrs import define, field
 
 from almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 def run_bio_preproc(
@@ -92,34 +93,62 @@ def run_bio_preproc(
 
 @define
 class PhysioCleaner(AlmKanalStep):
+    """Preprocess physiological signals in a continuous MNE recording.
+
+    ``PhysioCleaner`` extracts selected ECG, respiratory, EOG, and EMG channels
+    from a continuous recording and preprocesses them using
+    :func:`run_bio_preproc`. The resulting data contain the cleaned physiological
+    signals together with stimulus channels retained from the original recording.
+
+    Parameters
+    ----------
+    ecg : str | list | None, default=None
+        ECG channel or channels to preprocess. ``None`` disables ECG
+        preprocessing.
+    resp : str | list | None, default=None
+        Respiratory channel or channels to preprocess. ``None`` disables
+        respiratory preprocessing.
+    eog : str | list | None, default=None
+        EOG channel or channels to preprocess. ``None`` disables EOG
+        preprocessing.
+    emg : str | list | None, default=None
+        EMG channel or channels to preprocess. ``None`` disables EMG
+        preprocessing.
+
+    Notes
+    -----
+    Physiological preprocessing is delegated to :func:`run_bio_preproc`, which
+    uses NeuroKit2 to process the selected signals.
+
+    The processed recording returned by :meth:`run` is stored under ``'data'``.
+    It contains the physiological outputs produced by the preprocessing routine
+    together with the stimulus channels retained from the original recording.
+
+    Processing metadata are stored under ``'physio_info'``. The current metadata
+    include the sampling frequency and signal-specific preprocessing information
+    for ECG, EOG, and EMG processing.
+
+    ``PhysioCleaner`` can occur only once in a pipeline and is intended to run
+    before forward modelling, spatial filtering, and source reconstruction.
+
+    The step currently does not add content to the MNE report.
+
+    See Also
+    --------
+    run_bio_preproc
+        Preprocess the selected physiological channels.
+    """
+
     ecg: None | str | list = None
     resp: None | str | list = None
     eog: None | str | list = None
     emg: None | str | list = None
 
-    def run(self, data: mne.io.BaseRaw, info: dict) -> mne.io.Raw:
-        """
-        Preprocess physiological signals (ECG, EOG, RESP, EMG) in an MNE raw object.
+    must_be_before: tuple = ('ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
 
-        This method extracts specified physiological channels, preprocesses them using `neurokit2`,
-        and returns a new raw object containing the cleaned physiological data along with stimulus channels.
-
-        Parameters
-        ----------
-        ecg : str | list | None, optional
-            Name(s) of the ECG channel(s) to preprocess. Defaults to None.
-        resp : str | list | None, optional
-            Name(s) of the respiratory channel(s) to preprocess. Defaults to None.
-        eog : str | list | None, optional
-            Name(s) of the EOG channel(s) to preprocess. Defaults to None.
-        emg : str | list | None, optional
-            Name(s) of the EMG channel(s) to preprocess. Defaults to None.
-
-        Returns
-        -------
-        mne.io.Raw
-            A new raw object containing the preprocessed physiological signals and stimulus channels.
-        """
+    def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> dict:
         data = run_bio_preproc(
             raw=data,
             ecg=self.ecg,
@@ -158,5 +187,6 @@ class PhysioCleaner(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        pass  # maybe let this function plot ECG ERP etc.
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
+        pass
+        # maybe let this function plot ECG ERP etc.

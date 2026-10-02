@@ -14,6 +14,7 @@ from scipy.io import wavfile
 from almkanal import EpochTRF, TRFSpanSpec
 from almkanal.almkanal_steps import trf_utils
 from almkanal.stim_utils.audio_utils import prepare_audio
+from almkanal.info import AlmKanalInfo
 
 
 @pytest.fixture
@@ -122,7 +123,7 @@ def test_recorded_audio_takes_precedence_over_assumed_drift(timing_data) -> None
         audio_channels=['recorded'], realign_without_audio=True,
         epoch_len_s=1, hw_delay_s=0, verbose=False,
     )
-    result = step.run(timing_data['raw'], {})
+    result = step.run(timing_data['raw'], AlmKanalInfo())
     assert result['TRF_info']['alignment_method'] == 'audio'
     assert result['data'].metadata['alignment_method'].eq('audio').all()
     assert result['data'].metadata['clock_slope'].eq(1.2).all()
@@ -132,7 +133,7 @@ def test_recorded_audio_takes_precedence_over_assumed_drift(timing_data) -> None
         {'missing': (1634, 4134)}, wav_by_label={'missing': 'missing.wav'},
     )
     with pytest.raises(RuntimeError, match='Audio alignment failed'):
-        step.run(timing_data['raw'], {})
+        step.run(timing_data['raw'], AlmKanalInfo())
 
 
 def test_alignment_disabled_retains_fixed_delay_processing(timing_data, monkeypatch) -> None:
@@ -159,10 +160,10 @@ def test_failed_alignment_can_raise_or_skip(timing_data) -> None:
         hw_delay_s=0, epoch_len_s=1, verbose=False,
     )
     with pytest.raises(RuntimeError, match='Audio alignment failed for missing'):
-        step.run(timing_data['raw'], {})
+        step.run(timing_data['raw'], AlmKanalInfo())
     step.on_alignment_error = 'skip'
     with pytest.warns(UserWarning, match='Skipping audio trial missing'):
-        result = step.run(timing_data['raw'], {})
+        result = step.run(timing_data['raw'], AlmKanalInfo())
     alignment = result['TRF_info']['alignment_info']
     assert alignment['n_trials_found'] == 2
     assert alignment['n_trials_failed'] == 1
@@ -239,11 +240,11 @@ def test_default_advances_only_meg_and_negative_delay_warns(meg_pulse_data, feat
     assert step.hw_delay_s == 0.0165
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
-        advanced = step.run(raw, {})
-        reference = attrs.evolve(step, hw_delay_s=0).run(raw, {})
+        advanced = step.run(raw, AlmKanalInfo())
+        reference = attrs.evolve(step, hw_delay_s=0).run(raw, AlmKanalInfo())
     assert not any('hw_delay_s' in str(warning.message) for warning in caught)
     with pytest.warns(UserWarning, match='Negative hw_delay_s delays') as caught_negative:
-        delayed = attrs.evolve(step, hw_delay_s=-0.0165).run(raw, {})
+        delayed = attrs.evolve(step, hw_delay_s=-0.0165).run(raw, AlmKanalInfo())
     assert len(caught_negative) == 1
 
     expected_feature = prepare_audio(str(meg_pulse_data['wav']), feature=feature, target_fs=2000)[0][0, :8000]

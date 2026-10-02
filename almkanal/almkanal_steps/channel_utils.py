@@ -1,10 +1,11 @@
 import mne
 import numpy as np
-from attrs import define
+from attrs import define, field
 from autoreject import Ransac
 from numpy.typing import ArrayLike
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
 
 
 def run_maxwell(
@@ -62,8 +63,58 @@ def run_maxwell(
 
 @define
 class Maxwell(AlmKanalStep):
+    """Apply Maxwell filtering to a continuous raw MEG recording.
+
+    ``Maxwell`` applies Signal Space Separation (SSS) and, optionally, temporal
+    Signal Space Separation (tSSS) to a single :class:`mne.io.BaseRaw` recording.
+
+    The step can also transform the data to a specified destination head position
+    and use system-specific fine-calibration and cross-talk compensation files.
+
+    Parameters
+    ----------
+    mw_coord_frame : str, default='head'
+        Coordinate frame used for Maxwell filtering. Typically ``'head'`` or
+        ``'meg'``.
+    mw_destination : array-like | None, default=None
+        Destination head position used during Maxwell filtering. ``None`` keeps the
+        destination behavior defined by the underlying Maxwell-filtering routine.
+    mw_calibration_file : str | None, default=None
+        Path to the fine-calibration file used during Maxwell filtering.
+    mw_cross_talk_file : str | None, default=None
+        Path to the cross-talk compensation file used during Maxwell filtering.
+    mw_st_duration : float | None, default=None
+        Temporal Signal Space Separation (tSSS) buffer duration, in seconds.
+        ``None`` disables temporal SSS.
+
+    Notes
+    -----
+    The input must be a continuous :class:`mne.io.BaseRaw` object. Maxwell
+    filtering is performed through :func:`run_maxwell` using the configured
+    coordinate frame, destination, calibration file, cross-talk file, and tSSS
+    settings.
+
+    The processed raw object is returned under ``'data'``.
+
+    The processing metadata returned by :meth:`run` is stored under
+    ``'maxwell_info'`` and contains the effective coordinate frame, destination,
+    calibration file, cross-talk file, and tSSS duration.
+
+    ``Maxwell`` can occur only once in a pipeline and is intended to run before
+    ICA, forward modelling, spatial filtering, and source reconstruction.
+
+    See Also
+    --------
+    run_maxwell
+        Apply Maxwell filtering to a raw MEG recording.
+    MultiBlockMaxwell
+        Apply Maxwell filtering to multiple recording blocks before concatenating
+        them.
+    """
+
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
 
     mw_coord_frame: str = 'head'
     mw_destination: None | ArrayLike = None
@@ -74,32 +125,8 @@ class Maxwell(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
-        """
-        Apply Maxwell filtering to the raw MEG data.
-
-        Parameters
-        ----------
-        mw_coord_frame : str, optional
-            Coordinate frame for Maxwell filtering ('head' or 'meg'). Defaults to 'head'.
-        mw_destination : str | None, optional
-            Destination coordinate frame for alignment. Defaults to None.
-        mw_calibration_file : str | None, optional
-            Path to the calibration file. Defaults to None.
-        mw_cross_talk_file : str | None, optional
-            Path to the cross-talk file. Defaults to None.
-        mw_st_duration : int | None, optional
-            Duration (in seconds) for tSSS (temporal Signal Space Separation). Defaults to None.
-
-        Returns
-        -------
-        None
-        """
-
-        # this should do maxwell filtering
-        # should only be possible on raw data and only if no other preprocessing apart from filtering was done
-
         raw_max = run_maxwell(
             raw=data,
             coord_frame=self.mw_coord_frame,
@@ -120,14 +147,71 @@ class Maxwell(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.BaseRaw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
 
 
 @define
 class MultiBlockMaxwell(AlmKanalStep):
+    """Apply Maxwell filtering to multiple raw MEG recording blocks.
+
+    ``MultiBlockMaxwell`` applies Maxwell filtering independently to each raw MEG
+    block and then concatenates the filtered blocks into a single continuous
+    recording.
+
+    All blocks are transformed to a common destination position before
+    concatenation. If ``mw_destination`` is not provided, the destination is
+    computed from the median device-to-head translation across all input blocks.
+
+    Parameters
+    ----------
+    mw_coord_frame : str, default='head'
+        Coordinate frame used for Maxwell filtering. Typically ``'head'`` or
+        ``'meg'``.
+    mw_destination : array-like | None, default=None
+        Destination head position used during Maxwell filtering. If ``None``, a
+        common destination is derived by taking the median of the translation
+        components of ``info['dev_head_t']`` across all input blocks.
+    mw_calibration_file : str | None, default=None
+        Path to the fine-calibration file used by Maxwell filtering.
+    mw_cross_talk_file : str | None, default=None
+        Path to the cross-talk compensation file used by Maxwell filtering.
+    mw_st_duration : float | None, default=None
+        Temporal Signal Space Separation (tSSS) buffer duration, in seconds.
+        ``None`` disables temporal SSS.
+
+    Notes
+    -----
+    The input to :meth:`run` must be a list of :class:`mne.io.BaseRaw` objects.
+    Each block is Maxwell filtered separately using the same coordinate frame,
+    destination, calibration file, cross-talk file, and tSSS configuration.
+
+    When ``mw_destination`` is ``None``, the common destination is computed from
+    the median three-dimensional translation of the device-to-head transforms
+    across all blocks. This provides a shared head position to which all blocks
+    are aligned before concatenation.
+
+    After Maxwell filtering, the processed blocks are concatenated with
+    :func:`mne.concatenate_raws` and returned as a single continuous raw object.
+
+    The processing metadata returned by :meth:`run` is stored under
+    ``'maxwell_info'`` and contains the effective coordinate frame, destination,
+    calibration file, cross-talk file, and tSSS duration.
+
+    ``MultiBlockMaxwell`` can occur only once in a pipeline and is intended to run
+    before ICA, forward modelling, spatial filtering, and source reconstruction.
+
+    See Also
+    --------
+    run_maxwell
+        Apply Maxwell filtering to an individual raw recording.
+    mne.concatenate_raws
+        Concatenate the filtered raw blocks.
+    """
+
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
 
     mw_coord_frame: str = 'head'
     mw_destination: None | ArrayLike = None
@@ -138,36 +222,8 @@ class MultiBlockMaxwell(AlmKanalStep):
     def run(
         self,
         data: list[mne.io.BaseRaw],
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
-        """
-        Apply Maxwell filtering to the raw MEG data.
-
-        Parameters
-        ----------
-        mw_coord_frame : str, optional
-            Coordinate frame for Maxwell filtering ('head' or 'meg'). Defaults to 'head'.
-        mw_destination : str | None, optional
-            Destination coordinate frame for alignment. Defaults to None.
-        mw_calibration_file : str | None, optional
-            Path to the calibration file. Defaults to None.
-        mw_cross_talk_file : str | None, optional
-            Path to the cross-talk file. Defaults to None.
-        mw_st_duration : int | None, optional
-            Duration (in seconds) for tSSS (temporal Signal Space Separation). Defaults to None.
-
-        Returns
-        -------
-        None
-        """
-
-        # this should do maxwell filtering
-        # should only be possible on raw data and only if no other preprocessing apart from filtering was done
-        # block_pos_l = [raw.info["dev_head_t"]['trans'][:3, 3] for raw in data]
-
-        # blocks_pos = np.array(block_pos_l)
-        # all_distances = np.sqrt(blocks_pos[:,0]**2 + blocks_pos[:,1]**2 + blocks_pos[:,2]**2)
-        # mean_distance = np.median(all_distances)
         if self.mw_destination is None:
             block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
             destination = np.median(block_pos_l, axis=0)
@@ -200,14 +256,82 @@ class MultiBlockMaxwell(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.BaseRaw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_maxfiltered')
 
 
 @define
 class EEGRANSAC(AlmKanalStep):
+    """Detect and interpolate bad EEG channels using RANSAC.
+
+    ``EEGRANSAC`` uses :class:`autoreject.Ransac` to identify EEG channels whose
+    signals are poorly predicted from other EEG sensors. Continuous data are first
+    split into fixed-length epochs for RANSAC fitting. Channels identified as bad
+    are then marked in the original recording and interpolated using MNE.
+
+    Only EEG channels participate in RANSAC detection and interpolation. Existing
+    bad channels of other channel types are preserved and excluded from the
+    interpolation step.
+
+    Parameters
+    ----------
+    ransac_epoch_duration : int | float, default=4
+        Duration, in seconds, of the fixed-length epochs created from the
+        continuous recording for RANSAC fitting.
+    n_resample : int, default=50
+        Number of random sensor subsets used by RANSAC to estimate channel
+        predictability.
+    min_channels : float, default=0.25
+        Fraction of available EEG channels used for robust reconstruction during
+        each RANSAC resampling iteration.
+    min_corr : float, default=0.75
+        Minimum correlation between the measured and RANSAC-predicted signal for a
+        channel to be considered sufficiently predictable.
+    unbroken_time : float, default=0.4
+        Fraction of time for which a channel may fall below ``min_corr`` before it
+        is classified as bad.
+    n_jobs : int, default=1
+        Number of parallel jobs used by :class:`autoreject.Ransac`.
+    verbose : bool, default=False
+        Whether RANSAC should emit progress and diagnostic output.
+
+    Notes
+    -----
+    The continuous recording is segmented into fixed-length epochs solely for
+    RANSAC fitting. These temporary epochs are not returned and do not replace the
+    continuous pipeline data.
+
+    Only EEG channels are retained in the temporary RANSAC epochs. ECG, EOG, MEG,
+    and other channel types therefore do not contribute to the bad-channel
+    detection procedure.
+
+    Previously marked bad channels are preserved when the newly detected EEG bad
+    channels are added. During interpolation, previously bad non-EEG channels are
+    explicitly excluded so that this step only repairs EEG channels.
+
+    Interpolation is performed on the supplied raw object using
+    :meth:`mne.io.Raw.interpolate_bads`.
+
+    The processing metadata returned by :meth:`run` is stored under
+    ``'ransac_info'`` and contains the RANSAC epoch duration and effective RANSAC
+    configuration.
+
+    ``EEGRANSAC`` may occur multiple times in a pipeline and is intended to run
+    before ICA, forward modelling, spatial filtering, and source reconstruction.
+
+    See Also
+    --------
+    autoreject.Ransac
+        RANSAC implementation used for bad-channel detection.
+    mne.make_fixed_length_epochs
+        Create the temporary epochs used for RANSAC fitting.
+    mne.io.Raw.interpolate_bads
+        Interpolate channels marked as bad.
+    """
+
     must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = True
 
     ransac_epoch_duration: int | float = 4
     n_resample: int = 50
@@ -220,42 +344,8 @@ class EEGRANSAC(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
-        """
-        Apply RANSAC to discover bad EEG channels and interpolate them using autorejects methods.
-
-        Parameters
-        ----------
-        ransac_epoch_duration : int | float = 4
-            Number indicating the length of epochs in seconds that will be generated for the
-            continuous file to run RANSAC.
-
-        n_resample : int, optional
-            Number of times the sensors are resampled.
-
-        min_channels : float, optional
-            Fraction of sensors for robust reconstruction.
-
-        min_corr : float, optional
-            Cut-off correlation for abnormal wrt neighbours.
-
-        unbroken_time : float, optional
-            Cut-off fraction of time sensor can have poor RANSAC predictability.
-
-        n_jobs: int, optional
-            Number of parallel jobs.
-
-        verbose: bool, optional
-            The verbosity of progress messages. If False, suppress all output messages.
-
-
-
-        Returns
-        -------
-        None
-        """
-
         epo4ransac = mne.make_fixed_length_epochs(data, duration=self.ransac_epoch_duration)
         # NOTE: We only do this for eeg -> think if this is overall smart
         # So why not use picks from autoreject.Ransac -> I am not sure hwo this will handle eg. ECG or EOG signals
@@ -297,6 +387,7 @@ class EEGRANSAC(AlmKanalStep):
             'data': raw_ransac,
             'ransac_info': {
                 'ransac_epoch_duration': self.ransac_epoch_duration,
+                'bad_chs_eeg': bad_chs_eeg,
                 'n_resample': self.n_resample,
                 'min_channels': self.min_channels,
                 'min_corr': self.min_corr,
@@ -305,14 +396,85 @@ class EEGRANSAC(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.BaseRaw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_ransac')
 
 
 @define
 class ReReference(AlmKanalStep):
-    must_be_before: tuple = ('ICA', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
+    """Re-reference EEG, ECoG, sEEG, or DBS channels.
+
+    ``ReReference`` changes the reference of electrophysiological channels using
+    :meth:`mne.io.Raw.set_eeg_reference`. It supports references based on one or
+    more existing channels, average referencing, REST referencing, and explicit
+    per-channel reference mappings.
+
+    Parameters
+    ----------
+    ref_channels : str | list of str | dict, default='average'
+        Reference specification passed to
+        :meth:`mne.io.Raw.set_eeg_reference`.
+
+        Supported forms include:
+
+        - ``'average'`` to use the average of the selected channel type.
+        - ``'REST'`` to apply the Reference Electrode Standardization Technique.
+        - A channel name or list of channel names defining the reference.
+        - A dictionary mapping data-channel names to one or more reference
+        channels, allowing different references for individual channels.
+        - An empty list to leave the data unchanged.
+
+    projection : bool, default=False
+        Whether an average reference should be added as a projection rather than
+        applied directly to the data. When ``True`` with
+        ``ref_channels='average'``, the projection is added but is not immediately
+        applied. Other reference schemes require direct re-referencing.
+    ch_type : str | list of str, default='auto'
+        Channel type or types to re-reference. Supported types include ``'eeg'``,
+        ``'ecog'``, ``'seeg'``, and ``'dbs'``. With ``'auto'``, MNE selects the
+        first supported channel type present in the recording.
+    forward : mne.Forward | None, default=None
+        Forward solution used for REST referencing. Only relevant when
+        ``ref_channels='REST'``.
+    joint : bool, default=False
+        Whether multiple channel types specified by ``ch_type`` should share a
+        common reference. If ``False``, referencing is handled separately for each
+        channel type.
+    verbose : bool | str | int | None, default=False
+        Verbosity setting passed to :meth:`mne.io.Raw.set_eeg_reference`.
+
+    Notes
+    -----
+    Re-referencing is performed in place on the supplied raw object. The modified
+    object is returned under ``'data'``.
+
+    Except when adding an average-reference projection, the data must be preloaded
+    before the reference can be applied.
+
+    For average referencing, channels marked as bad in ``data.info['bads']`` are
+    excluded from the reference calculation by MNE.
+
+    REST referencing requires a suitable forward solution supplied through
+    ``forward``.
+
+    The processing metadata returned by :meth:`run` is stored under ``'ref_info'``
+    and contains the reference channels, projection setting, channel types,
+    forward solution, joint-reference setting, and verbosity configuration.
+
+    ``ReReference`` may occur multiple times in a pipeline and is intended to run
+    before forward modelling, spatial filtering, and source reconstruction.
+
+    See Also
+    --------
+    mne.io.Raw.set_eeg_reference
+        Change the reference of channels in a raw recording.
+    mne.set_eeg_reference
+        General MNE function for re-referencing Raw, Epochs, or Evoked data.
+    """
+
+    must_be_before: tuple = ('ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
+    allow_repeated: bool = True
 
     ref_channels: str | list[str] | dict = 'average'
     projection: bool = False
@@ -324,62 +486,8 @@ class ReReference(AlmKanalStep):
     def run(
         self,
         data: mne.io.BaseRaw,
-        info: dict,
+        info: AlmKanalInfo,
     ) -> dict:
-        """
-        Does ReReferencing of your EEG, ECoG or sEEG channels.
-        This is essentially a wrapper around mne.io.Raw.set_eeg_reference.
-        The documentation is copied from there.
-
-        Parameters
-        ----------
-        ref_channels: list of str | str | dict
-            Can be:
-            The name(s) of the channel(s) used to construct the reference for every channel of ch_type.
-
-            'average' to apply an average reference (default)
-
-            'REST' to use the Reference Electrode Standardization Technique infinity reference [4].
-
-            A dictionary mapping names of data channels to (lists of) names of reference channels.
-            For example, {‘A1’: ‘A3’} would replace the data in channel ‘A1’ with the difference between ‘A1’ and ‘A3’.
-            To take the average of multiple channels as reference,
-            supply a list of channel names as the dictionary value, e.g. {‘A1’: [‘A2’, ‘A3’]}
-            would replace channel A1 with A1 - mean(A2, A3).
-
-            An empty list, in which case MNE will not attempt any re-referencing of the data
-
-        projection: bool
-            If ref_channels='average' this argument specifies if the average reference should be
-            computed as a projection (True) or not (False; default).
-            If projection=True, the average reference is added as a projection and is not applied to the data
-            (it can be applied afterwards with the apply_proj method).
-            If projection=False, the average reference is directly applied to the data.
-            If ref_channels is not 'average',
-            projection must be set to False (the default in this case).
-
-        ch_typelist of str | str
-            The name of the channel type to apply the reference to. Valid channel types are 'auto', 'eeg', 'ecog',
-            'seeg', 'dbs'. If 'auto', the first channel type of eeg, ecog, seeg or dbs that is found
-            (in that order) will be selected.
-
-        forwardinstance of Forward | None
-            Forward solution to use. Only used with ref_channels='REST'.
-
-        jointbool
-            How to handle list-of-str ch_type. If False (default), one projector is created per channel type.
-            If True, one projector is created across all channel types. This is only used when projection=True.
-
-        verbosebool | str | int | None
-            Control verbosity of the logging output. If None, use the default verbosity level.
-            See the logging documentation and mne.verbose() for details. Should only be passed as a keyword argument.
-
-
-        Returns
-        -------
-        None
-        """
-
         reref = data.set_eeg_reference(
             ref_channels=self.ref_channels,
             projection=self.projection,
@@ -401,5 +509,5 @@ class ReReference(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.BaseRaw, report: mne.Report, info: AlmKanalInfo) -> None:
         report.add_raw(data, butterfly=False, psd=True, title='raw_reref')

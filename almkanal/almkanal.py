@@ -1,13 +1,12 @@
 # %%
 import json
-import warnings
-from collections import Counter
 from copy import deepcopy
 
 import mne
 from attrs import define, field
 
 from almkanal.data_utils.info_generator import build_json
+from almkanal.info import AlmKanalInfo, StepInfo
 
 
 # %%
@@ -17,6 +16,7 @@ class AlmKanalStep:
 
     must_be_before: tuple = field(default=None, init=False)
     must_be_after: tuple = field(default=None, init=False)
+    allow_repeated: bool = field(default=True, init=False)
 
     def _check_dependencies(self, steps: list['AlmKanalStep']) -> None:
         pre: list[AlmKanalStep] = []
@@ -63,14 +63,20 @@ class AlmKanalStep:
     def check_can_run(self, steps: list['AlmKanalStep']) -> None:
         self._check_dependencies(steps)
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
+        if not self.allow_repeated:
+            n_occurrences = sum(type(step) is type(self) for step in steps)
+
+            if n_occurrences > 1:
+                raise ValueError(f'{self.__class__.__name__} can only occur once in a pipeline.')
+
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
         """Apply the processing step to the given data.
 
         Child classes must implement this method.
         """
         raise NotImplementedError('Child classes should implement the apply() method.')
 
-    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: dict) -> None:
+    def reports(self, data: mne.io.BaseRaw | mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
         """
         Update the provided mne.Report object based on the current data.
 
@@ -79,9 +85,15 @@ class AlmKanalStep:
         """
         raise NotImplementedError('Child classes should implement the reports() method.')
 
+    def create_info(self, info: dict) -> StepInfo:
+        return StepInfo(
+            step=self.__class__.__name__,
+            info=info,
+        )
+
 
 @define
-class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(AlmKanalSteps)
+class AlmKanal:
     """
     Initializes the pipeline.
 
@@ -94,7 +106,7 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
 
     steps: list[AlmKanalStep] = field()
     pick_params: dict = field(default=None)
-    info: dict = field(init=False)
+    info: AlmKanalInfo = field(init=False)
 
     def __attrs_post_init__(self) -> None:
         # Validate ordering constraints for each step.
@@ -103,16 +115,16 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
             step.check_can_run(self.steps)
 
         # Save metadata about the steps.
-        self.info = {
-            'steps_order_valid': True,
-            'steps': [step.__class__.__name__ for step in self.steps],
-            'steps_info': {},  # This will be updated when the pipeline is run.
-        }
+        self.info = AlmKanalInfo(pick_params=deepcopy(self.pick_params))
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:  # noqa: C901, PLR0912
+    def run(  # noqa:  C901, PLR0912
+        self,
+        data: mne.io.BaseRaw | mne.BaseEpochs | list[mne.io.BaseRaw] | list[mne.BaseEpochs],
+    ) -> tuple[mne.io.BaseRaw | mne.BaseEpochs, mne.Report]:  # noqa: C901, PLR0912
         """Applies each preprocessing step in sequence and returns the processed data, along with a report."""
 
-        self.info['steps_info'] = {}
+        self.info.processing_history.clear()
+
         if isinstance(data, list):
             if not data:
                 raise ValueError('Input data list must not be empty.')
@@ -155,19 +167,19 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
                 data = data_list
 
         current_data = data
-        context: dict = {'Picks': self.pick_params}  # Shared context dictionary for passing extra info between steps.
+        # self.info = AlmKanalInfo(pick_params=deepcopy(self.pick_params))
         for step in self.steps:
-            result = step.run(current_data, deepcopy(context))
+            result = step.run(current_data, deepcopy(self.info))
             if not isinstance(result, dict) or 'data' not in result:
                 raise ValueError(f"Step {step.__class__.__name__} must return a dictionary with a 'data' key.")
             current_data = result['data']
-            # Extract extra information from the step's result and update the shared context.
+            # Store the processing information produced by the step.
             extra_info = {k: v for k, v in result.items() if k != 'data'}
-            context[step.__class__.__name__] = extra_info
+            self.info.add(step.create_info(extra_info))
+
             # Call the step's reports method, passing the updated context.
-            step.reports(current_data, report, context)
-        # Save the shared context in self.info.
-        self.info['steps_info'] = context
+            step.reports(current_data, report, self.info)
+
         return current_data, report
 
     def __call__(self, data: mne.io.BaseRaw | mne.BaseEpochs) -> mne.io.BaseRaw | mne.BaseEpochs:
@@ -183,18 +195,8 @@ class AlmKanal:  # TODO: Think about Thomas's smart idea of doing this AlmKanal(
         return:
          A dictionary containing all the settings used in the almkanal pipeline.
         """
-        repeated = [name for name, count in Counter(self.info['steps']).items() if count > 1]
 
-        if repeated:
-            warnings.warn(
-                'Repeated step names: '
-                f'{", ".join(repeated)}. '
-                'The current JSON format retains only the final result '
-                'for each step name, not the complete processing history.',
-                UserWarning,
-                stacklevel=2,
-            )
-        json_file = build_json(self.info, max_seq_elems=max_elements)
+        json_file = build_json(self.info.processing_history, max_seq_elems=max_elements)
 
         if path is not None:
             with open(path, 'w', encoding='utf-8') as f:  # noqa PTH123

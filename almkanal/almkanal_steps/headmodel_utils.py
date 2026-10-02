@@ -6,10 +6,53 @@ import matplotlib
 import matplotlib.pyplot as plt
 import mne
 import numpy as np
-from attrs import define
+from attrs import define, field
 from mne.coreg import Coregistration
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.info import AlmKanalInfo
+
+
+def _check_individual_headmodel(
+    subject_id: str,
+    subjects_dir: str | Path,
+) -> None:
+    """Check prerequisites for using an individual FreeSurfer head model."""
+    subject_dir = Path(subjects_dir) / subject_id
+    bem_dir = subject_dir / 'bem'
+
+    if not subject_dir.is_dir():
+        raise FileNotFoundError(f'FreeSurfer subject not found: {subject_dir}')
+
+    t1_file = subject_dir / 'mri' / 'T1.mgz'
+    if not t1_file.is_file():
+        raise FileNotFoundError(
+            f'FreeSurfer reconstruction for {subject_id} appears incomplete: ' f'{t1_file} is missing.'
+        )
+
+    required_surfaces = (
+        bem_dir / 'inner_skull.surf',
+        bem_dir / 'outer_skin.surf',
+    )
+
+    missing = [path for path in required_surfaces if not path.is_file()]
+
+    if missing:
+        missing_str = '\n'.join(f'  - {path}' for path in missing)
+
+        raise RuntimeError(
+            f'Individual MRI head modeling was requested for {subject_id}, '
+            'but the required BEM/head surfaces are missing.\n\n'
+            f'Missing files:\n{missing_str}\n\n'
+            'These surfaces must be generated before running AlmKanal. '
+            'A common way to create them is with FreeSurfer watershed BEM '
+            'generation, for example via:\n\n'
+            '    mne.bem.make_watershed_bem(...)\n\n'
+            'This requires a working FreeSurfer installation and license. '
+            'FreeSurfer may also be run externally, e.g. through '
+            'Apptainer/Singularity or a cluster job. AlmKanal does not '
+            'attempt to manage FreeSurfer execution automatically.'
+        )
 
 
 def compute_headmodel(
@@ -386,8 +429,6 @@ class ForwardModel(AlmKanalStep):
     subject_id: str
     subjects_dir: str | Path
     pick_dict: dict | None = None
-    must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
-    must_be_after: tuple = ('Maxwell', 'ICA')
     source: str = 'surface'
     redo_hdm: bool = True
     spacing: str = 'oct6'
@@ -398,12 +439,17 @@ class ForwardModel(AlmKanalStep):
     min_dist_src: float = 5.0
     meg: bool = True
     eeg: bool = False
+    redo_bem: bool = False
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
+    must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
+    must_be_after: tuple = ('Maxwell', 'ICA')
+    allow_repeated: bool = field(default=False, init=False)
+
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
         if self.source not in ('surface', 'volume'):
             raise ValueError("source must be 'surface' or 'volume'.")
 
-        pick_dict = self.pick_dict if self.pick_dict is not None else info.get('Picks')
+        pick_dict = self.pick_dict if self.pick_dict is not None else info.pick_params
         cache_id = f'{self.subject_id}_from_template' if self.use_template_mri else self.subject_id
 
         if self.eeg and np.size(self.bem_conductivity) == 1:
@@ -413,6 +459,13 @@ class ForwardModel(AlmKanalStep):
 
         fs_dir = Path(self.subjects_dir) / 'freesurfer'
         fs_dir.mkdir(parents=True, exist_ok=True)
+
+        if not self.use_template_mri:
+            _check_individual_headmodel(
+                subject_id=self.subject_id,
+                subjects_dir=fs_dir,
+            )
+
         mne.datasets.fetch_fsaverage(subjects_dir=fs_dir)
 
         # This is run to ensure that appropriate template files exist that we can use for morphing
@@ -491,8 +544,8 @@ class ForwardModel(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        fig = info['ForwardModel']['fwd_info']['coreg_fig']
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
+        fig = info.get_step_info('ForwardModel', required=True)['fwd_info']['coreg_fig']
         if fig is not None:
             report.add_figure(
                 fig=fig,
@@ -500,4 +553,4 @@ class ForwardModel(AlmKanalStep):
                 image_format='PNG',
                 caption='',
             )
-        report.add_forward(info['ForwardModel']['fwd_info']['fwd'], title='ForwardModel')
+        report.add_forward(info.get_step_info('ForwardModel', required=True)['fwd_info']['fwd'], title='ForwardModel')

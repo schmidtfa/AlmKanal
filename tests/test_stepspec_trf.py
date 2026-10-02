@@ -10,6 +10,7 @@ import pytest
 from almkanal import AlmKanal, preprocessing_report
 from almkanal.report.methods_context import build_context_from_files
 from almkanal.stim_utils.alignment_utils import summarize_alignments
+from almkanal.info import AlmKanalInfo, StepInfo
 
 
 def make_info(drifts: list[float], failures: int = 0) -> dict:
@@ -38,8 +39,16 @@ def make_info(drifts: list[float], failures: int = 0) -> dict:
 
 def write_pipeline_json(path: Path, info: dict) -> Path:
     pipeline = AlmKanal(steps=[])
-    pipeline.info = {'steps': ['EpochTRF'], 'steps_info': {'EpochTRF': {'TRF_info': info}}}
+
+    pipeline.info.add(
+        StepInfo(
+            step='EpochTRF',
+            info={'TRF_info': info},
+        )
+    )
+
     pipeline.generate_json(str(path))
+
     return path
 
 
@@ -50,7 +59,7 @@ def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: P
         write_pipeline_json(tmp_path / 'first.json', make_info(first, failures=2)),
         write_pipeline_json(tmp_path / 'second.json', make_info(second)),
     ]
-    exported = json.loads(files[0].read_text())['EpochTRF']['TRF_info']['alignment_info']
+    exported = json.loads(files[0].read_text())['processing_history'][0]['info']['TRF_info']['alignment_info']
     assert exported['trials'] == {'length': 75}
     assert exported['summary']['drift_us_per_s']['n'] == 75
     ctx = build_context_from_files(files)
@@ -116,7 +125,7 @@ def test_inference_counts_and_priors_survive_truncation_and_pool_separately(tmp_
         write_pipeline_json(tmp_path / 'second.json', second),
         write_pipeline_json(tmp_path / 'complete.json', make_info([800.0])),
     ]
-    exported = json.loads(files[0].read_text())['EpochTRF']['TRF_info']['alignment_info']
+    exported = json.loads(files[0].read_text())['processing_history'][0]['info']['TRF_info']['alignment_info']
     assert exported['trials'] == {'length': 75}
     assert exported['end_inference_drift_counts'] == {'499.0': 77}
     result = build_context_from_files(files).steps[0].results
@@ -163,13 +172,34 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         'train_freq': None, 'train_thresh': None,
         'components_dict': {'eog': [1, 2]},
     }
-    steps_info = {'ICA': {'ica_info': ica_info}}
-    epoch_step = {'EpochTRF': {'TRF_info': info}}
-    resample_step = {'Resample': {'resample_info': {'sfreq': 100.0}}}
-    for step in ([epoch_step, resample_step] if resample_after_epochs else [resample_step, epoch_step]):
-        steps_info.update(step)
+
     pipeline = AlmKanal(steps=[])
-    pipeline.info = {'steps': list(steps_info), 'steps_info': steps_info}
+
+    pipeline.info.add(
+        StepInfo(
+            step='ICA',
+            info={'ica_info': ica_info},
+        )
+    )
+
+    epoch_step = StepInfo(
+        step='EpochTRF',
+        info={'TRF_info': info},
+    )
+
+    resample_step = StepInfo(
+        step='Resample',
+        info={'resample_info': {'sfreq': 100.0}},
+    )
+
+    if resample_after_epochs:
+        pipeline.info.add(epoch_step)
+        pipeline.info.add(resample_step)
+    else:
+        pipeline.info.add(resample_step)
+        pipeline.info.add(epoch_step)
+
+
     path = tmp_path / 'pipeline.json'
     pipeline.generate_json(str(path))
     methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()

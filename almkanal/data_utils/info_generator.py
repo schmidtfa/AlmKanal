@@ -3,6 +3,8 @@ import importlib.util
 from pathlib import PurePath
 from typing import Any, no_type_check
 
+from almkanal.info import StepInfo
+
 # --- Optional NumPy import without try/except ---
 np: Any | None = None
 NUMPY_GENERIC: tuple[type, ...] = ()
@@ -17,9 +19,8 @@ _DROP = object()
 
 
 def build_json(  # noqa C901
-    raw_dict: dict,
+    processing_history: list[StepInfo],
     *,
-    restrict_to_steps: bool = True,
     max_seq_elems: int = 40,  # threshold AND summary length
 ) -> dict:
     """
@@ -82,12 +83,17 @@ def build_json(  # noqa C901
         return _DROP
 
     # Build subset (optionally ordered/filtered by `steps`)
-    si = raw_dict.get('steps_info', {}) or {}
-    items = [(s, si[s]) for s in (raw_dict.get('steps') or []) if s in si] if restrict_to_steps else list(si.items())
+    cleaned = []
 
-    cleaned = {}
-    for step, payload in items:
-        sp = sanitize(payload or {})
-        if sp is not _DROP:
-            cleaned[step] = sp
-    return cleaned
+    for step_info in processing_history:
+        payload = sanitize(step_info.info or {})
+
+        if payload is not _DROP:
+            cleaned.append(
+                {
+                    'step': step_info.step,
+                    'info': payload,
+                }
+            )
+
+    return {'processing_history': cleaned}

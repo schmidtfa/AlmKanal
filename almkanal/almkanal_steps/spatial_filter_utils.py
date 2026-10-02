@@ -5,10 +5,11 @@ from pathlib import Path
 
 import mne
 import numpy as np
-from attrs import define
+from attrs import define, field
 
 from almkanal import AlmKanalStep
 from almkanal.almkanal_steps.channel_utils import run_maxwell
+from almkanal.info import AlmKanalInfo, StepInfo
 
 
 # %%
@@ -72,7 +73,7 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
 def preproc_empty_room(  # noqa: C901
     raw_er: mne.io.Raw,
     data: mne.io.Raw | mne.Epochs,
-    preproc_info: dict,
+    preproc_info: list[StepInfo],
     picks: list[str] | None,
 ) -> mne.io.Raw:
     """
@@ -100,59 +101,34 @@ def preproc_empty_room(  # noqa: C901
     if picks is not None:
         raw_er.pick(picks)
 
-    if 'Maxwell' in preproc_info:
-        if isinstance(data, mne.BaseEpochs):
-            raw = mne.io.RawArray(np.zeros((len(data.ch_names), 1)), info=data.info)
-        elif isinstance(data, mne.io.BaseRaw):
-            raw = data
+    replay_steps = [step for step in preproc_info if step.step in {'Maxwell', 'Filter', 'Resample', 'ICA'}]
 
-        raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
-        raw_er = run_maxwell(raw_er, **preproc_info['Maxwell']['maxwell_info'])
+    for step in replay_steps:
+        if step.step == 'Maxwell':
+            maxwell_info = step.info['maxwell_info']
+            if isinstance(data, mne.BaseEpochs):
+                raw = mne.io.RawArray(np.zeros((len(data.ch_names), 1)), info=data.info)
+            else:
+                raw = data
 
-    highpass_diff = not np.isclose(
-        data.info['highpass'],
-        raw_er.info['highpass'],
-        atol=0.01,
-    )
+            raw_er = mne.preprocessing.maxwell_filter_prepare_emptyroom(raw_er=raw_er, raw=raw)
+            raw_er = run_maxwell(raw_er, **maxwell_info)
 
-    lowpass_diff = not np.isclose(
-        data.info['lowpass'],
-        raw_er.info['lowpass'],
-        atol=0.01,
-    )
+        elif step.step == 'Filter':
+            filter_info = step.info['filter_info'].copy()
+            raw_er.filter(**filter_info)
 
-    if highpass_diff and lowpass_diff:
-        raw_er.filter(
-            l_freq=data.info['highpass'],
-            h_freq=data.info['lowpass'],
-        )
+        elif step.step == 'Resample':
+            resample_info = step.info['resample_info'].copy()
+            raw_er.resample(**resample_info)
 
-    elif highpass_diff:
-        raw_er.filter(
-            l_freq=data.info['highpass'],
-            h_freq=None,
-        )
+        elif step.step == 'ICA':
+            ica_info = step.info['ica_info']
 
-    elif lowpass_diff:
-        raw_er.filter(
-            l_freq=None,
-            h_freq=data.info['lowpass'],
-        )
-
-    if not np.isclose(
-        data.info['sfreq'],
-        raw_er.info['sfreq'],
-        atol=0.01,
-    ):
-        raw_er.resample(data.info['sfreq'])
-
-    if 'ICA' in preproc_info:
-        ica_info = preproc_info['ICA']['ica_info']
-
-        if not ica_info.get('fit_only', False):
-            ica = ica_info['ica'].copy()
-            ica.exclude = list(ica_info.get('applied_exclude', ica.exclude))
-            ica.apply(raw_er)
+            if not ica_info.get('fit_only', False):
+                ica = ica_info['ica'].copy()
+                ica.exclude = list(ica_info.get('applied_exclude', ica.exclude))
+                ica.apply(raw_er)
 
     return raw_er
 
@@ -161,7 +137,7 @@ def process_empty_room(
     data: mne.io.BaseRaw | mne.BaseEpochs,
     info: mne.Info,
     picks: list[str] | None,
-    preproc_info: dict,
+    preproc_info: list[StepInfo],
     empty_room: str | mne.io.BaseRaw,
     get_nearest: bool = False,
 ) -> tuple[dict, mne.Covariance]:
@@ -218,7 +194,7 @@ def comp_spatial_filters(
     data: mne.io.BaseRaw | mne.BaseEpochs,
     fwd: mne.Forward,
     pick_dict: dict | None,
-    preproc_info: dict,
+    preproc_info: list[StepInfo],
     data_cov: None | mne.Covariance = None,
     noise_cov: None | mne.Covariance = None,
     empty_room: None | str | mne.io.BaseRaw = None,
@@ -332,6 +308,85 @@ def comp_spatial_filters(
 
 @define
 class SpatialFilter(AlmKanalStep):
+    """Compute LCMV spatial filters for source reconstruction.
+
+    ``SpatialFilter`` computes data and noise covariance matrices as needed and
+    constructs an LCMV beamformer for subsequent source reconstruction. The
+    forward model and channel-selection parameters can either be supplied
+    directly or obtained from preceding pipeline configuration.
+
+    If an empty-room recording is used to estimate the noise covariance, the
+    relevant preprocessing history is passed along so that compatible
+    preprocessing can be applied to the empty-room data before covariance
+    estimation.
+
+    Parameters
+    ----------
+    fwd : mne.Forward | None, default=None
+        Forward model used to construct the spatial filter. If ``None``, the
+        forward solution produced by a preceding ``ForwardModel`` step is used.
+    pick_dict : dict | None, default=None
+        Channel-selection parameters used for spatial filtering. If ``None``,
+        the pipeline-level ``pick_params`` stored in :class:`AlmKanalInfo` are
+        used. A value must be available from one of these sources.
+    data_cov : mne.Covariance | None, default=None
+        Precomputed data covariance matrix. If ``None``, it is computed from
+        the input data.
+    noise_cov : mne.Covariance | None, default=None
+        Precomputed noise covariance matrix. If provided, it is used directly.
+        Otherwise, a covariance can be derived from ``empty_room`` or, when no
+        empty-room data are supplied, according to the fallback behaviour of
+        :func:`comp_spatial_filters`.
+    empty_room : str | mne.io.BaseRaw | None, default=None
+        Empty-room recording used to estimate the noise covariance. May be a
+        path to a recording or an already loaded :class:`mne.io.BaseRaw`
+        instance.
+    nearest_empty_room : bool, default=False
+        Whether an empty-room recording nearest in acquisition date should be
+        selected when resolving empty-room data.
+    chans2keep : list of str | None, default=None
+        Channels to preserve separately before spatial-filter channel selection,
+        for example stimulus features, ECG, EOG, or eye-tracking channels.
+        Their data are stored in the returned spatial-filter metadata.
+    lcmv_reg : float, default=0.05
+        Regularization parameter passed to the LCMV beamformer computation.
+    lcmv_pick_ori : str | None, default='max-power'
+        Source-orientation selection passed to the LCMV beamformer.
+    lcmv_weight_norm : str | None, default='nai'
+        Weight-normalization method passed to the LCMV beamformer.
+    lcmv_reduce_rank : bool, default=False
+        Whether to reduce the rank during LCMV filter construction.
+
+    Notes
+    -----
+    ``pick_dict`` takes precedence over pipeline-level ``pick_params``. If
+    neither is available, :meth:`run` raises a :class:`ValueError`.
+
+    Likewise, an explicitly supplied ``fwd`` takes precedence over the forward
+    model stored by a preceding ``ForwardModel`` step.
+
+    The input data are returned unchanged. Computed spatial-filter information
+    is stored under ``'spatial_filter_info'`` and contains the beamformer
+    filters, effective LCMV settings, data covariance, noise covariance, and any
+    channels preserved through ``chans2keep``.
+
+    When empty-room data are used, the pipeline's ordered processing history is
+    passed to the empty-room preprocessing machinery so that relevant previous
+    preprocessing steps can be replayed before estimating the noise covariance.
+
+    ``SpatialFilter`` is intended to precede ``SourceReconstruction`` and can
+    occur only once in a pipeline.
+
+    See Also
+    --------
+    comp_spatial_filters
+        Compute the covariance matrices and LCMV beamformer.
+    SourceReconstruction
+        Apply the resulting spatial filters to reconstruct source activity.
+    ForwardModel
+        Produce the forward solution used for spatial filtering.
+    """
+
     fwd: mne.Forward | None = None
     pick_dict: dict | None = None
     data_cov: None | mne.Covariance = None
@@ -350,33 +405,13 @@ class SpatialFilter(AlmKanalStep):
         'ICA',
         'ForwardModel',
     )
+    allow_repeated: bool = field(default=False, init=False)
 
-    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: dict) -> dict:
-        """
-        Compute spatial filters for source projection using LCMV beamformers.
-
-        Parameters
-        ----------
-        fwd : mne.Forward | None, optional
-            The forward model. Defaults to None.
-        data_cov : NDArray | None, optional
-            Data covariance matrix. Defaults to None.
-        noise_cov : NDArray | None, optional
-            Noise covariance matrix. Defaults to None.
-        empty_room : str | mne.io.Raw | None, optional
-            Path to or preloaded empty room recording. Defaults to None.
-        get_nearest_empty_room : bool, optional
-            Whether to find the nearest empty room recording. Defaults to False.
-
-        Returns
-        -------
-        None
-        """
-
+    def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
         pick_dict = self.pick_dict
 
         if pick_dict is None:
-            pick_dict = info['Picks']
+            pick_dict = info.pick_params
 
         if pick_dict is None:
             raise ValueError('pick_dict must be provided for spatial filtering.')
@@ -387,7 +422,7 @@ class SpatialFilter(AlmKanalStep):
         fwd = self.fwd
 
         if fwd is None:
-            fwd = info['ForwardModel']['fwd_info']['fwd']
+            fwd = info.get_step_info('ForwardModel', required=True)['fwd_info']['fwd']
 
         filters, lcmv_settings, noise_cov, data_cov = comp_spatial_filters(
             data=data,
@@ -395,7 +430,7 @@ class SpatialFilter(AlmKanalStep):
             pick_dict=pick_dict,
             data_cov=self.data_cov,
             noise_cov=self.noise_cov,
-            preproc_info=info,
+            preproc_info=info.processing_history,
             empty_room=self.empty_room,
             nearest_empty_room=self.nearest_empty_room,
             lcmv_reg=self.lcmv_reg,
@@ -414,8 +449,8 @@ class SpatialFilter(AlmKanalStep):
             },
         }
 
-    def reports(self, data: mne.io.Raw, report: mne.Report, info: dict) -> None:
-        spatial_info = info['SpatialFilter']['spatial_filter_info']
+    def reports(self, data: mne.io.Raw, report: mne.Report, info: AlmKanalInfo) -> None:
+        spatial_info = info.get_step_info('SpatialFilter', required=True)['spatial_filter_info']
 
         report.add_covariance(
             spatial_info['data_cov'],
