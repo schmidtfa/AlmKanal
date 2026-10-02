@@ -3,7 +3,6 @@
 Linearly constrained minimum variance (LCMV) beamformer spatial filters
 ({{ ref('VanVeen1997', 'Van Veen, B. D., van Drongelen, W., Yuchtman, M., & Suzuki, A. (1997). Localization of brain electrical activity via linearly constrained minimum variance spatial filtering. IEEE Transactions on Biomedical Engineering, 44(9), 867–880. doi:10.1109/10.623056') }})
 were computed using MNE-Python.
-
 {% if s.settings.data_cov_source == 'continuous' %}
 The data covariance matrix was estimated from the continuous recording using automatic covariance estimation.
 {% elif s.settings.data_cov_source == 'epoched' %}
@@ -11,7 +10,6 @@ The data covariance matrix was estimated from the epoched data using automatic c
 {% elif s.settings.data_cov_source == 'provided' %}
 A precomputed data covariance matrix was used.
 {% endif %}
-
 {% if s.settings.noise_cov_source == 'empty_room' %}
 The noise covariance matrix was estimated from a preprocessed empty-room recording.
 {% elif s.settings.noise_cov_source == 'nearest_empty_room' %}
@@ -23,7 +21,6 @@ An ad-hoc noise covariance matrix was used.
 {% elif s.settings.noise_cov_source == 'none' %}
 No noise covariance matrix was used.
 {% endif %}
-
 {% if s.settings.pick_ori == 'max-power' %}
 At each source location, the orientation maximizing source power was selected.
 {% elif s.settings.pick_ori == 'normal' %}
@@ -31,7 +28,6 @@ Source orientations were constrained normal to the cortical surface.
 {% elif s.settings.pick_ori == 'vector' %}
 The three source-orientation components were retained separately.
 {% endif %}
-
 {% if s.settings.weight_norm == 'nai' %}
 Beamformer weights were normalized using the Neural Activity Index (NAI)
 {%- elif s.settings.weight_norm == 'unit-noise-gain' %}
@@ -41,7 +37,6 @@ Beamformer weights were normalized using rotation-invariant unit noise gain
 {%- elif s.settings.weight_norm is none %}
 No beamformer weight normalization was applied
 {%- endif %}, with a regularization parameter of {{ s.settings.reg }}.
-
 {% if s.settings.reduce_rank %}
 The beamformer denominator rank was reduced by one at each source location.
 {% endif %}
