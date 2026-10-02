@@ -414,7 +414,7 @@ class ICA(AlmKanalStep):
     emg_thresh: float = 0.5
     train: bool = True
     train_freq: float = 16.666
-    train_thresh: float = 5
+    train_thresh: float = 6
     img_path: None | str = None
     fname: None | str = None
 

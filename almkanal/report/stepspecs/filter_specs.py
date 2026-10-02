@@ -26,4 +26,6 @@ def filter_spec() -> StepSpec:
 
 @register_step('Resample')
 def resample_spec() -> StepSpec:
-    return StepSpec(settings_fn=keys_selector('sfreq', 'new_sfreq', 'resample_sfreq', 'npad', 'window'))
+    return StepSpec(
+        settings_fn=keys_selector('sfreq', 'original_sfreq', 'applied_to', 'method', 'window', 'npad', 'pad')
+    )
