@@ -245,17 +245,47 @@ class MultiBlockMaxwell(AlmKanalStep):
     mw_calibration_file: None | str = None
     mw_cross_talk_file: None | str = None
     mw_st_duration: float | None = None
+    mw_st_correlation: float = 0.98
 
     def run(
         self,
         data: list[mne.io.BaseRaw],
         info: AlmKanalInfo,
     ) -> dict:
+        n_blocks = len(data)
+
         if self.mw_destination is None:
             block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
             destination = np.median(block_pos_l, axis=0)
+            destination_source = 'median_block_translation'
         else:
             destination = self.mw_destination
+            destination_source = 'explicit'
+
+        calibration_per_block = [
+            self.mw_calibration_file is not False
+            and (self.mw_calibration_file is not None or raw.info.get('fine_calibration') is not None)
+            for raw in data
+        ]
+
+        cross_talk_per_block = [
+            self.mw_cross_talk_file is not False
+            and (self.mw_cross_talk_file is not None or raw.info.get('cross_talk') is not None)
+            for raw in data
+        ]
+        if len(set(calibration_per_block)) > 1:
+            raise ValueError(
+                'Fine-calibration information is available for only some '
+                'recording blocks. Maxwell filtering should use a consistent '
+                'calibration configuration across all blocks.'
+            )
+
+        if len(set(cross_talk_per_block)) > 1:
+            raise ValueError(
+                'Cross-talk information is available for only some '
+                'recording blocks. Maxwell filtering should use a consistent '
+                'cross-talk configuration across all blocks.'
+            )
 
         raw_max_list = []
         for raw in data:
@@ -267,6 +297,7 @@ class MultiBlockMaxwell(AlmKanalStep):
                     calibration_file=self.mw_calibration_file,
                     cross_talk_file=self.mw_cross_talk_file,
                     st_duration=self.mw_st_duration,
+                    st_correlation=self.mw_st_correlation,
                 )
             )
 
@@ -275,8 +306,10 @@ class MultiBlockMaxwell(AlmKanalStep):
         return {
             'data': raw_max,
             'maxwell_info': {
+                'n_blocks': n_blocks,
                 'coord_frame': self.mw_coord_frame,
                 'destination': destination,
+                'destination_source': destination_source,
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
