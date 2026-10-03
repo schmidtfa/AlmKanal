@@ -1,0 +1,32 @@
+
+#### Source Modelling
+
+A {{ s.settings.source_type }} source space was constructed
+{%- if s.settings.anatomy == 'scaled_fsaverage' %}
+ using a participant-specific scaled fsaverage anatomy
+{%- elif s.settings.anatomy == 'individual' %}
+ using the participant's individual FreeSurfer reconstruction
+{%- endif -%}
+{%- if s.settings.source_type == 'surface' %}
+ with {{ s.settings.source_spacing }} spacing
+{%- elif s.settings.source_type == 'volume' %}
+ with a {{ s.settings.volume_spacing_mm }} mm grid spacing
+{%- endif %}.
+The sensor and anatomical coordinate systems were coregistered, and a
+{{ s.settings.bem_layers }}-layer boundary-element model (BEM)
+({{ ref('HamalainenSarvas1989', 'Hämäläinen, M. S., & Sarvas, J. (1989). Realistic conductivity geometry model of the human head for interpretation of neuromagnetic data. IEEE Transactions on Biomedical Engineering, 36(2), 165–171. doi:10.1109/10.16463') }})
+was used with
+{%- if s.settings.bem_layers == 1 %}
+ a conductivity of {{ s.settings.bem_conductivity[0] }} S/m
+{%- else %}
+ conductivities of {{ s.settings.bem_conductivity | join(', ') }} S/m
+{%- endif %}.
+The forward solution included
+{%- if s.settings.meg and s.settings.eeg %}
+ MEG and EEG sensors
+{%- elif s.settings.meg %}
+ MEG sensors
+{%- elif s.settings.eeg %}
+ EEG sensors
+{%- endif %},
+with source locations required to be at least {{ s.settings.min_dist_src_mm }} mm from the inner skull.

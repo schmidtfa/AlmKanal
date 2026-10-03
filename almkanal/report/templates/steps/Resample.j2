@@ -1,0 +1,16 @@
+{# expected keys: sfreq/new_sfreq/resample_sfreq, npad, window #}
+{% set sfreq = s.settings.sfreq %}
+{% set original_sfreq = s.settings.original_sfreq %}
+{% set applied_to = s.settings.applied_to %}
+{% set method = s.settings.method %}
+{% set window = s.settings.window %}
+{% set npad = s.settings.npad %}
+{% set pad = s.settings.pad %}
+
+#### Resampling
+
+{% if method == 'fft' %}
+The {{ applied_to }} data were resampled from {{ original_sfreq }} Hz to {{ sfreq }} Hz using FFT-based resampling with a {{ window }} frequency-domain window.
+{% elif method == 'polyphase' %}
+The {{ applied_to }} data were resampled from {{ original_sfreq }} Hz to {{ sfreq }} Hz using polyphase FIR resampling with a {{ window }} time-domain window.
+{% endif %}
