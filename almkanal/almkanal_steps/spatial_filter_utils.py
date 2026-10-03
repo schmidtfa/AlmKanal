@@ -424,6 +424,10 @@ class SpatialFilter(AlmKanalStep):
         if fwd is None:
             fwd = info.get_step_info('ForwardModel', required=True)['fwd_info']['fwd']
 
+        data_cov_source = (
+            'provided' if self.data_cov is not None else 'continuous' if isinstance(data, mne.io.BaseRaw) else 'epoched'
+        )
+
         filters, lcmv_settings, noise_cov, data_cov = comp_spatial_filters(
             data=data,
             fwd=fwd,
@@ -438,6 +442,16 @@ class SpatialFilter(AlmKanalStep):
             lcmv_weight_norm=self.lcmv_weight_norm,
             lcmv_reduce_rank=self.lcmv_reduce_rank,
         )
+
+        if self.noise_cov is not None:
+            noise_cov_source = 'provided'
+        elif self.empty_room is not None:
+            noise_cov_source = 'nearest_empty_room' if self.nearest_empty_room else 'empty_room'
+        elif noise_cov is not None:
+            noise_cov_source = 'ad_hoc'
+        else:
+            noise_cov_source = 'none'
+
         return {
             'data': data,
             'spatial_filter_info': {
@@ -446,6 +460,13 @@ class SpatialFilter(AlmKanalStep):
                 'data_cov': data_cov,
                 'noise_cov': noise_cov,
                 'extra_data': extra_data,
+                # reporting metadata
+                'reg': self.lcmv_reg,
+                'pick_ori': self.lcmv_pick_ori,
+                'weight_norm': self.lcmv_weight_norm,
+                'reduce_rank': self.lcmv_reduce_rank,
+                'data_cov_source': data_cov_source,
+                'noise_cov_source': noise_cov_source,
             },
         }
 

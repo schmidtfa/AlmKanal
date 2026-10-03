@@ -76,12 +76,14 @@ def test_settings_fn_returns_jsonable_dict(step_name: str) -> None:
             },
             "lcmv_settings": {"reg": 0.05, "pick_ori": "max-power", "weight_norm": "nai", "rank": {"mag": 56}},
         },
-        "SourceReconstruction": {
-            "orig_data_type": "raw", "source": "surface", "atlas": "glasser",
-            "label_mode": "pca_flip", "subjects_dir": "/path/to/subjects_dir",
-            "subject_id": "fsaverage", "n_labels": 360,
-        },
-    }
+        'SourceReconstruction': {
+                                'orig_data_type': 'raw',
+                                'morph2fsaverage': True,
+                                'return_parc': True,
+                                'atlas': 'glasser',
+                                'effective_label_mode': 'pca_flip',
+                            },
+            }
 
 
     payload = examples[step_name]

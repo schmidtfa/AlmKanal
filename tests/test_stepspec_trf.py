@@ -1,18 +1,13 @@
 from __future__ import annotations
-
 import json
 from copy import deepcopy
 from pathlib import Path
-
 import numpy as np
 import pytest
-
 from almkanal import AlmKanal, preprocessing_report
 from almkanal.report.methods_context import build_context_from_files
 from almkanal.stim_utils.alignment_utils import summarize_alignments
 from almkanal.info import AlmKanalInfo, StepInfo
-
-
 def make_info(drifts: list[float], failures: int = 0) -> dict:
     trials = [{
         'drift_us_per_s': drift, 'offset_s': 0.04, 'clock_slope': 1 + drift / 1e6,
@@ -35,23 +30,16 @@ def make_info(drifts: list[float], failures: int = 0) -> dict:
             'summary': summarize_alignments(trials),
         },
     }
-
-
 def write_pipeline_json(path: Path, info: dict) -> Path:
     pipeline = AlmKanal(steps=[])
-
     pipeline.info.add(
         StepInfo(
             step='EpochTRF',
             info={'TRF_info': info},
         )
     )
-
     pipeline.generate_json(str(path))
-
     return path
-
-
 def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: Path) -> None:
     first = list(np.arange(75, dtype=float))
     second = [-100.0, 200.0]
@@ -72,7 +60,6 @@ def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: P
     assert stats['max'] == 200
     assert results['n_trials_failed'] == 2
     assert results['n_recordings'] == 2
-
     output = preprocessing_report(files, tmp_path / 'methods.md').read_text()
     assert '77 of 79 trials' in output
     assert '2 failed and were skipped' in output
@@ -85,8 +72,6 @@ def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: P
     assert '\n#### Realignment\n\n' in output
     assert 'normalized cross-correlation' in output
     assert 'Without recorded audio' not in output
-
-
 def test_report_checks_configuration_but_allows_different_results(tmp_path: Path) -> None:
     one = make_info([1.0])
     two = deepcopy(one)
@@ -94,8 +79,6 @@ def test_report_checks_configuration_but_allows_different_results(tmp_path: Path
     files = [write_pipeline_json(tmp_path / 'one.json', one), write_pipeline_json(tmp_path / 'two.json', two)]
     with pytest.raises(ValueError, match="Settings mismatch in 'EpochTRF'"):
         build_context_from_files(files)
-
-
 @pytest.mark.parametrize('info', [
     {'epoch_len_s': 5.0},
     {'epoch_len_s': 5.0, 'realign_audio': False, 'hw_delay_s': -0.0165},
@@ -106,14 +89,10 @@ def test_old_or_disabled_alignment_reports_remain_supported(tmp_path: Path, info
     assert 'Data were epoched in 5.0s long epochs.' in text
     assert 'clock drift' not in text
     assert '#### Realignment' not in text
-
-
 def test_one_trial_summary_has_zero_sd(tmp_path: Path) -> None:
     path = write_pipeline_json(tmp_path / 'one.json', make_info([5.0]))
     metrics = build_context_from_files([path]).steps[0].results['metrics']
     assert metrics['drift_us_per_s'] == {'n': 1, 'mean': 5.0, 'sd': 0.0, 'min': 5.0, 'max': 5.0}
-
-
 def test_inference_counts_and_priors_survive_truncation_and_pool_separately(tmp_path: Path) -> None:
     first = make_info([1500.0] * 75, failures=2)
     second = make_info([1000.0])
@@ -138,8 +117,6 @@ def test_inference_counts_and_priors_survive_truncation_and_pool_separately(tmp_
     assert 'normalized cross-correlation' in methods
     assert 'using WAV duration multiplied by' not in methods
     assert 'Without recorded audio' not in methods
-
-
 def test_inferred_end_report_without_audio_alignment(tmp_path: Path) -> None:
     info = {
         'epoch_len_s': 5.0, 'realign_audio': False,
@@ -148,8 +125,6 @@ def test_inferred_end_report_without_audio_alignment(tmp_path: Path) -> None:
     path = write_pipeline_json(tmp_path / 'unaligned.json', info)
     methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()
     assert methods.strip() == '### Preprocessing\n\nData were epoched in 5.0s long epochs.'
-
-
 @pytest.mark.parametrize('alignment_method', [None, 'audio', 'assumed_drift'])
 @pytest.mark.parametrize('resample_after_epochs', [False, True])
 def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resample_after_epochs: bool) -> None:
@@ -172,41 +147,54 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         'train_freq': None, 'train_thresh': None,
         'components_dict': {'eog': [1, 2]},
     }
-
     pipeline = AlmKanal(steps=[])
-
     pipeline.info.add(
         StepInfo(
             step='ICA',
             info={'ica_info': ica_info},
         )
     )
-
     epoch_step = StepInfo(
         step='EpochTRF',
         info={'TRF_info': info},
     )
-
+    resample_applied_to = (
+        'epoched'
+        if resample_after_epochs
+        else 'continuous'
+    )
     resample_step = StepInfo(
         step='Resample',
-        info={'resample_info': {'sfreq': 100.0}},
+        info={
+            'resample_info': {
+                'sfreq': 100.0,
+                'original_sfreq': 1000.0,
+                'applied_to': resample_applied_to,
+                'method': 'fft',
+                'window': 'boxcar',
+                'npad': 'auto',
+                'pad': 'reflect_limited',
+            }
+        },
     )
-
     if resample_after_epochs:
         pipeline.info.add(epoch_step)
         pipeline.info.add(resample_step)
     else:
         pipeline.info.add(resample_step)
         pipeline.info.add(epoch_step)
-
-
     path = tmp_path / 'pipeline.json'
     pipeline.generate_json(str(path))
     methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()
     preprocessing = methods.split('### References')[0]
     ica_section = preprocessing.split('#### Independent Component Analysis\n', 1)[1]
     assert '2.00 components were rejected per subject' in ica_section
-    assert 'Data were resampled to 100.0 Hz.' in preprocessing
+    resample_sentence = (
+        f'The {resample_applied_to} data were resampled from 1000.0 Hz '
+        'to 100.0 Hz using FFT-based resampling with a boxcar '
+        'frequency-domain window.'
+    )
+    assert resample_sentence in preprocessing
     assert 'Data were epoched in 1.0s long epochs.' in preprocessing
     if alignment_method is None:
         assert '#### Realignment' not in methods
@@ -214,7 +202,7 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         assert 'physical-delay correction' not in methods
         assert 'WAV-derived' not in methods
         assert 'Data were epoched in 1.0s long epochs.' in ica_section
-        assert 'Data were resampled to 100.0 Hz.' in ica_section
+        assert resample_sentence in ica_section
     else:
         assert methods.count('\n#### Realignment\n\n') == 1
         ica_section, realignment = ica_section.split('\n#### Realignment\n\n')

@@ -12,9 +12,10 @@ def run_maxwell(
     raw: mne.io.Raw,
     coord_frame: str = 'head',
     destination: None | ArrayLike = None,
-    calibration_file: None | str = None,
-    cross_talk_file: None | str = None,
+    calibration_file: None | bool | str = None,
+    cross_talk_file: None | bool | str = None,
     st_duration: float | None = None,
+    st_correlation: float = 0.98,
 ) -> mne.io.Raw:
     """
     Perform Maxwell filtering on raw MEG data.
@@ -55,6 +56,7 @@ def run_maxwell(
         calibration=calibration_file,
         cross_talk=cross_talk_file,
         coord_frame=coord_frame,
+        st_correlation=st_correlation,
         destination=destination,
     )
 
@@ -79,13 +81,26 @@ class Maxwell(AlmKanalStep):
     mw_destination : array-like | None, default=None
         Destination head position used during Maxwell filtering. ``None`` keeps the
         destination behavior defined by the underlying Maxwell-filtering routine.
-    mw_calibration_file : str | None, default=None
-        Path to the fine-calibration file used during Maxwell filtering.
-    mw_cross_talk_file : str | None, default=None
-        Path to the cross-talk compensation file used during Maxwell filtering.
     mw_st_duration : float | None, default=None
         Temporal Signal Space Separation (tSSS) buffer duration, in seconds.
         ``None`` disables temporal SSS.
+    mw_calibration_file : str | bool | None, default=None
+        Fine-calibration information passed to Maxwell filtering. A path
+        specifies an external calibration file. With ``None``, calibration
+        embedded in ``data.info`` is used when available. ``True`` requires
+        embedded calibration information, whereas ``False`` disables fine
+        calibration.
+
+    mw_cross_talk_file : str | bool | None, default=None
+        Cross-talk compensation passed to Maxwell filtering. A path specifies
+        an external cross-talk file. With ``None``, cross-talk information
+        embedded in ``data.info`` is used when available. ``True`` requires
+        embedded cross-talk information, whereas ``False`` disables it.
+
+    mw_st_correlation : float, default=0.98
+        Correlation threshold used by temporal Signal Space Separation (tSSS).
+        Only relevant when ``mw_st_duration`` is not ``None``.
+
 
     Notes
     -----
@@ -118,15 +133,23 @@ class Maxwell(AlmKanalStep):
 
     mw_coord_frame: str = 'head'
     mw_destination: None | ArrayLike = None
-    mw_calibration_file: None | str = None
-    mw_cross_talk_file: None | str = None
+    mw_calibration_file: str | bool | None = None
+    mw_cross_talk_file: str | bool | None = None
     mw_st_duration: float | None = None
+    mw_st_correlation: float = 0.98
 
     def run(
         self,
         data: mne.io.BaseRaw,
         info: AlmKanalInfo,
     ) -> dict:
+        calibration_applied = self.mw_calibration_file is not False and (
+            self.mw_calibration_file is not None or data.info.get('fine_calibration') is not None
+        )
+
+        cross_talk_applied = self.mw_cross_talk_file is not False and (
+            self.mw_cross_talk_file is not None or data.info.get('cross_talk') is not None
+        )
         raw_max = run_maxwell(
             raw=data,
             coord_frame=self.mw_coord_frame,
@@ -134,6 +157,7 @@ class Maxwell(AlmKanalStep):
             calibration_file=self.mw_calibration_file,
             cross_talk_file=self.mw_cross_talk_file,
             st_duration=self.mw_st_duration,
+            st_correlation=self.mw_st_correlation,
         )
 
         return {
@@ -144,6 +168,9 @@ class Maxwell(AlmKanalStep):
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
+                'st_correlation': self.mw_st_correlation,
+                'calibration_applied': calibration_applied,
+                'cross_talk_applied': cross_talk_applied,
             },
         }
 
@@ -218,17 +245,47 @@ class MultiBlockMaxwell(AlmKanalStep):
     mw_calibration_file: None | str = None
     mw_cross_talk_file: None | str = None
     mw_st_duration: float | None = None
+    mw_st_correlation: float = 0.98
 
     def run(
         self,
         data: list[mne.io.BaseRaw],
         info: AlmKanalInfo,
     ) -> dict:
+        n_blocks = len(data)
+
         if self.mw_destination is None:
             block_pos_l = [raw.info['dev_head_t']['trans'][:3, 3] for raw in data]
             destination = np.median(block_pos_l, axis=0)
+            destination_source = 'median_block_translation'
         else:
             destination = self.mw_destination
+            destination_source = 'explicit'
+
+        calibration_per_block = [
+            self.mw_calibration_file is not False
+            and (self.mw_calibration_file is not None or raw.info.get('fine_calibration') is not None)
+            for raw in data
+        ]
+
+        cross_talk_per_block = [
+            self.mw_cross_talk_file is not False
+            and (self.mw_cross_talk_file is not None or raw.info.get('cross_talk') is not None)
+            for raw in data
+        ]
+        if len(set(calibration_per_block)) > 1:
+            raise ValueError(
+                'Fine-calibration information is available for only some '
+                'recording blocks. Maxwell filtering should use a consistent '
+                'calibration configuration across all blocks.'
+            )
+
+        if len(set(cross_talk_per_block)) > 1:
+            raise ValueError(
+                'Cross-talk information is available for only some '
+                'recording blocks. Maxwell filtering should use a consistent '
+                'cross-talk configuration across all blocks.'
+            )
 
         raw_max_list = []
         for raw in data:
@@ -240,6 +297,7 @@ class MultiBlockMaxwell(AlmKanalStep):
                     calibration_file=self.mw_calibration_file,
                     cross_talk_file=self.mw_cross_talk_file,
                     st_duration=self.mw_st_duration,
+                    st_correlation=self.mw_st_correlation,
                 )
             )
 
@@ -248,8 +306,10 @@ class MultiBlockMaxwell(AlmKanalStep):
         return {
             'data': raw_max,
             'maxwell_info': {
+                'n_blocks': n_blocks,
                 'coord_frame': self.mw_coord_frame,
                 'destination': destination,
+                'destination_source': destination_source,
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
@@ -340,6 +400,7 @@ class EEGRANSAC(AlmKanalStep):
     unbroken_time: float = 0.4
     n_jobs: int = 1
     verbose: bool = False
+    random_state: int | None = 435656
 
     def run(
         self,
@@ -357,6 +418,7 @@ class EEGRANSAC(AlmKanalStep):
             min_corr=self.min_corr,
             unbroken_time=self.unbroken_time,
             n_jobs=self.n_jobs,
+            random_state=self.random_state,
             verbose=self.verbose,
         )
 
@@ -381,6 +443,7 @@ class EEGRANSAC(AlmKanalStep):
         raw_ransac = data.interpolate_bads(
             reset_bads=True,
             exclude=non_eeg_bads,
+            method=dict(eeg='spline'),
         )
 
         return {
@@ -392,6 +455,8 @@ class EEGRANSAC(AlmKanalStep):
                 'min_channels': self.min_channels,
                 'min_corr': self.min_corr,
                 'unbroken_time': self.unbroken_time,
+                'random_state': self.random_state,
+                'interpolation_method': 'spline',
                 'n_jobs': self.n_jobs,
             },
         }
@@ -488,6 +553,14 @@ class ReReference(AlmKanalStep):
         data: mne.io.BaseRaw,
         info: AlmKanalInfo,
     ) -> dict:
+        supported_types = ('eeg', 'ecog', 'seeg', 'dbs')
+
+        if self.ch_type == 'auto':
+            present_types = set(data.get_channel_types())
+            resolved_ch_type: str | list[str] = next(ch_type for ch_type in supported_types if ch_type in present_types)
+        else:
+            resolved_ch_type = self.ch_type
+
         reref = data.set_eeg_reference(
             ref_channels=self.ref_channels,
             projection=self.projection,
@@ -504,6 +577,7 @@ class ReReference(AlmKanalStep):
                 'projection': self.projection,
                 'ch_type': self.ch_type,
                 'forward': self.forward,
+                'resolved_ch_type': resolved_ch_type,
                 'joint': self.joint,
                 'verbose': self.verbose,
             },

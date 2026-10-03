@@ -1,8 +1,35 @@
-{# Optional refs:
-{% set _ = ref('Glasser2016','Glasser, M. F., et al. (2016). A multi-modal parcellation of human cerebral cortex. *Nature*, 536, 171–178.') %}
-#}
+#### Source Reconstruction
 
-Sensor data were projected to source space using the spatial filters, and
-{%- if s.settings.atlas %} parcellated with the {{ 'HCP-MMP1' if s.settings.atlas|lower == 'glasser' else s.settings.atlas }} atlas{%- endif -%}
-{%- if s.settings.label_mode %} (label aggregation: {{ s.settings.label_mode }}){%- endif -%}.
-{%- if s.settings.n_labels %} The parcellation comprised {{ s.settings.n_labels }} labels.{% endif -%}
+The
+{%- if s.settings.orig_data_type == 'raw' %}
+ continuous
+{%- else %}
+ epoched
+{%- endif %}
+ sensor data were projected to source space using the previously computed spatial filters.
+{% if s.settings.morph2fsaverage %}
+The resulting source estimates were morphed to the common fsaverage source space before further analysis.
+{% endif %}
+{% if s.settings.return_parc %}
+Source activity was subsequently parcellated using the
+{%- if s.settings.atlas|lower == 'glasser' %}
+ HCP-MMP1 atlas
+{%- elif s.settings.atlas|lower == 'dk' %}
+ Desikan-Killiany atlas
+{%- elif s.settings.atlas|lower == 'destrieux' %}
+ Destrieux atlas
+{%- else %}
+ {{ s.settings.atlas }} atlas
+{%- endif %}.
+{% if s.settings.effective_label_mode == 'pca_flip' %}
+A representative time course for each parcel was obtained using PCA with sign correction (`pca_flip`).
+{% elif s.settings.effective_label_mode == 'mean_flip' %}
+Parcel time courses were obtained by sign-flipped averaging across source locations (`mean_flip`).
+{% elif s.settings.effective_label_mode == 'mean' %}
+Parcel time courses were obtained by averaging across source locations.
+{% elif s.settings.effective_label_mode == 'max' %}
+Parcel time courses were obtained using the maximum absolute source activity within each parcel.
+{% elif s.settings.effective_label_mode == 'auto' %}
+Parcel time courses were extracted using MNE-Python's automatic aggregation mode.
+{% endif %}
+{% endif %}

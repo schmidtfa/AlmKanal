@@ -141,6 +141,32 @@ class Filter(AlmKanalStep):
             h_tb_param = self.h_trans_bandwidth
             h_tb_report = float(self.h_trans_bandwidth)
 
+        sfreq = float(data.info['sfreq'])
+
+        filter_length_samples: int | None = None
+        filter_length_seconds: float | None = None
+        filter_order: int | None = None
+
+        if self.method == 'fir':
+            fir_coeffs = mne.filter.create_filter(
+                data=None,
+                sfreq=sfreq,
+                l_freq=self.highpass,
+                h_freq=self.lowpass,
+                filter_length=self.filter_length,
+                l_trans_bandwidth=l_tb_param,
+                h_trans_bandwidth=h_tb_param,
+                method=self.method,
+                phase=self.phase,
+                fir_window=self.fir_window,
+                fir_design=self.fir_design,
+                verbose=False,
+            )
+
+            filter_length_samples = len(fir_coeffs)
+            filter_length_seconds = filter_length_samples / sfreq
+            filter_order = filter_length_samples - 1
+
         # --- apply filter
         data.filter(
             l_freq=self.highpass,
@@ -172,6 +198,8 @@ class Filter(AlmKanalStep):
         else:
             iir_params_json = self.iir_params
 
+        applied_to = 'continuous' if isinstance(data, mne.io.BaseRaw) else 'epoched'
+
         return {
             'data': data,
             'filter_info': {
@@ -179,14 +207,17 @@ class Filter(AlmKanalStep):
                 'h_freq': self.lowpass,
                 'picks': self.picks,
                 'filter_length': self.filter_length,
+                'filter_length_samples': filter_length_samples,
+                'filter_length_seconds': filter_length_seconds,
+                'filter_order': filter_order,
                 'l_trans_bandwidth': l_tb_report,
                 'h_trans_bandwidth': h_tb_report,
-                'n_jobs': self.n_jobs,
                 'method': self.method,
                 'iir_params': iir_params_json,
                 'phase': self.phase,
                 'fir_window': self.fir_window,
                 'fir_design': self.fir_design,
+                'applied_to': applied_to,
                 'skip_by_annotation': skip_for_json,
                 'pad': self.pad,
             },
@@ -257,10 +288,10 @@ class Resample(AlmKanalStep):
 
     sfreq: int
     npad: str = 'auto'
-    window: str = 'auto'
+    window: str | tuple[str, float] = 'auto'
     n_jobs: int | None = None
     pad: str = 'auto'
-    method: str = 'fft'
+    method: Literal['fft', 'polyphase'] = 'fft'
     must_be_before: tuple[str, ...] = ()
     must_be_after: tuple[str, ...] = ('Epochs',)
     allow_repeated: bool = True
@@ -273,6 +304,22 @@ class Resample(AlmKanalStep):
                 f' Currently you lowpass the data at {lowpass} Hz. '
                 'Note: MNE’s resampling applies an internal anti-aliasing filter, but this pipeline '
                 'prefers explicit filter settings for reporting.'
+            )
+
+        old_sfreq = float(data.info['sfreq'])
+        applied_to = 'continuous' if isinstance(data, mne.io.BaseRaw) else 'epoched'
+        window_report: str | tuple[str, float]
+
+        if self.method == 'fft':
+            window_report = 'boxcar' if self.window == 'auto' else self.window
+            pad_report = 'reflect_limited' if self.pad == 'auto' else self.pad
+        elif self.method == 'polyphase':
+            window_report = ('kaiser', 5.0) if self.window == 'auto' else self.window
+            pad_report = 'reflect' if self.pad == 'auto' else self.pad
+        else:
+            raise ValueError(
+                'Resampling with AlmKanal requires either "fft" or "polyphase" resampling. '
+                'This decision is made to streamline methods reporting.'
             )
 
         data.resample(
@@ -288,10 +335,11 @@ class Resample(AlmKanalStep):
             'data': data,
             'resample_info': {
                 'sfreq': self.sfreq,
+                'original_sfreq': old_sfreq,
+                'applied_to': applied_to,
+                'window': window_report,
                 'npad': self.npad,
-                'window': self.window,
-                'n_jobs': self.n_jobs,
-                'pad': self.pad,
+                'pad': pad_report,
                 'method': self.method,
             },
         }

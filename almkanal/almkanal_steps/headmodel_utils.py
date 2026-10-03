@@ -530,17 +530,39 @@ class ForwardModel(AlmKanalStep):
             meg=self.meg,
             eeg=self.eeg,
         )
+
+        if self.source == 'surface':
+            source_spacing = f'ico{self.source_ico}' if self.use_template_mri else self.spacing
+            volume_spacing_mm = None
+        else:
+            source_spacing = None
+            volume_spacing_mm = self.volume_pos
+
+        anatomy = 'scaled_fsaverage' if self.use_template_mri else 'individual'
+
+        bem_conductivity = [float(value) for value in np.atleast_1d(self.bem_conductivity)]
+
         return {
             'data': data,
             'fwd_info': {
                 'coreg_fig': fig,
                 'fwd': fwd,
+                # methodological settings
                 'source_type': self.source,
+                'source_spacing': source_spacing,
+                'volume_spacing_mm': volume_spacing_mm,
+                'anatomy': anatomy,
+                'bem_conductivity': bem_conductivity,
+                'bem_layers': len(bem_conductivity),
+                'min_dist_src_mm': self.min_dist_src,
+                'meg': self.meg,
+                'eeg': self.eeg,
+                # realized / subject-specific provenance
+                'n_sources': int(fwd['nsource']),
+                'n_sources_by_space': [int(src['nuse']) for src in fwd['src']],
                 'subject_id_freesurfer': cache_id,
                 'subjects_dir': str(fs_dir),
                 'template_src': str(template_src),
-                'subject_dir': self.subjects_dir,  # Legacy workspace metadata.
-                'template_mri': self.use_template_mri,
             },
         }
 

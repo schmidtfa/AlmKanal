@@ -436,7 +436,17 @@ def test_forward_model_prepares_fsaverage_morph_target(
 
     compute = Mock(return_value=('trans', None))
 
-    forward = Mock(return_value={'src': 'subject-src'})
+    if source == 'surface':
+        fwd = {
+            'nsource': 4,
+            'src': [{'nuse': 2}, {'nuse': 2}],
+        }
+    else:
+        fwd = {
+            'nsource': 3,
+            'src': [{'nuse': 3}],
+        }
+    forward = Mock(return_value=fwd)
 
     monkeypatch.setattr(hm, 'compute_headmodel', compute)
 
@@ -582,7 +592,12 @@ def test_forward_model_passes_current_source_parameters(
 
     compute = Mock(return_value=('trans', None))
 
-    forward = Mock(return_value={'src': 'src'})
+    forward = Mock(
+        return_value={
+            'nsource': 4,
+            'src': [{'nuse': 2}, {'nuse': 2}],
+        }
+    )
 
     monkeypatch.setattr(hm, 'compute_headmodel', compute)
 
@@ -663,6 +678,18 @@ def test_forward_model_passes_current_source_parameters(
     )
 
     assert Path(result['fwd_info']['subjects_dir']) == fs_dir
+
+    assert result['fwd_info']['source_type'] == 'surface'
+    assert result['fwd_info']['source_spacing'] == 'ico5'
+    assert result['fwd_info']['volume_spacing_mm'] is None
+    assert result['fwd_info']['anatomy'] == 'scaled_fsaverage'
+    assert result['fwd_info']['bem_layers'] == 1
+    assert result['fwd_info']['bem_conductivity'] == [0.3]
+    assert result['fwd_info']['min_dist_src_mm'] == 3.0
+    assert result['fwd_info']['meg'] is True
+    assert result['fwd_info']['eeg'] is False
+    assert result['fwd_info']['n_sources'] == 4
+    assert result['fwd_info']['n_sources_by_space'] == [2, 2]
 
 
 
