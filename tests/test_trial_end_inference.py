@@ -35,8 +35,8 @@ def test_infers_all_missing_ends_without_changing_events(onset_only_trials, end_
         infer_missing_ends=True,
         base_audio_path=path.parent,
     )
-    # 8 seconds at +499 us/s -> 8004 raw samples, after rounding at 1000 Hz.
-    assert spec.spans_by_label == {'trial_000': (1234, 9238), 'trial_001': (11234, 19238)}
+    # Generic defaults assume no drift: 8 seconds -> 8000 raw samples at 1000 Hz.
+    assert spec.spans_by_label == {'trial_000': (1234, 9234), 'trial_001': (11234, 19234)}
     assert list(spec.wav_by_label.values()) == [path.name, path.name]
     for metadata in spec.metadata_by_label.values():
         assert metadata == {
@@ -44,13 +44,13 @@ def test_infers_all_missing_ends_without_changing_events(onset_only_trials, end_
             'onset_code': 11,
             'end_code': None,
             'end_inferred': True,
-            'end_inference_drift_us_per_s': 499.0,
+            'end_inference_drift_us_per_s': 0.0,
             'end_inference_wav_duration_s': 8.0,
         }
     np.testing.assert_array_equal(raw.get_data(), original)
 
 
-@pytest.mark.parametrize('drift, duration_samples', [(0.0, 8000), (1000.0, 8008), (-1000.0, 7992)])
+@pytest.mark.parametrize('drift, duration_samples', [(0.0, 8000), (499.0, 8004), (1000.0, 8008), (-1000.0, 7992)])
 def test_custom_signed_drift_and_absolute_wav_paths(onset_only_trials, drift, duration_samples):
     raw, path = onset_only_trials
     spec = TRFSpanSpec.from_events(
@@ -128,12 +128,12 @@ def test_inference_does_not_extend_past_available_trial(onset_only_trials, bound
 
 def test_inference_at_exclusive_recording_boundary_is_crop_safe(onset_only_trials):
     raw, path = onset_only_trials
-    raw.crop(tmax=8.003)
+    raw.crop(tmax=7.999)
     spec = TRFSpanSpec.from_events(raw, {11: path}, infer_missing_ends=True)
     on, off = spec.spans_by_label['trial_000']
-    assert (on, off) == (1234, 9237)
+    assert (on, off) == (1234, 9233)
     trial = raw.copy().crop((on - raw.first_samp) / 1000, (off - raw.first_samp) / 1000)
-    assert trial.n_times == 8004
+    assert trial.n_times == 8000
 
 
 @pytest.mark.parametrize('n_samples, drift', [(0, 499), (1, -999_999)])

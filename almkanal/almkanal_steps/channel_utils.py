@@ -5,9 +5,21 @@ from autoreject import Ransac
 from numpy.typing import ArrayLike
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.defaults import default_field, function_defaults, step_with_defaults
 from almkanal.info import AlmKanalInfo
 
 
+@function_defaults(
+    'maxwell',
+    aliases={
+        'coord_frame': ('maxwell', 'mw_coord_frame'),
+        'destination': ('maxwell', 'mw_destination'),
+        'calibration_file': ('maxwell', 'mw_calibration_file'),
+        'cross_talk_file': ('maxwell', 'mw_cross_talk_file'),
+        'st_duration': ('maxwell', 'mw_st_duration'),
+        'st_correlation': ('maxwell', 'mw_st_correlation'),
+    },
+)
 def run_maxwell(
     raw: mne.io.Raw,
     coord_frame: str = 'head',
@@ -131,13 +143,14 @@ class Maxwell(AlmKanalStep):
     must_be_after: tuple = ()
     allow_repeated: bool = field(default=False, init=False)
 
-    mw_coord_frame: str = 'head'
-    mw_destination: None | ArrayLike = None
-    mw_calibration_file: str | bool | None = None
-    mw_cross_talk_file: str | bool | None = None
-    mw_st_duration: float | None = None
-    mw_st_correlation: float = 0.98
+    mw_coord_frame: str = default_field('maxwell', 'mw_coord_frame')
+    mw_destination: None | ArrayLike = default_field('maxwell', 'mw_destination')
+    mw_calibration_file: str | bool | None = default_field('maxwell', 'mw_calibration_file')
+    mw_cross_talk_file: str | bool | None = default_field('maxwell', 'mw_cross_talk_file')
+    mw_st_duration: float | None = default_field('maxwell', 'mw_st_duration')
+    mw_st_correlation: float = default_field('maxwell', 'mw_st_correlation')
 
+    @step_with_defaults
     def run(
         self,
         data: mne.io.BaseRaw,
@@ -240,13 +253,14 @@ class MultiBlockMaxwell(AlmKanalStep):
     must_be_after: tuple = ()
     allow_repeated: bool = field(default=False, init=False)
 
-    mw_coord_frame: str = 'head'
-    mw_destination: None | ArrayLike = None
-    mw_calibration_file: None | str = None
-    mw_cross_talk_file: None | str = None
-    mw_st_duration: float | None = None
-    mw_st_correlation: float = 0.98
+    mw_coord_frame: str = default_field('maxwell', 'mw_coord_frame')
+    mw_destination: None | ArrayLike = default_field('maxwell', 'mw_destination')
+    mw_calibration_file: None | str = default_field('maxwell', 'mw_calibration_file')
+    mw_cross_talk_file: None | str = default_field('maxwell', 'mw_cross_talk_file')
+    mw_st_duration: float | None = default_field('maxwell', 'mw_st_duration')
+    mw_st_correlation: float = default_field('maxwell', 'mw_st_correlation')
 
+    @step_with_defaults
     def run(
         self,
         data: list[mne.io.BaseRaw],
@@ -393,15 +407,16 @@ class EEGRANSAC(AlmKanalStep):
     must_be_after: tuple = ()
     allow_repeated: bool = True
 
-    ransac_epoch_duration: int | float = 4
-    n_resample: int = 50
-    min_channels: float = 0.25
-    min_corr: float = 0.75
-    unbroken_time: float = 0.4
-    n_jobs: int = 1
-    verbose: bool = False
-    random_state: int | None = 435656
+    ransac_epoch_duration: int | float = default_field('ransac', 'ransac_epoch_duration')
+    n_resample: int = default_field('ransac', 'n_resample')
+    min_channels: float = default_field('ransac', 'min_channels')
+    min_corr: float = default_field('ransac', 'min_corr')
+    unbroken_time: float = default_field('ransac', 'unbroken_time')
+    n_jobs: int = default_field('ransac', 'n_jobs')
+    verbose: bool = default_field('ransac', 'verbose')
+    random_state: int | None = default_field('ransac', 'random_state')
 
+    @step_with_defaults
     def run(
         self,
         data: mne.io.BaseRaw,
@@ -541,13 +556,14 @@ class ReReference(AlmKanalStep):
     must_be_after: tuple = ()
     allow_repeated: bool = True
 
-    ref_channels: str | list[str] | dict = 'average'
-    projection: bool = False
-    ch_type: str | list[str] = 'auto'
-    forward: mne.Forward | None = None
-    joint: bool = False
-    verbose: bool | str | int | None = False
+    ref_channels: str | list[str] | dict = default_field('rereference', 'ref_channels')
+    projection: bool = default_field('rereference', 'projection')
+    ch_type: str | list[str] = default_field('rereference', 'ch_type')
+    forward: mne.Forward | None = default_field('rereference', 'forward')
+    joint: bool = default_field('rereference', 'joint')
+    verbose: bool | str | int | None = default_field('rereference', 'verbose')
 
+    @step_with_defaults
     def run(
         self,
         data: mne.io.BaseRaw,

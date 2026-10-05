@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import Callable, Mapping, Sequence
-from inspect import Parameter, signature
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -13,6 +12,7 @@ import pandas as pd
 from attrs import define, field
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.defaults import default_field, function_defaults, get_defaults, step_with_defaults, use_defaults
 from almkanal.stim_utils.alignment_utils import (
     DEFAULT_FALLBACK_DRIFT_US_PER_S,
     apply_raw_wav_alignment,
@@ -81,6 +81,13 @@ class TRFSpanSpec:
         return list(self.spans_by_label.keys())
 
     @classmethod
+    @function_defaults(
+        'trials',
+        aliases={
+            'stim_channel': ('events', 'stim_channel'),
+            'fallback_drift_us_per_s': ('trf', 'fallback_drift_us_per_s'),
+        },
+    )
     def from_events(
         cls,
         raw: mne.io.BaseRaw,
@@ -96,7 +103,7 @@ class TRFSpanSpec:
 
         Set infer_missing_ends=True to replace missing end triggers with WAV
         duration * (1 + fallback_drift_us_per_s / 1e6), on the raw clock.
-        The default prior is +499 us/s; this only defines the span. EpochTRF
+        The prior comes from the active profile; this only defines the span. EpochTRF
         estimates actual offset and drift when audio_channels are supplied.
         Without recorded audio, enable realign_without_audio on EpochTRF to
         also resample the neural data, using the same fallback_drift_us_per_s.
@@ -176,7 +183,7 @@ def _aligned_segment(
     )
     # Apply the physical delay only AFTER correcting the recording clock.
     # output_neural(t) = aligned_neural(t + hw_delay_s): selecting later
-    # samples advances neural events. The default +0.0165 compensates the
+    # samples advances neural events. The Salzburg +0.0165 setting compensates the
     # playback-to-ear delay in the air tubes. WAV features are attached afterward.
     start = before + delay_samples
     n_samples = int(round(alignment['wav_duration_s'] * sfreq))
@@ -191,7 +198,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     *,
     feature: str = 'envelope',
     audio_cutoff_hz: float = 80.0,
-    hw_delay_s: float = 0.0165,
+    hw_delay_s: float = 0.0,
     epoch_len_s: float = 5.0,
     wav_ext: str = '.wav',
     audio_channels: Sequence[str] | None = None,
@@ -386,6 +393,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     return epochs_all, alignment_info
 
 
+@function_defaults('trf')
 def build_trf_epochs(
     raw: mne.io.BaseRaw,
     spec: TRFSpanSpec,
@@ -393,7 +401,7 @@ def build_trf_epochs(
     *,
     feature: str = 'envelope',
     audio_cutoff_hz: float = 80.0,
-    hw_delay_s: float = 0.0165,
+    hw_delay_s: float = 0.0,
     epoch_len_s: float = 5.0,
     wav_ext: str = '.wav',
     audio_channels: Sequence[str] | None = None,
@@ -408,14 +416,14 @@ def build_trf_epochs(
 
     Supplying audio_channels enables per-trial offset and drift estimation.
     With audio_channels=None, realign_without_audio=True instead resamples using
-    WAV duration and fallback_drift_us_per_s (default +499 us/s). This assumes
+    WAV duration and fallback_drift_us_per_s (general profile: zero; Salzburg: +499 us/s). This assumes
     the trial onset is WAV time zero; no onset offset is measured. Positive
     drift means t_raw = (1 + drift / 1e6) * t_wav relative to the trial onset.
     Recorded audio takes precedence when supplied, and failed audio fits follow
     on_alignment_error without falling back to an assumed drift.
     hw_delay_s always shifts neural data relative to WAV features, after any
     realignment, rounded to the nearest sample on the corrected clock.
-    Positive values advance neural events; the default +0.0165 s compensates
+    Positive values advance neural events; the Salzburg +0.0165 s setting compensates
     the 16.5 ms playback-to-ear delay when the audio reference precedes the
     air tubes. Negative values add lag and emit a warning. The added WAV
     feature channels are never delay-shifted.
@@ -471,10 +479,10 @@ class EpochTRF(AlmKanalStep):
     audio_cutoff_hz : float, default=80.0
         Low-pass cutoff frequency, in Hz, used when constructing the audio
         feature.
-    hw_delay_s : float, default=0.0165
+    hw_delay_s : float, default=0.0
         Physical-delay correction, in seconds, applied to the neural data after
         clock realignment. Positive values advance neural events relative to the
-        WAV feature channels. The default of 16.5 ms compensates the typical
+        WAV feature channels. The Salzburg profile uses 16.5 ms to compensate the
         playback-to-ear delay when the recorded audio reference precedes sound
         arrival at the ears. Use zero when the reference already represents
         sound arrival at the ears. Negative values add lag and emit a warning.
@@ -485,6 +493,7 @@ class EpochTRF(AlmKanalStep):
         between the recording and the WAV files. When provided, audio-based
         alignment takes precedence over assumed-drift alignment. When ``None``,
         no clock realignment is performed unless ``realign_without_audio=True``.
+        The Salzburg profile uses ``("MISC007", "MISC008")``.
     alignment_kwargs : mapping | None, default=None
         Additional keyword arguments passed to
         :func:`estimate_raw_wav_alignment`. These override that function's
@@ -504,7 +513,7 @@ class EpochTRF(AlmKanalStep):
         estimating offset and drift from recorded audio.
     fallback_drift_us_per_s : float, default=DEFAULT_FALLBACK_DRIFT_US_PER_S
         Assumed clock drift, in microseconds per second, used when
-        ``realign_without_audio=True``. The default is +499 µs/s.
+        ``realign_without_audio=True``. The general profile uses zero; the Salzburg profile uses +499 µs/s.
 
     Notes
     -----
@@ -561,25 +570,30 @@ class EpochTRF(AlmKanalStep):
 
     gen_span_spec: Callable
     base_audio_path: str | Path
-    feature: str = 'envelope'
-    audio_cutoff_hz: float = 80.0
-    hw_delay_s: float = 0.0165
-    epoch_len_s: float = 5.0
-    audio_channels: Sequence[str] | None = None
-    alignment_kwargs: Mapping[str, Any] | None = None
-    preserve_annotations: bool = True
-    on_alignment_error: Literal['raise', 'skip'] = 'raise'
-    verbose: bool = True
+    feature: str = default_field('trf', 'feature')
+    audio_cutoff_hz: float = default_field('trf', 'audio_cutoff_hz')
+    hw_delay_s: float = default_field('trf', 'hw_delay_s')
+    epoch_len_s: float = default_field('trf', 'epoch_len_s')
+    audio_channels: Sequence[str] | None = default_field('trf', 'audio_channels')
+    alignment_kwargs: Mapping[str, Any] | None = default_field('trf', 'alignment_kwargs')
+    preserve_annotations: bool = default_field('trf', 'preserve_annotations')
+    on_alignment_error: Literal['raise', 'skip'] = default_field('trf', 'on_alignment_error')
+    verbose: bool = default_field('trf', 'verbose')
 
-    realign_without_audio: bool = field(default=False, kw_only=True)
-    fallback_drift_us_per_s: float = field(default=DEFAULT_FALLBACK_DRIFT_US_PER_S, kw_only=True)
+    realign_without_audio: bool = default_field('trf', 'realign_without_audio', kw_only=True)
+    fallback_drift_us_per_s: float = default_field('trf', 'fallback_drift_us_per_s', kw_only=True)
 
     must_be_before: tuple = ()
     must_be_after: tuple = ()
     allow_repeated: bool = field(default=False, init=False)
 
+    @step_with_defaults
     def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> dict:
-        spec: TRFSpanSpec = self.gen_span_spec(data)
+        span_profile = self._defaults_profile
+        if self.fallback_drift_us_per_s != span_profile.trf.fallback_drift_us_per_s:
+            span_profile = span_profile.with_overrides(trf={'fallback_drift_us_per_s': self.fallback_drift_us_per_s})
+        with use_defaults(span_profile):
+            spec: TRFSpanSpec = self.gen_span_spec(data)
         sfreq = float(data.info['sfreq'])
         epochs, alignment_info = _build_trf_epochs(
             raw=data,
@@ -599,11 +613,8 @@ class EpochTRF(AlmKanalStep):
         )
         alignment_settings = {}
         if self.audio_channels is not None:
-            alignment_settings = {
-                name: parameter.default
-                for name, parameter in signature(estimate_raw_wav_alignment).parameters.items()
-                if parameter.default is not Parameter.empty and name != 'verbose'
-            }
+            alignment_settings = get_defaults().section('alignment')
+            alignment_settings.pop('verbose')
             alignment_settings.update(self.alignment_kwargs or {})
         return {
             'data': epochs,

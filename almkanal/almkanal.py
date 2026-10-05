@@ -6,6 +6,7 @@ import mne
 from attrs import define, field
 
 from almkanal.data_utils.info_generator import build_json
+from almkanal.defaults import Defaults, default_field, get_defaults
 from almkanal.info import AlmKanalInfo, StepInfo
 
 
@@ -17,6 +18,7 @@ class AlmKanalStep:
     must_be_before: tuple = field(default=None, init=False)
     must_be_after: tuple = field(default=None, init=False)
     allow_repeated: bool = field(default=True, init=False)
+    _defaults_profile: Defaults = field(factory=get_defaults, init=False, repr=False, eq=False)
 
     def _check_dependencies(self, steps: list['AlmKanalStep']) -> None:
         pre: list[AlmKanalStep] = []
@@ -105,7 +107,7 @@ class AlmKanal:
     """
 
     steps: list[AlmKanalStep] = field()
-    pick_params: dict = field(default=None)
+    pick_params: dict = default_field('pipeline', 'pick_params')
     info: AlmKanalInfo = field(init=False)
 
     def __attrs_post_init__(self) -> None:

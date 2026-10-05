@@ -1,27 +1,32 @@
+from numbers import Real
+
 import mne
 import numpy as np
 import pandas as pd
 from scipy.constants import pi
 
+from almkanal.defaults import function_defaults
+
 
 # TODO: Write function for MEG channel
 # TODO: TRF cleaner -> fit trf on blinks & saccades -> subtract prediction from eyedata
+@function_defaults('eye')
 def clean_pixx_eye_data(  # noqa PLR0915
     eye_data: np.ndarray,
     gaze_lims: dict = {'x': 6, 'y': 6},
     filter_settings: dict = {'pupil_diameter': (None, 30), 'xy_movements': (0.1, 40)},
     annotate_bads: bool = True,
-    trigger_ch_name: str = 'STI101',
-    tpixx_fs: int = 2000,
-    distance: int | float = 82,
-    screen_width: int | float = 63,
-    screen_rect: list = [0, 0, 1920, 1080],
+    trigger_ch_name: str = 'stim',
+    tpixx_fs: int | None = None,
+    distance: int | float | None = None,
+    screen_width: int | float | None = None,
+    screen_rect: list | tuple | None = None,
     verbose: bool = False,
 ) -> mne.io.BaseRaw:
     """Preprocess eyetracking data recorded using a TRACKPixx3.
 
-    NOTE: Default settings are based upon the recording setup in the meg lab at the university of salzburg
-    and should be adjust if used elsewhere.
+    Sampling rate and screen geometry must be supplied explicitly or through
+    the active profile. Defaults.salzburg() supplies the Salzburg recording setup.
 
     This function can be used to apply some basic preprocessing steps on the .mat file obtained
     from the trackpixx eyetracker. The function returns an mne.io.Raw instance.
@@ -42,8 +47,8 @@ def clean_pixx_eye_data(  # noqa PLR0915
         The distance to the eye tracker in cm
     screen_width : int
         The screen width in cm
-    screem_rect : list
-        The dimensions of the screen area
+    screen_rect : list | tuple
+        The screen rectangle in pixels: left, top, right, bottom.
     verbose : bool
         Whether or not we want a verbose output
 
@@ -53,13 +58,39 @@ def clean_pixx_eye_data(  # noqa PLR0915
     raw : mne.io.Raw
         Raw object.
     """
+    configuration_help = (
+        'Pass the hardware settings explicitly, configure the eye defaults section, '
+        'or select Defaults.salzburg() for the Salzburg recording setup.'
+    )
+    if tpixx_fs is None or distance is None or screen_width is None:
+        raise ValueError(f'tpixx_fs, distance, and screen_width must be configured. {configuration_help}')
+    for name, value in {'tpixx_fs': tpixx_fs, 'distance': distance, 'screen_width': screen_width}.items():
+        if not isinstance(value, Real) or isinstance(value, bool) or not np.isfinite(value) or value <= 0:
+            raise ValueError(f'{name} must be a finite positive number. {configuration_help}')
+    try:
+        rectangle = np.asarray(screen_rect, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f'screen_rect must contain four finite coordinates. {configuration_help}') from exc
+    rectangle_size = 4
+    if (
+        rectangle.shape != (rectangle_size,)
+        or not np.isfinite(rectangle).all()
+        or rectangle[2] <= rectangle[0]
+        or rectangle[3] <= rectangle[1]
+    ):
+        raise ValueError(
+            'screen_rect must contain [left, top, right, bottom] with positive width and height. ' + configuration_help
+        )
+
     nan_value = 9999.0
     va1_deg_cm = 2 * pi * distance / 360  # visual angle 1 deg [unit:cm]
-    px_in_cm = screen_width / screen_rect[2]
+    screen_width_px = rectangle[2] - rectangle[0]
+    screen_height_px = rectangle[3] - rectangle[1]
+    px_in_cm = screen_width / screen_width_px
     va1_deg_px = np.floor(va1_deg_cm / px_in_cm)
     px2deg = 1 / va1_deg_px
-    gaze_xlim = (screen_rect[2] / gaze_lims['x']) * px2deg
-    gaze_ylim = (screen_rect[3] / gaze_lims['y']) * px2deg
+    gaze_xlim = (screen_width_px / gaze_lims['x']) * px2deg
+    gaze_ylim = (screen_height_px / gaze_lims['y']) * px2deg
 
     # columns labels for the raw data we get from the trackpixx3
     columns = [

@@ -5,6 +5,8 @@ import librosa
 import numpy as np
 from scipy.signal import butter, resample_poly, sosfiltfilt
 
+from almkanal.defaults import function_defaults
+
 
 def resample_poly_exact(x: np.ndarray, fs_in: int | float, fs_out: int | float, axis: int = -1) -> np.ndarray:
     """Polyphase resample, then trim/pad to n_out = round(T * fs_out)."""
@@ -31,6 +33,7 @@ def resample_poly_exact(x: np.ndarray, fs_in: int | float, fs_out: int | float, 
     return y
 
 
+@function_defaults('audio')
 def prepare_audio(  # noqa PLR0915
     audio_path: str,
     feature: str = 'envelope',

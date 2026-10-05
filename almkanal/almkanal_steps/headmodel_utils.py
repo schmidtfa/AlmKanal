@@ -10,6 +10,7 @@ from attrs import define, field
 from mne.coreg import Coregistration
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.defaults import default_field, function_defaults, step_with_defaults
 from almkanal.info import AlmKanalInfo
 
 
@@ -250,6 +251,7 @@ def plot_head_model(  # noqa: PLR0912, PLR0915, C901
     return fig
 
 
+@function_defaults('forward_model')
 def make_fwd(
     info: mne.Info,
     source: str,
@@ -428,23 +430,24 @@ class ForwardModel(AlmKanalStep):
 
     subject_id: str
     subjects_dir: str | Path
-    pick_dict: dict | None = None
-    source: str = 'surface'
-    redo_hdm: bool = True
-    spacing: str = 'oct6'
-    source_ico: int = 4
-    bem_conductivity: float | Sequence[float] = (0.3,)  # fine for MEG should be changed for EEG
-    volume_pos: float = 5.0
-    use_template_mri: bool = True
-    min_dist_src: float = 5.0
-    meg: bool = True
-    eeg: bool = False
-    redo_bem: bool = False
+    pick_dict: dict | None = default_field('forward_model', 'pick_dict')
+    source: str = default_field('forward_model', 'source')
+    redo_hdm: bool = default_field('forward_model', 'redo_hdm')
+    spacing: str = default_field('forward_model', 'spacing')
+    source_ico: int = default_field('forward_model', 'source_ico')
+    bem_conductivity: float | Sequence[float] = default_field('forward_model', 'bem_conductivity')
+    volume_pos: float = default_field('forward_model', 'volume_pos')
+    use_template_mri: bool = default_field('forward_model', 'use_template_mri')
+    min_dist_src: float = default_field('forward_model', 'min_dist_src')
+    meg: bool = default_field('forward_model', 'meg')
+    eeg: bool = default_field('forward_model', 'eeg')
+    redo_bem: bool = default_field('forward_model', 'redo_bem')
 
     must_be_before: tuple = ('SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ('Maxwell', 'ICA')
     allow_repeated: bool = field(default=False, init=False)
 
+    @step_with_defaults
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
         if self.source not in ('surface', 'volume'):
             raise ValueError("source must be 'surface' or 'volume'.")

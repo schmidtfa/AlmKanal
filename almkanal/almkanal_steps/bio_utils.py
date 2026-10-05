@@ -4,9 +4,11 @@ import numpy as np
 from attrs import define, field
 
 from almkanal import AlmKanalStep
+from almkanal.defaults import default_field, function_defaults, step_with_defaults
 from almkanal.info import AlmKanalInfo
 
 
+@function_defaults('physio')
 def run_bio_preproc(
     raw: mne.io.Raw,
     ecg: None | str | list = None,
@@ -139,15 +141,16 @@ class PhysioCleaner(AlmKanalStep):
         Preprocess the selected physiological channels.
     """
 
-    ecg: None | str | list = None
-    resp: None | str | list = None
-    eog: None | str | list = None
-    emg: None | str | list = None
+    ecg: None | str | list = default_field('physio', 'ecg')
+    resp: None | str | list = default_field('physio', 'resp')
+    eog: None | str | list = default_field('physio', 'eog')
+    emg: None | str | list = default_field('physio', 'emg')
 
     must_be_before: tuple = ('ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
     allow_repeated: bool = field(default=False, init=False)
 
+    @step_with_defaults
     def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> dict:
         data = run_bio_preproc(
             raw=data,

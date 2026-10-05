@@ -11,6 +11,7 @@ import numpy as np
 from scipy.signal import butter, correlate, hilbert, sosfiltfilt
 from scipy.stats import theilslopes
 
+from almkanal.defaults import function_defaults
 from almkanal.stim_utils.audio_utils import resample_poly_exact
 
 if TYPE_CHECKING:
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 VARIANCE_EPSILON = 1e-12
 ENERGY_EPSILON = 1e-20
 MIN_ANCHORS_FOR_DRIFT = 2
-DEFAULT_FALLBACK_DRIFT_US_PER_S = 499.0
+DEFAULT_FALLBACK_DRIFT_US_PER_S = 0.0  # General profile; Salzburg uses +499 us/s.
 LAG_LIMIT_MARGIN_FRACTION = 0.05
 MIN_ANCHOR_TIME_COVERAGE = 0.5
 
@@ -81,6 +82,13 @@ def _infer_audio_trial_end(
     }
 
 
+@function_defaults(
+    'trials',
+    aliases={
+        'stim_channel': ('events', 'stim_channel'),
+        'fallback_drift_us_per_s': ('trf', 'fallback_drift_us_per_s'),
+    },
+)
 def find_audio_trials(  # noqa: C901, PLR0912, PLR0915
     raw: mne.io.BaseRaw,
     onset_trigger_to_wav: Mapping[int, str | Path],
@@ -315,6 +323,7 @@ def _alignment_quality_warnings(
     return reasons
 
 
+@function_defaults('alignment')
 def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
     raw_trial: mne.io.BaseRaw,
     wav_file: str | Path,
@@ -537,6 +546,7 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
     return alignment
 
 
+@function_defaults('trf')
 def assume_raw_wav_alignment(
     wav_file: str | Path,
     raw_sfreq: float,

@@ -5,9 +5,11 @@ import numpy as np
 from attrs import define, field
 
 from almkanal import AlmKanalStep
+from almkanal.defaults import default_field, function_defaults, step_with_defaults
 from almkanal.info import AlmKanalInfo
 
 
+@function_defaults('source_reconstruction')
 def src2parc(  # noqa: C901, PLR0912
     stc: mne.SourceEstimate | mne.VolSourceEstimate | list,
     src: mne.SourceSpaces,
@@ -131,16 +133,17 @@ class SourceReconstruction(AlmKanalStep):
         Source time courses or parcellated data.
     """
 
-    filters: None | mne.beamformer.Beamformer = None
-    return_parc: bool = False
-    label_mode: str = 'pca_flip'
-    atlas: str = 'glasser'
-    morph2fsaverage: bool = True
+    filters: None | mne.beamformer.Beamformer = default_field('source_reconstruction', 'filters')
+    return_parc: bool = default_field('source_reconstruction', 'return_parc')
+    label_mode: str = default_field('source_reconstruction', 'label_mode')
+    atlas: str = default_field('source_reconstruction', 'atlas')
+    morph2fsaverage: bool = default_field('source_reconstruction', 'morph2fsaverage')
 
     must_be_before: tuple = ()
     must_be_after: tuple = ('Maxwell', 'ICA', 'ForwardModel')
     allow_repeated: bool = field(default=False, init=False)
 
+    @step_with_defaults
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:  # noqa: C901, PLR0912
         fwd_info = info.get_step('ForwardModel')
         if fwd_info is None:

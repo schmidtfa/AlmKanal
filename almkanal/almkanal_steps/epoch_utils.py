@@ -4,6 +4,7 @@ from attrs import define, field
 from numpy.typing import ArrayLike
 
 from almkanal import AlmKanalStep
+from almkanal.defaults import default_field, step_with_defaults
 from almkanal.info import AlmKanalInfo
 
 
@@ -99,25 +100,26 @@ class Epochs(AlmKanalStep):
     )
     allow_repeated: bool = field(default=False, init=False)
 
-    tmin: float = -0.15
-    tmax: float = 0.5
-    events: None | ArrayLike = None
-    event_id: None | dict = None
-    baseline: None | tuple = None
-    preload: bool = True
-    picks: str | ArrayLike | None = None
-    reject: dict | None = None
-    flat: dict | None = None
-    proj: bool | str = True
-    reject_tmin: float | None = None
-    reject_tmax: float | None = None
-    detrend: int | None = None
-    on_missing: str = 'raise'
-    reject_by_annotation: bool = True
-    metadata: None | pd.DataFrame = None
-    event_repeated: str = 'error'
-    verbose: bool | str | int | None = None
+    tmin: float = default_field('epochs', 'tmin')
+    tmax: float = default_field('epochs', 'tmax')
+    events: None | ArrayLike = default_field('epochs', 'events')
+    event_id: None | dict = default_field('epochs', 'event_id')
+    baseline: None | tuple = default_field('epochs', 'baseline')
+    preload: bool = default_field('epochs', 'preload')
+    picks: str | ArrayLike | None = default_field('epochs', 'picks')
+    reject: dict | None = default_field('epochs', 'reject')
+    flat: dict | None = default_field('epochs', 'flat')
+    proj: bool | str = default_field('epochs', 'proj')
+    reject_tmin: float | None = default_field('epochs', 'reject_tmin')
+    reject_tmax: float | None = default_field('epochs', 'reject_tmax')
+    detrend: int | None = default_field('epochs', 'detrend')
+    on_missing: str = default_field('epochs', 'on_missing')
+    reject_by_annotation: bool = default_field('epochs', 'reject_by_annotation')
+    metadata: None | pd.DataFrame = default_field('epochs', 'metadata')
+    event_repeated: str = default_field('epochs', 'event_repeated')
+    verbose: bool | str | int | None = default_field('epochs', 'verbose')
 
+    @step_with_defaults
     def run(
         self,
         data: mne.io.BaseRaw,
