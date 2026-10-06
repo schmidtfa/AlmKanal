@@ -83,10 +83,10 @@ class VPixxConfig:
         if any(x < 0 for x in self.blink_buffer):
             raise ValueError('blink_buffer values must be non-negative.')
 
+TWO_INPUT_VALUES = 2
+BLINK_PROBABILITY_THRESHOLD = 0.5
 
 DEFAULT_VPIXX_CONFIG = VPixxConfig()
-BLINK_PROBABILITY_THRESHOLD = 0.5
-TWO_INPUT_VALUES = 2
 
 VPIXX_CHANNELS = (
     'Left Eye x',
