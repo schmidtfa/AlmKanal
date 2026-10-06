@@ -14,12 +14,6 @@ from almkanal.eye_utils.gaze_utils import (
     read_vpixx_mat,
 )
 
-
-# ---------------------------------------------------------------------------
-# Synthetic data helpers
-# ---------------------------------------------------------------------------
-
-
 def make_synthetic_vpixx_mat(
     path: Path,
     *,
@@ -56,9 +50,7 @@ def make_synthetic_vpixx_mat(
 
     data[:, 0] = times
 
-    # ------------------------------------------------------------------
-    # Synthetic gaze data
-    # ------------------------------------------------------------------
+    # Simulate gaze data
 
     # Smooth gaze trajectory.
     gaze_x = 960.0 + 100.0 * np.sin(2 * np.pi * 0.5 * times)
@@ -68,7 +60,7 @@ def make_synthetic_vpixx_mat(
     data[:, 2] = gaze_y
     data[:, 3] = 3.0
 
-    # Right eye is similar but slightly different.
+    # Right eye is similar but slightly different
     data[:, 4] = gaze_x + 5.0
     data[:, 5] = gaze_y + 3.0
     data[:, 6] = 3.1
@@ -80,9 +72,6 @@ def make_synthetic_vpixx_mat(
     data[:, 8] = 0.0
     data[:, 9] = 0.0
 
-    # Digital output is column 10 in the original MAT array because
-    # column 0 is the timestamp. After read_vpixx_mat(), it becomes
-    # eye_data[:, 9].
     digital_output = np.zeros(n_samples)
 
     for time, code in zip(trigger_times, trigger_codes):
@@ -139,8 +128,6 @@ def make_synthetic_meg(
     return mne.io.RawArray(data, info)
 
 
-
-
 def test_read_vpixx_mat(tmp_path):
     """Test reading a synthetic VPixx MAT file."""
     path = tmp_path / "synthetic_eye.mat"
@@ -156,7 +143,6 @@ def test_read_vpixx_mat(tmp_path):
     assert data.shape == (4000, 19)
     assert sfreq == pytest.approx(2000.0)
 
-    # Timestamp was removed.
     assert data.shape[1] == 19
 
 
@@ -190,10 +176,8 @@ def test_load_eyetracking_data(tmp_path):
 
     assert expected_channels.issubset(raw.ch_names)
 
-    # Digital output should be a stimulus channel.
     assert raw.get_channel_types(picks=["Digital Output"]) == ["stim"]
 
-    # The derived gaze signals should contain finite data.
     for channel in (
         "eyetracker_x",
         "eyetracker_y",
@@ -224,9 +208,7 @@ def test_align_eye_to_meg(tmp_path):
     meg_trigger_times = (1.0, 2.0, 3.0)
 
     # Eye recording starts 0.5 seconds later.
-    #
-    # Therefore the same physical events occur at:
-    # 1.5, 2.5, 3.5 seconds in eye-tracker time.
+
     eye_trigger_times = (0.5, 1.5, 2.5)
     trigger_codes = (1, 2, 3)
 
@@ -267,11 +249,6 @@ def test_align_eye_to_meg(tmp_path):
     assert aligned_eye.n_times == meg.n_times
 
 
-# ---------------------------------------------------------------------------
-# End-to-end public API test
-# ---------------------------------------------------------------------------
-
-
 def test_add_eye_tracking_data(tmp_path):
     """Test complete MEG + eye-tracking integration."""
     eye_path = tmp_path / "synthetic_eye.mat"
@@ -283,9 +260,7 @@ def test_add_eye_tracking_data(tmp_path):
         trigger_codes=(1, 2, 3),
     )
 
-    # Eye tracker has:
-    # - a different sampling frequency
-    # - a 0.5 second temporal offset
+
     make_synthetic_vpixx_mat(
         eye_path,
         sfreq=2000.0,
@@ -303,11 +278,9 @@ def test_add_eye_tracking_data(tmp_path):
         interpolate_blinks=False,
     )
 
-    # Original MEG channels are still present.
     for channel in original_meg_channels:
         assert channel in result.ch_names
 
-    # Eye channels were added.
     expected_eye_channels = {
         "eyetracker_x",
         "eyetracker_y",
@@ -321,11 +294,11 @@ def test_add_eye_tracking_data(tmp_path):
 
     assert expected_eye_channels.issubset(result.ch_names)
 
-    # Sampling frequencies should now agree.
+    # Sampling frequencies should  match
     assert result.info["sfreq"] == pytest.approx(1000.0)
 
-    # add_channels() requires compatible sample counts.
+    # add_channels() requires compatible sample counts
     assert result.n_times == meg.n_times
 
-    # The resulting object contains more channels than the original MEG.
+    # The resulting object contains more channels than the original MEG
     assert result.info["nchan"] > len(original_meg_channels)

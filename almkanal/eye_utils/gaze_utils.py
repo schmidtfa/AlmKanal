@@ -18,14 +18,16 @@ from typing import Literal
 import mne
 import numpy as np
 from pymatreader import read_mat
+
 from .blink_utils import call_blink_annotations, vpixx_default_blinkmap
 
 logger = logging.getLogger(__name__)
 
 
-
 @dataclass(frozen=True)
-class VPixxConfig:      # this corresponds to the standard vpixx configurations in the Lab at the Christian-Doppler Klinik in Salzburg. Adjust if needed.
+class VPixxConfig:
+    # this corresponds to the standard vpixx configurations in the Lab
+    # at the Christian-Doppler Klinik in Salzburg. Adjust if needed.
     """Configuration for VPixx eye-tracking preprocessing.
 
     Parameters
@@ -52,59 +54,60 @@ class VPixxConfig:      # this corresponds to the standard vpixx configurations 
     screen_resolution: tuple[int, int] = (1920, 1080)
     screen_size: tuple[float, float] = (0.61, 0.34)
     screen_distance: float = 0.82
-    calibration_model: str = "HV5"
-    calibration_eye: Literal["left", "right"] = "right"
+    calibration_model: str = 'HV5'
+    calibration_eye: Literal['left', 'right'] = 'right'
     blink_buffer: tuple[float, float] = (0.05, 0.2)
     digital_output_threshold: float = 256.0
     missing_value: float = 9999.0
 
     def __post_init__(self) -> None:
         """Validate configuration."""
-        if len(self.screen_resolution) != 2:
-            raise ValueError("screen_resolution must contain two values.")
+        if len(self.screen_resolution) != TWO_INPUT_VALUES:
+            raise ValueError('screen_resolution must contain two values.')
 
         if any(x <= 0 for x in self.screen_resolution):
-            raise ValueError("screen_resolution values must be positive.")
+            raise ValueError('screen_resolution values must be positive.')
 
-        if len(self.screen_size) != 2:
-            raise ValueError("screen_size must contain two values.")
+        if len(self.screen_size) != TWO_INPUT_VALUES:
+            raise ValueError('screen_size must contain two values.')
 
         if any(x <= 0 for x in self.screen_size):
-            raise ValueError("screen_size values must be positive.")
+            raise ValueError('screen_size values must be positive.')
 
         if self.screen_distance <= 0:
-            raise ValueError("screen_distance must be positive.")
+            raise ValueError('screen_distance must be positive.')
 
-        if len(self.blink_buffer) != 2:
-            raise ValueError("blink_buffer must contain two values.")
+        if len(self.blink_buffer) != TWO_INPUT_VALUES:
+            raise ValueError('blink_buffer must contain two values.')
 
         if any(x < 0 for x in self.blink_buffer):
-            raise ValueError("blink_buffer values must be non-negative.")
+            raise ValueError('blink_buffer values must be non-negative.')
 
 
 DEFAULT_VPIXX_CONFIG = VPixxConfig()
-
+BLINK_PROBABILITY_THRESHOLD = 0.5
+TWO_INPUT_VALUES = 2
 
 VPIXX_CHANNELS = (
-    "Left Eye x",
-    "Left Eye y",
-    "Left Eye Pupil Diameter",
-    "Right Eye x",
-    "Right Eye y",
-    "Right Eye Pupil Diameter",
-    "Digital Input",
-    "Left Eye Blink",
-    "Right Eye Blink",
-    "Digital Output",
-    "Left Eye Fixation",
-    "Right Eye Fixation",
-    "Left Eye Saccade",
-    "Right Eye Saccade",
-    "Message code",
-    "Left Eye Raw x",
-    "Left Eye Raw y",
-    "Right Eye Raw x",
-    "Right Eye Raw y",
+    'Left Eye x',
+    'Left Eye y',
+    'Left Eye Pupil Diameter',
+    'Right Eye x',
+    'Right Eye y',
+    'Right Eye Pupil Diameter',
+    'Digital Input',
+    'Left Eye Blink',
+    'Right Eye Blink',
+    'Digital Output',
+    'Left Eye Fixation',
+    'Right Eye Fixation',
+    'Left Eye Saccade',
+    'Right Eye Saccade',
+    'Message code',
+    'Left Eye Raw x',
+    'Left Eye Raw y',
+    'Right Eye Raw x',
+    'Right Eye Raw y',
 )
 
 
@@ -137,32 +140,25 @@ def read_vpixx_mat(
     filepath = Path(filepath)
 
     if not filepath.is_file():
-        raise FileNotFoundError(f"Eye-tracking file does not exist: {filepath}")
+        raise FileNotFoundError(f'Eye-tracking file does not exist: {filepath}')
 
-    logger.info("Reading VPixx eye-tracking file: %s", filepath)
+    logger.info('Reading VPixx eye-tracking file: %s', filepath)
 
     mat = read_mat(filepath)
 
-    if "data" not in mat:
-        raise ValueError(
-            f"Could not find 'data' in VPixx MAT file: {filepath}"
-        )
+    if 'data' not in mat:
+        raise ValueError(f"Could not find 'data' in VPixx MAT file: {filepath}")
 
-    data = np.asarray(mat["data"], dtype=float)
+    data = np.asarray(mat['data'], dtype=float)
 
-    if data.ndim != 2 or data.shape[0] < 2 or data.shape[1] < 2:
-        raise ValueError(
-            "VPixx data must be a 2D array containing at least "
-            "two samples and two columns."
-        )
+    if data.ndim != TWO_INPUT_VALUES or data.shape[0] < TWO_INPUT_VALUES or data.shape[1] < TWO_INPUT_VALUES:
+        raise ValueError('VPixx data must be a 2D array containing at least ' 'two samples and two columns.')
 
     time = data[:, 0]
     dt = np.diff(time)
 
     if np.any(dt <= 0):
-        raise ValueError(
-            "VPixx timestamps must be strictly increasing."
-        )
+        raise ValueError('VPixx timestamps must be strictly increasing.')
 
     sampling_interval = float(np.median(dt))
     sfreq = 1.0 / sampling_interval
@@ -201,22 +197,19 @@ def make_eye_mne(
     """
     eye_data = np.asarray(eye_data, dtype=float)
 
-    if eye_data.ndim != 2:
-        raise ValueError("eye_data must be a 2D array.")
+    if eye_data.ndim != TWO_INPUT_VALUES:
+        raise ValueError('eye_data must be a 2D array.')
 
     if eye_data.shape[1] != len(VPIXX_CHANNELS):
-        raise ValueError(
-            f"Expected {len(VPIXX_CHANNELS)} VPixx channels, "
-            f"got {eye_data.shape[1]}."
-        )
+        raise ValueError(f'Expected {len(VPIXX_CHANNELS)} VPixx channels, ' f'got {eye_data.shape[1]}.')
 
     if sfreq <= 0:
-        raise ValueError("sfreq must be positive.")
+        raise ValueError('sfreq must be positive.')
 
     info = mne.create_info(
         ch_names=list(VPIXX_CHANNELS),
         sfreq=sfreq,
-        ch_types=["misc"] * len(VPIXX_CHANNELS),
+        ch_types=['misc'] * len(VPIXX_CHANNELS),
     )
 
     raw = mne.io.RawArray(eye_data.T, info)
@@ -224,16 +217,16 @@ def make_eye_mne(
     mne.preprocessing.eyetracking.set_channel_types_eyetrack(
         raw,
         mapping={
-            "Left Eye x": ("eyegaze", "px", "left", "x"),
-            "Left Eye Raw x": ("eyegaze", "px", "left", "x"),
-            "Left Eye y": ("eyegaze", "px", "left", "y"),
-            "Left Eye Raw y": ("eyegaze", "px", "left", "y"),
-            "Right Eye x": ("eyegaze", "px", "right", "x"),
-            "Right Eye Raw x": ("eyegaze", "px", "right", "x"),
-            "Right Eye y": ("eyegaze", "px", "right", "y"),
-            "Right Eye Raw y": ("eyegaze", "px", "right", "y"),
-            "Left Eye Pupil Diameter": ("pupil", "au", "left"),
-            "Right Eye Pupil Diameter": ("pupil", "au", "right"),
+            'Left Eye x': ('eyegaze', 'px', 'left', 'x'),
+            'Left Eye Raw x': ('eyegaze', 'px', 'left', 'x'),
+            'Left Eye y': ('eyegaze', 'px', 'left', 'y'),
+            'Left Eye Raw y': ('eyegaze', 'px', 'left', 'y'),
+            'Right Eye x': ('eyegaze', 'px', 'right', 'x'),
+            'Right Eye Raw x': ('eyegaze', 'px', 'right', 'x'),
+            'Right Eye y': ('eyegaze', 'px', 'right', 'y'),
+            'Right Eye Raw y': ('eyegaze', 'px', 'right', 'y'),
+            'Left Eye Pupil Diameter': ('pupil', 'au', 'left'),
+            'Right Eye Pupil Diameter': ('pupil', 'au', 'right'),
         },
     )
 
@@ -273,14 +266,13 @@ def create_vpixx_calibration(
 vpixx_templatecalibration = create_vpixx_calibration
 
 
-
 def _calculate_eye_quality(raw: mne.io.BaseRaw) -> dict[str, float]:
     """Calculate the fraction of missing gaze samples for each eye."""
     quality = {}
 
-    for eye in ("left", "right"):
-        x = raw.get_data(picks=f"{eye.title()} Eye x")[0]
-        y = raw.get_data(picks=f"{eye.title()} Eye y")[0]
+    for eye in ('left', 'right'):
+        x = raw.get_data(picks=f'{eye.title()} Eye x')[0]
+        y = raw.get_data(picks=f'{eye.title()} Eye y')[0]
 
         quality[eye] = float(np.mean(np.isnan(x) | np.isnan(y)))
 
@@ -293,11 +285,10 @@ def _select_best_eye(
     """Return the eye with the lowest proportion of missing samples."""
     quality = _calculate_eye_quality(raw)
 
-    if np.isclose(quality["left"], quality["right"]):
+    if np.isclose(quality['left'], quality['right']):
         return None
 
-    return min(quality, key=quality.get)
-
+    return min(quality, key=lambda eye: quality[eye])
 
 def _combine_eyes(
     left: np.ndarray,
@@ -308,7 +299,7 @@ def _combine_eyes(
 
     valid = np.isfinite(stacked)
 
-    with np.errstate(invalid="ignore"):
+    with np.errstate(invalid='ignore'):
         result = np.nanmean(stacked, axis=0)
 
     # Avoid warnings and preserve missing values when both eyes are absent.
@@ -327,15 +318,11 @@ def _five_point_velocity(
 
     vx = np.zeros_like(x, dtype=float)
     vy = np.zeros_like(y, dtype=float)
+    min_len = 5
+    if len(x) >= min_len:
+        vx[2:-2] = (x[4:] + x[3:-1] - x[1:-3] - x[:-4]) / (6.0 * dt)
 
-    if len(x) >= 5:
-        vx[2:-2] = (
-            x[4:] + x[3:-1] - x[1:-3] - x[:-4]
-        ) / (6.0 * dt)
-
-        vy[2:-2] = (
-            y[4:] + y[3:-1] - y[1:-3] - y[:-4]
-        ) / (6.0 * dt)
+        vy[2:-2] = (y[4:] + y[3:-1] - y[1:-3] - y[:-4]) / (6.0 * dt)
 
     velocity = np.sqrt(vx**2 + vy**2)
 
@@ -351,7 +338,7 @@ def _make_derived_channel(
     info = mne.create_info(
         ch_names=[name],
         sfreq=sfreq,
-        ch_types=["misc"],
+        ch_types=['misc'],
     )
 
     return mne.io.RawArray(
@@ -361,7 +348,7 @@ def _make_derived_channel(
 
 
 # main preprocessing functions
-def load_eyetracking_data(
+def load_eyetracking_data(  # noqa PLR0915
     eye_path: str | Path,
     *,
     config: VPixxConfig = DEFAULT_VPIXX_CONFIG,
@@ -436,7 +423,7 @@ def load_eyetracking_data(
     if blink_buffer is None:
         blink_buffer = config.blink_buffer
 
-    logger.info("Loading eye-tracking data from %s", eye_path)
+    logger.info('Loading eye-tracking data from %s', eye_path)
 
     eye_data, sfreq = read_vpixx_mat(eye_path)
 
@@ -445,7 +432,7 @@ def load_eyetracking_data(
     digital_output = eye_data[:, 9]
 
     if np.count_nonzero(digital_output > config.digital_output_threshold) > 1:
-        logger.debug("Scaling VPixx Digital Output by 1/256.")
+        logger.debug('Scaling VPixx Digital Output by 1/256.')
         eye_data[:, 9] /= 256.0
 
     # Replace VPixx missing-value marker.
@@ -459,10 +446,8 @@ def load_eyetracking_data(
         raw = mne.preprocessing.eyetracking.convert_units(
             raw,
             calibration=calibration,
-            to="radians",
+            to='radians',
         )
-
-
 
     blink_map = vpixx_default_blinkmap()
     annotations = call_blink_annotations(raw, blink_map)
@@ -471,19 +456,17 @@ def load_eyetracking_data(
     quality = _calculate_eye_quality(raw)
 
     logger.info(
-        "Missing gaze data: left=%.2f%%, right=%.2f%%",
-        quality["left"] * 100,
-        quality["right"] * 100,
+        'Missing gaze data: left=%.2f%%, right=%.2f%%',
+        quality['left'] * 100,
+        quality['right'] * 100,
     )
 
     good_eye = _select_best_eye(raw)
 
     if good_eye is None:
-        logger.info(
-            "Both eyes have equivalent data quality; combining both eyes."
-        )
+        logger.info('Both eyes have equivalent data quality; combining both eyes.')
     else:
-        logger.info("Selected %s eye based on data quality.", good_eye)
+        logger.info('Selected %s eye based on data quality.', good_eye)
 
     if interpolate_blinks:
         raw_clean = mne.preprocessing.eyetracking.interpolate_blinks(
@@ -494,34 +477,26 @@ def load_eyetracking_data(
     else:
         raw_clean = raw.copy()
 
-    sfreq = raw_clean.info["sfreq"]
+    sfreq = raw_clean.info['sfreq']
 
-    left_x = raw_clean.get_data(picks="Left Eye x")[0]
-    right_x = raw_clean.get_data(picks="Right Eye x")[0]
-    left_y = raw_clean.get_data(picks="Left Eye y")[0]
-    right_y = raw_clean.get_data(picks="Right Eye y")[0]
+    left_x = raw_clean.get_data(picks='Left Eye x')[0]
+    right_x = raw_clean.get_data(picks='Right Eye x')[0]
+    left_y = raw_clean.get_data(picks='Left Eye y')[0]
+    right_y = raw_clean.get_data(picks='Right Eye y')[0]
 
-    left_pupil = raw_clean.get_data(
-        picks="Left Eye Pupil Diameter"
-    )[0]
-    right_pupil = raw_clean.get_data(
-        picks="Right Eye Pupil Diameter"
-    )[0]
+    left_pupil = raw_clean.get_data(picks='Left Eye Pupil Diameter')[0]
+    right_pupil = raw_clean.get_data(picks='Right Eye Pupil Diameter')[0]
 
-    left_blink = raw_clean.get_data(
-        picks="Left Eye Blink"
-    )[0]
-    right_blink = raw_clean.get_data(
-        picks="Right Eye Blink"
-    )[0]
+    left_blink = raw_clean.get_data(picks='Left Eye Blink')[0]
+    right_blink = raw_clean.get_data(picks='Right Eye Blink')[0]
 
-    if good_eye == "left":
+    if good_eye == 'left':
         x = left_x
         y = left_y
         pupil = left_pupil
         blinks = left_blink
 
-    elif good_eye == "right":
+    elif good_eye == 'right':
         x = right_x
         y = right_y
         pupil = right_pupil
@@ -536,7 +511,8 @@ def load_eyetracking_data(
             np.nanmean(
                 np.vstack([left_blink, right_blink]),
                 axis=0,
-            ) > 0.5
+            )
+            > BLINK_PROBABILITY_THRESHOLD
         ).astype(int)
 
     velocity_x, velocity_y, velocity = _five_point_velocity(
@@ -546,18 +522,18 @@ def load_eyetracking_data(
     )
 
     derived = [
-        _make_derived_channel("eyetracker_x", x, sfreq),
-        _make_derived_channel("eyetracker_y", y, sfreq),
-        _make_derived_channel("pupil_diameter", pupil, sfreq),
-        _make_derived_channel("blinks", blinks, sfreq),
-        _make_derived_channel("velocity", velocity, sfreq),
-        _make_derived_channel("velocity_x", velocity_x, sfreq),
-        _make_derived_channel("velocity_y", velocity_y, sfreq),
+        _make_derived_channel('eyetracker_x', x, sfreq),
+        _make_derived_channel('eyetracker_y', y, sfreq),
+        _make_derived_channel('pupil_diameter', pupil, sfreq),
+        _make_derived_channel('blinks', blinks, sfreq),
+        _make_derived_channel('velocity', velocity, sfreq),
+        _make_derived_channel('velocity_x', velocity_x, sfreq),
+        _make_derived_channel('velocity_y', velocity_y, sfreq),
     ]
 
     raw_clean.set_channel_types(
-        {"Digital Output": "stim"},
-        on_unit_change="ignore",
+        {'Digital Output': 'stim'},
+        on_unit_change='ignore',
     )
 
     raw_clean.add_channels(
@@ -568,37 +544,34 @@ def load_eyetracking_data(
     if include_raw_vpixx_channels:
         keep_channels = [
             *VPIXX_CHANNELS,
-            "eyetracker_x",
-            "eyetracker_y",
-            "pupil_diameter",
-            "blinks",
-            "velocity",
-            "velocity_x",
-            "velocity_y",
+            'eyetracker_x',
+            'eyetracker_y',
+            'pupil_diameter',
+            'blinks',
+            'velocity',
+            'velocity_x',
+            'velocity_y',
         ]
     else:
         keep_channels = [
-            "eyetracker_x",
-            "eyetracker_y",
-            "pupil_diameter",
-            "blinks",
-            "velocity",
-            "velocity_x",
-            "velocity_y",
-            "Digital Output",
+            'eyetracker_x',
+            'eyetracker_y',
+            'pupil_diameter',
+            'blinks',
+            'velocity',
+            'velocity_x',
+            'velocity_y',
+            'Digital Output',
         ]
 
     raw_clean.pick(keep_channels)
 
-
-    raw_clean.info["description"] = (
-        f"VPixx eye tracking; selected_eye={good_eye or 'both'}"
-    )
+    raw_clean.info['description'] = f"VPixx eye tracking; selected_eye={good_eye or 'both'}"
 
     logger.info(
-        "Finished eye-tracking preprocessing: %d samples, %.2f Hz.",
+        'Finished eye-tracking preprocessing: %d samples, %.2f Hz.',
         raw_clean.n_times,
-        raw_clean.info["sfreq"],
+        raw_clean.info['sfreq'],
     )
 
     return raw_clean
@@ -608,8 +581,8 @@ def align_eye_to_meg(
     meg_data: mne.io.BaseRaw,
     eye_data: mne.io.BaseRaw,
     *,
-    meg_stim_channel: str = "STI101",
-    eye_stim_channel: str = "Digital Output",
+    meg_stim_channel: str = 'STI101',
+    eye_stim_channel: str = 'Digital Output',
     meg_min_duration: float = 0.002,
     meg_max_trigger: int = 4096,
 ) -> mne.io.BaseRaw:
@@ -650,24 +623,18 @@ def align_eye_to_meg(
     If you need to preserve the original, pass ``eye_data.copy()``.
     """
     if not isinstance(meg_data, mne.io.BaseRaw):
-        raise TypeError("meg_data must be an MNE Raw object.")
+        raise TypeError('meg_data must be an MNE Raw object.')
 
     if not isinstance(eye_data, mne.io.BaseRaw):
-        raise TypeError("eye_data must be an MNE Raw object.")
+        raise TypeError('eye_data must be an MNE Raw object.')
 
     if meg_stim_channel not in meg_data.ch_names:
-        raise ValueError(
-            f"MEG stimulus channel {meg_stim_channel!r} "
-            "was not found in the recording."
-        )
+        raise ValueError(f'MEG stimulus channel {meg_stim_channel!r} ' 'was not found in the recording.')
 
     if eye_stim_channel not in eye_data.ch_names:
-        raise ValueError(
-            f"Eye stimulus channel {eye_stim_channel!r} "
-            "was not found in the recording."
-        )
+        raise ValueError(f'Eye stimulus channel {eye_stim_channel!r} ' 'was not found in the recording.')
 
-    logger.info("Finding MEG synchronization events.")
+    logger.info('Finding MEG synchronization events.')
 
     eye_events = mne.find_events(
         eye_data,
@@ -681,17 +648,16 @@ def align_eye_to_meg(
         min_duration=meg_min_duration,
     )
 
-
     eye_events = eye_events[eye_events[:, 1] == 0]
 
     meg_events = meg_events[meg_events[:, 1] == 0]
     meg_events = meg_events[meg_events[:, 2] < meg_max_trigger]
 
     if len(eye_events) == 0:
-        raise ValueError("No synchronization events found in eye tracking.")
+        raise ValueError('No synchronization events found in eye tracking.')
 
     if len(meg_events) == 0:
-        raise ValueError("No synchronization events found in MEG.")
+        raise ValueError('No synchronization events found in MEG.')
 
     meg_matched, eye_matched = _match_events_by_code_and_order(
         meg_events,
@@ -699,31 +665,28 @@ def align_eye_to_meg(
     )
 
     if len(meg_matched) == 0:
-        raise ValueError(
-            "No matching synchronization events were found between "
-            "MEG and eye tracking."
-        )
+        raise ValueError('No matching synchronization events were found between ' 'MEG and eye tracking.')
 
     logger.info(
-        "Found %d matching synchronization events.",
+        'Found %d matching synchronization events.',
         len(meg_matched),
     )
 
     eye_samples = eye_matched[:, 0]
-    t_eye = eye_samples / eye_data.info["sfreq"]
+    t_eye = eye_samples / eye_data.info['sfreq']
 
     meg_samples = meg_matched[:, 0] - meg_data.first_samp
-    t_meg = meg_samples / meg_data.info["sfreq"]
+    t_meg = meg_samples / meg_data.info['sfreq']
 
-    logger.debug("MEG synchronization times: %s", t_meg)
-    logger.debug("Eye synchronization times: %s", t_eye)
+    logger.debug('MEG synchronization times: %s', t_meg)
+    logger.debug('Eye synchronization times: %s', t_eye)
 
     mne.preprocessing.realign_raw(
         meg_data,
         eye_data,
         t_raw=t_meg,
         t_other=t_eye,
-        verbose="error",
+        verbose='error',
     )
 
     return eye_data
@@ -781,8 +744,8 @@ def add_eye_tracking_data(
     blink_buffer: tuple[float, float] | None = None,
     convert_to_radians: bool = True,
     include_raw_vpixx_channels: bool = False,
-    meg_stim_channel: str = "STI101",
-    eye_stim_channel: str = "Digital Output",
+    meg_stim_channel: str = 'STI101',
+    eye_stim_channel: str = 'Digital Output',
 ) -> mne.io.BaseRaw:
     """Add preprocessed eye tracking to an MEG recording.
 
@@ -828,7 +791,7 @@ def add_eye_tracking_data(
     performed elsewhere.
     """
     if not isinstance(meg_data, mne.io.BaseRaw):
-        raise TypeError("meg_data must be an MNE Raw object.")
+        raise TypeError('meg_data must be an MNE Raw object.')
 
     eye_data = load_eyetracking_data(
         eye_path,
@@ -840,7 +803,7 @@ def add_eye_tracking_data(
     )
 
     if align:
-        logger.info("Aligning eye tracking to MEG.")
+        logger.info('Aligning eye tracking to MEG.')
         align_eye_to_meg(
             meg_data,
             eye_data,
@@ -848,26 +811,23 @@ def add_eye_tracking_data(
             eye_stim_channel=eye_stim_channel,
         )
     else:
-        logger.info(
-            "Eye-tracking/MEG alignment disabled; "
-            "adding eye tracking without synchronization."
-        )
+        logger.info('Eye-tracking/MEG alignment disabled; ' 'adding eye tracking without synchronization.')
 
     meg_data.load_data()
     eye_data.load_data()
 
-    if meg_data.info["sfreq"] != eye_data.info["sfreq"]:
+    if meg_data.info['sfreq'] != eye_data.info['sfreq']:
         raise ValueError(
-            "MEG and eye-tracking sampling frequencies differ after "
-            "alignment. Resample the eye-tracking data before adding it "
-            "to the MEG recording."
+            'MEG and eye-tracking sampling frequencies differ after '
+            'alignment. Resample the eye-tracking data before adding it '
+            'to the MEG recording.'
         )
 
     if meg_data.n_times != eye_data.n_times:
         raise ValueError(
-            "MEG and eye-tracking recordings have different numbers of "
-            "samples. They cannot be combined with Raw.add_channels(). "
-            "Check temporal alignment and recording durations."
+            'MEG and eye-tracking recordings have different numbers of '
+            'samples. They cannot be combined with Raw.add_channels(). '
+            'Check temporal alignment and recording durations.'
         )
 
     meg_data.add_channels(
@@ -875,7 +835,6 @@ def add_eye_tracking_data(
         force_update_info=True,
     )
 
-    logger.info("Eye-tracking channels added to MEG.")
+    logger.info('Eye-tracking channels added to MEG.')
 
     return meg_data
-
