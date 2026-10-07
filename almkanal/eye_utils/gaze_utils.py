@@ -83,6 +83,7 @@ class VPixxConfig:
         if any(x < 0 for x in self.blink_buffer):
             raise ValueError('blink_buffer values must be non-negative.')
 
+
 TWO_INPUT_VALUES = 2
 BLINK_PROBABILITY_THRESHOLD = 0.5
 
@@ -167,9 +168,6 @@ def read_vpixx_mat(
     data[:, 0] -= data[0, 0]
 
     return data[:, 1:], sfreq
-
-
-readvpixxmat = read_vpixx_mat
 
 
 def make_eye_mne(
@@ -289,6 +287,7 @@ def _select_best_eye(
         return None
 
     return min(quality, key=lambda eye: quality[eye])
+
 
 def _combine_eyes(
     left: np.ndarray,
