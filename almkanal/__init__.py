@@ -6,6 +6,7 @@ from almkanal.almkanal_steps.bio_utils import PhysioCleaner
 from almkanal.almkanal_steps.channel_utils import EEGRANSAC, Maxwell, MultiBlockMaxwell, ReReference
 from almkanal.almkanal_steps.epoch_utils import Epochs
 from almkanal.almkanal_steps.event_utils import Events
+from almkanal.almkanal_steps.eye_utils import VPixxCleaner
 from almkanal.almkanal_steps.filter_utils import Filter, Resample
 from almkanal.almkanal_steps.headmodel_utils import ForwardModel
 from almkanal.almkanal_steps.ica_utils import ICA
@@ -17,6 +18,7 @@ from almkanal.report.exporting import preprocessing_report
 __all__ = [
     'AlmKanal',
     'AlmKanalStep',
+    'VPixxCleaner',
     'Filter',
     'Resample',
     'Maxwell',
