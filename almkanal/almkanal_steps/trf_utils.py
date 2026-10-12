@@ -62,14 +62,25 @@ def _validate_meta(_inst: Any, _attr: attrs.Attribute[MetaMap], meta: MetaMap) -
 
 @define
 class TRFSpanSpec:
-    """
-    Minimal spec for TRF epoch building.
-    - spans_by_label: REQUIRED raw-sample spans
-    - metadata_by_label: OPTIONAL per-label metadata to merge into epoch metadata
-                         values may be scalars (broadcast to all epochs of that label)
-                         or sequences of length n_epochs for that label
-    - wav_by_label: OPTIONAL WAV paths, relative to base_audio_path or absolute.
-                   Distinct trial labels may reference the same WAV.
+    """Describe trial spans, WAV files, and metadata for TRF epoching.
+
+    Parameters
+    ----------
+    spans_by_label : dict of str to tuple of (int, int | None)
+        Trial label to ``(onset, end)`` samples, including ``raw.first_samp``.
+        An end of ``None`` leaves the available raw/WAV duration as the limit.
+    metadata_by_label : dict of str to mapping, optional
+        Extra epoch metadata per trial. Scalars are repeated; sequences with
+        one value per retained epoch are assigned elementwise. Defaults to empty.
+    wav_by_label : mapping of str to str | pathlib.Path, optional
+        WAV paths, absolute or relative to ``base_audio_path``. Missing entries
+        use the trial label with a ``.wav`` suffix. Defaults to empty.
+
+    Notes
+    -----
+    Trials are processed in insertion order. Use distinct labels for repeated
+    presentations of the same WAV, or construct them with :meth:`from_events`.
+    ``build_trf_epochs`` can override the implicit WAV suffix via ``wav_ext``.
     """
 
     spans_by_label: Spans = field(validator=_validate_spans)
@@ -77,6 +88,7 @@ class TRFSpanSpec:
     wav_by_label: Mapping[str, str | Path] = field(factory=dict)
 
     def labels(self) -> list:
+        """Return trial labels in insertion order."""
         # preserve insertion order from user’s dict (Python 3.7+)
         return list(self.spans_by_label.keys())
 
@@ -99,18 +111,48 @@ class TRFSpanSpec:
         base_audio_path: str | Path | None = None,
         fallback_drift_us_per_s: float = DEFAULT_FALLBACK_DRIFT_US_PER_S,
     ) -> TRFSpanSpec:
-        """Build ordered, uniquely labelled trials, including repeated WAVs.
+        """Build uniquely labelled TRF trials from onset and end triggers.
 
-        Set infer_missing_ends=True to replace missing end triggers with WAV
-        duration * (1 + fallback_drift_us_per_s / 1e6), on the raw clock.
-        The prior comes from the active profile; this only defines the span. EpochTRF
-        estimates actual offset and drift when audio_channels are supplied.
-        Without recorded audio, enable realign_without_audio on EpochTRF to
-        also resample the neural data, using the same fallback_drift_us_per_s.
-        Pass base_audio_path for relative WAV paths, and end_triggers=None
-        when no end-trigger codes exist. Actual end triggers take precedence.
-        End-inference provenance is retained in epoch metadata and reports;
-        the Raw trigger channel is not modified.
+        Defaults below describe the general profile; omitted settings use the
+        active defaults profile.
+
+        Parameters
+        ----------
+        raw : mne.io.BaseRaw
+            Continuous recording containing the stimulus triggers.
+        onset_trigger_to_wav : mapping of int to str | pathlib.Path
+            Onset trigger codes mapped to WAV paths. Repeated codes create
+            separate trials referencing the same WAV.
+        end_triggers : int | sequence of int | None, default=None
+            Codes that end a trial. ``None`` requires ``infer_missing_ends=True``.
+        stim_channel : str | None, default=None
+            Trigger channel name. ``None`` requires exactly one stim channel.
+        infer_missing_ends : bool, default=False
+            Estimate missing endpoints from WAV duration and assumed drift.
+            Recorded end triggers take precedence.
+        base_audio_path : str | pathlib.Path | None, default=None
+            WAV directory, required for relative paths when inferring ends.
+        fallback_drift_us_per_s : float, default=0.0
+            Assumed drift in microseconds per second for end inference.
+            Positive values lengthen the span; Salzburg defaults to +499.
+
+        Returns
+        -------
+        spec : TRFSpanSpec
+            Trials in trigger order, labelled ``trial_000``, ``trial_001``, etc.,
+            with WAV paths, trigger codes, and any end-inference metadata.
+
+        Notes
+        -----
+        End inference uses ``WAV duration * (1 + drift / 1e6)`` and leaves the
+        trigger channel unchanged. It only defines spans: to also resample
+        neural data without recorded audio, set ``realign_without_audio=True``
+        on :class:`EpochTRF` and use the same ``fallback_drift_us_per_s``.
+        With recorded audio, EpochTRF estimates the offset and drift instead.
+
+        See Also
+        --------
+        find_audio_trials : Trigger pairing and missing-end handling.
         """
         trials = find_audio_trials(
             raw,
@@ -412,25 +454,75 @@ def build_trf_epochs(
     on_alignment_error: Literal['raise', 'skip'] = 'raise',
     verbose: bool = True,
 ) -> mne.Epochs:
-    """Build TRF epochs, optionally realigning before physical-delay correction.
+    """Build fixed-length TRF epochs with stimulus features from WAV files.
 
-    Supplying audio_channels enables per-trial offset and drift estimation.
-    With audio_channels=None, realign_without_audio=True instead resamples using
-    WAV duration and fallback_drift_us_per_s (general profile: zero; Salzburg: +499 us/s). This assumes
-    the trial onset is WAV time zero; no onset offset is measured. Positive
-    drift means t_raw = (1 + drift / 1e6) * t_wav relative to the trial onset.
-    Recorded audio takes precedence when supplied, and failed audio fits follow
-    on_alignment_error without falling back to an assumed drift.
-    hw_delay_s always shifts neural data relative to WAV features, after any
-    realignment, rounded to the nearest sample on the corrected clock.
-    Positive values advance neural events; the Salzburg +0.0165 s setting compensates
-    the 16.5 ms playback-to-ear delay when the audio reference precedes the
-    air tubes. Negative values add lag and emit a warning. The added WAV
-    feature channels are never delay-shifted.
+    Defaults below describe the general profile; omitted configurable settings
+    use the active defaults profile.
 
-    For long stimuli, increase alignment_kwargs['max_lag_s'] to accommodate
-    initial offset plus drift accumulated over the full WAV duration. See
-    estimate_raw_wav_alignment for search-range guidance and fit warnings.
+    Parameters
+    ----------
+    raw : mne.io.BaseRaw
+        Continuous recording to epoch. The input is not modified.
+    spec : TRFSpanSpec
+        Trial spans, WAV paths, and optional per-trial metadata.
+    base_audio_path : str | pathlib.Path
+        Directory used to resolve relative WAV paths in ``spec``.
+    feature : str, default='envelope'
+        WAV feature: ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
+        ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See ``prepare_audio``.
+    audio_cutoff_hz : float, default=80.0
+        Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.
+    hw_delay_s : float, default=0.0
+        Neural timing shift in seconds, applied after clock correction.
+        Positive values advance neural events; negative values add lag and warn.
+    epoch_len_s : float, default=5.0
+        Duration of each non-overlapping epoch in seconds. Must be positive;
+        incomplete trailing epochs are discarded.
+    wav_ext : str, default='.wav'
+        Suffix used to turn labels without a ``wav_by_label`` entry into paths.
+    audio_channels : sequence of str | None, default=None
+        Recorded audio channel names for estimating offset and drift.
+        ``None`` disables measured alignment; see ``realign_without_audio``.
+    realign_without_audio : bool, default=False
+        Resample using assumed drift and WAV duration when ``audio_channels``
+        is ``None``. Assumes WAV time zero at the trial onset.
+    fallback_drift_us_per_s : float, default=0.0
+        Assumed drift in microseconds per second for ``realign_without_audio``.
+        Positive values mean the recording clock spans more time than the WAV.
+    alignment_kwargs : mapping | None, default=None
+        Overrides for ``estimate_raw_wav_alignment``, e.g. ``{'max_lag_s': 1.0}``.
+        Requires ``audio_channels``; ``None`` uses the active alignment defaults.
+    preserve_annotations : bool, default=True
+        Keep annotations and reject epochs overlapping bad intervals.
+        ``False`` removes annotations before epoching.
+    on_alignment_error : {'raise', 'skip'}, default='raise'
+        Raise on alignment failure, or warn and skip the affected trial.
+        Applies to measured and assumed alignment, not fit-quality warnings.
+    verbose : bool, default=True
+        Emit processing messages. Quality warnings are shown regardless.
+
+    Returns
+    -------
+    epochs : mne.Epochs
+        Concatenated epochs with the input channels, WAV features as ``misc``
+        channels, and trial/timing metadata. Raises if no epochs survive.
+
+    Notes
+    -----
+    Recorded audio takes precedence over assumed drift, including when a fit
+    fails. Clock correction precedes the sample-rounded ``hw_delay_s`` shift;
+    WAV features are not shifted. Alignment requires recording coverage for
+    the full WAV duration plus any physical-delay margins.
+
+    The Salzburg profile uses ``hw_delay_s=0.0165``, ``audio_channels``
+    ``('MISC007', 'MISC008')``, and ``fallback_drift_us_per_s=499.0``.
+    See :class:`EpochTRF` for delay conventions and assumed-drift behavior.
+
+    See Also
+    --------
+    EpochTRF : Pipeline step with alignment diagnostics and reporting.
+    estimate_raw_wav_alignment : Alignment options and search-range guidance.
+    prepare_audio : Available WAV features and their output channels.
     """
     epochs, _ = _build_trf_epochs(
         raw,
@@ -456,116 +548,80 @@ def build_trf_epochs(
 class EpochTRF(AlmKanalStep):
     """Create TRF epochs and attach stimulus features from WAV files.
 
-    ``EpochTRF`` extracts trial spans from a continuous recording, loads the
-    corresponding WAV files, computes stimulus features, and returns fixed-length
-    epochs containing both the neural data and the WAV-derived feature channels.
-
-    Neural data can optionally be realigned to the stimulus clock using either
-    recorded audio or an assumed clock drift when no recorded audio is available.
-    A fixed physical-delay correction can subsequently be applied to the neural
-    data.
+    Optionally correct the recording clock, apply a fixed neural timing shift,
+    then split trials into non-overlapping epochs with WAV features as ``misc``
+    channels. Defaults below describe the general profile; omitted settings use
+    the active profile captured when the step is constructed.
 
     Parameters
     ----------
-    gen_span_spec : Callable
-        Function that receives the input :class:`mne.io.BaseRaw` object and
-        returns a :class:`TRFSpanSpec` describing the trial spans and associated
-        WAV files.
+    gen_span_spec : callable
+        Callback ``gen_span_spec(raw) -> TRFSpanSpec`` supplying trial spans,
+        WAV paths, and optional metadata for the input recording.
     base_audio_path : str | pathlib.Path
-        Base directory used to locate WAV files referenced by the generated
-        :class:`TRFSpanSpec`.
+        Directory used to resolve relative WAV paths in the generated span spec.
     feature : str, default='envelope'
-        WAV feature to compute and append to the neural data.
+        WAV feature: ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
+        ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See ``prepare_audio``.
     audio_cutoff_hz : float, default=80.0
-        Low-pass cutoff frequency, in Hz, used when constructing the audio
-        feature.
+        Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.
     hw_delay_s : float, default=0.0
-        Physical-delay correction, in seconds, applied to the neural data after
-        clock realignment. Positive values advance neural events relative to the
-        WAV feature channels. The Salzburg profile uses 16.5 ms to compensate the
-        playback-to-ear delay when the recorded audio reference precedes sound
-        arrival at the ears. Use zero when the reference already represents
-        sound arrival at the ears. Negative values add lag and emit a warning.
+        Neural timing shift in seconds, applied after clock correction.
+        Positive values advance neural events; negative values add lag and warn.
     epoch_len_s : float, default=5.0
-        Length of the generated epochs, in seconds.
+        Duration of each non-overlapping epoch in seconds. Must be positive;
+        incomplete trailing epochs are discarded.
     audio_channels : sequence of str | None, default=None
-        Recorded audio channels used to estimate the temporal relationship
-        between the recording and the WAV files. When provided, audio-based
-        alignment takes precedence over assumed-drift alignment. When ``None``,
-        no clock realignment is performed unless ``realign_without_audio=True``.
-        The Salzburg profile uses ``("MISC007", "MISC008")``.
+        Recorded audio channel names for estimating offset and drift.
+        ``None`` disables measured alignment; see ``realign_without_audio``.
     alignment_kwargs : mapping | None, default=None
-        Additional keyword arguments passed to
-        :func:`estimate_raw_wav_alignment`. These override that function's
-        defaults.
+        Overrides for ``estimate_raw_wav_alignment``, e.g. ``{'max_lag_s': 1.0}``.
+        Requires ``audio_channels``; ``None`` uses the captured alignment defaults.
     preserve_annotations : bool, default=True
-        Whether annotations from the original recording are retained in the
-        realigned data.
+        Keep annotations and reject epochs overlapping bad intervals.
+        ``False`` removes annotations before epoching.
     on_alignment_error : {'raise', 'skip'}, default='raise'
-        Behaviour when alignment of a trial fails. ``'raise'`` propagates the
-        alignment error; ``'skip'`` records the failure and continues with the
-        remaining trials.
+        Raise on alignment failure, or warn, record the failure, and skip the
+        trial. Applies to measured and assumed alignment, not quality warnings.
     verbose : bool, default=True
-        Whether to emit informational output during processing.
+        Emit processing messages. Quality warnings are shown regardless.
     realign_without_audio : bool, default=False
-        If ``True`` and ``audio_channels`` is ``None``, realign neural data using
-        the original WAV duration and ``fallback_drift_us_per_s`` instead of
-        estimating offset and drift from recorded audio.
-    fallback_drift_us_per_s : float, default=DEFAULT_FALLBACK_DRIFT_US_PER_S
-        Assumed clock drift, in microseconds per second, used when
-        ``realign_without_audio=True``. The general profile uses zero; the Salzburg profile uses +499 µs/s.
+        Resample using assumed drift and WAV duration when ``audio_channels``
+        is ``None``. Assumes WAV time zero at the trial onset.
+    fallback_drift_us_per_s : float, default=0.0
+        Assumed drift in microseconds per second for ``realign_without_audio``
+        and, by default, missing-end inference in ``gen_span_spec``.
+    must_be_before : tuple of str, default=()
+        Step class names that must follow this step if present in the pipeline.
+    must_be_after : tuple of str, default=()
+        Step class names that must precede this step if present in the pipeline.
 
     Notes
     -----
-    Audio-based realignment estimates both onset offset and clock drift from the
-    recorded audio. The channels specified by ``audio_channels`` must therefore
-    be present and contain sufficient signal bandwidth for reliable alignment.
-
-    When ``realign_without_audio=True``, the mapping between WAV time and raw
-    time is assumed to be
-
-    ``t_raw = (1 + drift / 1e6) * t_wav``.
-
-    WAV time zero is assumed to coincide with the trial onset. This mode cannot
-    estimate an onset offset or verify the assumed drift. The original trial-end
-    sample does not determine the drift; instead, the WAV duration determines
-    the duration of the corrected trial.
-
-    If recorded audio is supplied, failed audio-based fits follow
-    ``on_alignment_error`` and do not fall back to the assumed-drift method.
-
-    Clock realignment is performed before ``hw_delay_s`` is applied. The WAV
-    feature channels themselves are not shifted. Physical delays are rounded to
-    the nearest sample on the corrected sampling grid.
-
-    Realignment retains sufficient recording margins to preserve the complete
-    WAV duration. Insufficient recording coverage is treated as an alignment
-    error.
-
-    Audio alignment searches within ``alignment_kwargs['max_lag_s']`` around
-    zero for each analysis window. The search range must accommodate both the
-    initial offset and drift accumulated over the full stimulus duration. For
-    example, a drift of +500 µs/s accumulates to 0.63 s over a 1260 s stimulus,
-    so a 1 s search range can be more appropriate than the default 0.25 s.
-    Missing-end inference does not expand this range automatically.
-
-    Potentially unreliable alignment fits emit :class:`RuntimeWarning` even when
-    ``verbose=False`` but are still applied. ``on_alignment_error`` controls
-    actual alignment failures, not quality warnings. The residual-RMS warning
-    threshold can be configured with
-    ``alignment_kwargs['warn_residual_rms_ms']`` and defaults to 10 ms.
-
-    The processing metadata returned by :meth:`run` is stored under
-    ``'TRF_info'`` and includes the effective alignment method, alignment
-    settings, applied physical delay, per-trial diagnostics, and inferred trial
-    endpoints.
+    - **Recorded audio:** takes precedence over assumed drift and needs sufficient
+      signal bandwidth. Failed fits follow ``on_alignment_error`` without falling
+      back to assumed drift. For long stimuli, increase
+      ``alignment_kwargs['max_lag_s']`` to cover offset plus accumulated drift;
+      see ``estimate_raw_wav_alignment`` for search limits and quality warnings.
+    - **Assumed drift:** uses ``t_raw = (1 + drift / 1e6) * t_wav`` relative to
+      trial onset. Positive drift lengthens raw time. The WAV determines trial
+      duration; the end trigger does not determine drift. No offset is measured.
+    - **Physical delay:** applied after clock correction, rounded to a sample.
+      WAV features stay unchanged. Use zero if the audio reference already
+      represents sound arrival at the ears. Alignment needs raw coverage for the
+      full WAV plus delay margins; insufficient coverage is an alignment error.
+    - **Salzburg defaults:** ``hw_delay_s=0.0165`` compensates the 16.5 ms air-tube
+      delay when the reference precedes the tubes. The profile also sets
+      ``audio_channels=('MISC007', 'MISC008')`` and
+      ``fallback_drift_us_per_s=499.0``. Pass ``audio_channels=None`` explicitly
+      to use assumed drift with this profile.
 
     See Also
     --------
-    estimate_raw_wav_alignment
-        Estimate clock offset and drift from recorded and reference audio.
-    TRFSpanSpec
-        Description of trial spans and their associated WAV files.
+    TRFSpanSpec : Trial spans, WAV paths, and optional metadata.
+    build_trf_epochs : Standalone epoch builder using an existing span spec.
+    estimate_raw_wav_alignment : Alignment options and fit diagnostics.
+    prepare_audio : Available WAV features and their output channels.
     """
 
     gen_span_spec: Callable
@@ -589,6 +645,22 @@ class EpochTRF(AlmKanalStep):
 
     @step_with_defaults
     def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> dict:
+        """Build TRF epochs and collect processing diagnostics.
+
+        Parameters
+        ----------
+        data : mne.io.BaseRaw
+            Continuous recording passed to ``gen_span_spec`` and then epoched.
+        info : AlmKanalInfo
+            Pipeline processing history; not used by this step.
+
+        Returns
+        -------
+        result : dict
+            ``data`` contains the epochs; ``TRF_info`` contains settings, spans,
+            alignment diagnostics, and inferred endpoints. ``defaults`` records
+            the captured profile and effective step parameters.
+        """
         span_profile = self._defaults_profile
         if self.fallback_drift_us_per_s != span_profile.trf.fallback_drift_us_per_s:
             span_profile = span_profile.with_overrides(trf={'fallback_drift_us_per_s': self.fallback_drift_us_per_s})
@@ -645,6 +717,17 @@ class EpochTRF(AlmKanalStep):
         }
 
     def reports(self, data: mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
+        """Add TRF epochs and any alignment diagnostics to the report.
+
+        Parameters
+        ----------
+        data : mne.BaseEpochs
+            Epochs produced by this step.
+        report : mne.Report
+            Report to update in place.
+        info : AlmKanalInfo
+            Pipeline history containing this step's ``TRF_info`` entry.
+        """
         report.add_epochs(data, title='Epoched (TRF)')
         trf_info = info.get_step_info('EpochTRF', required=True)['TRF_info']
         if trf_info['realign_audio']:

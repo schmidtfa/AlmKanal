@@ -9,7 +9,30 @@ from almkanal.defaults import function_defaults
 
 
 def resample_poly_exact(x: np.ndarray, fs_in: int | float, fs_out: int | float, axis: int = -1) -> np.ndarray:
-    """Polyphase resample, then trim/pad to n_out = round(T * fs_out)."""
+    """Resample with a polyphase filter and enforce the expected sample count.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Signal to resample.
+    fs_in : int | float
+        Input sampling rate in Hz.
+    fs_out : int | float
+        Target sampling rate in Hz.
+    axis : int, default=-1
+        Time axis to resample.
+
+    Returns
+    -------
+    y : numpy.ndarray
+        Resampled signal with ``round(x.shape[axis] * fs_out / fs_in)`` samples
+        along ``axis``. Trimming or zero-padding affects only the tail.
+
+    Notes
+    -----
+    Raises if the rational rate approximation would accumulate at least half
+    an output sample of drift over the input duration.
+    """
     t_in = x.shape[axis] / float(fs_in)  # exclusive end
     n_out = int(round(t_in * float(fs_out)))
     r = Fraction(float(fs_out) / float(fs_in)).limit_denominator(100_000)
@@ -43,6 +66,59 @@ def prepare_audio(  # noqa PLR0915
     fmin: float = 50.0,
     fmax: float = 8000.0,
 ) -> tuple[np.ndarray, np.ndarray, list, float]:
+    """Load audio as mono and extract uniformly sampled stimulus features.
+
+    Defaults below describe the general profile; omitted settings use the
+    active audio defaults.
+
+    Parameters
+    ----------
+    audio_path : str
+        Audio file path, absolute or relative to the working directory.
+    feature : str, default='envelope'
+        Feature to extract: ``'envelope'``, ``'rectify'``, ``'mel'``, ``'flux'``,
+        ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See Notes for meanings.
+    target_fs : float, default=100.0
+        Desired feature sampling rate in Hz.
+    cutoff_hz : float, default=80.0
+        Low-pass cutoff in Hz, applied to every feature before resampling.
+        Clipped to ``[1e-6, 0.49 * base_fs]`` on the feature's extraction grid.
+    n_mels : int, default=32
+        Mel band count for ``'mel'``, ``'flux'``, and ``'mel_onsets'``.
+    fmin : float, default=50.0
+        Lower mel frequency in Hz. Does not set the pitch search range.
+    fmax : float, default=8000.0
+        Upper mel frequency in Hz, capped at the audio Nyquist frequency for
+        extraction. Does not set the pitch search range.
+
+    Returns
+    -------
+    x : numpy.ndarray, shape (n_features, n_times)
+        Low-pass filtered features, resampled when needed to match ``target_fs``.
+    t : numpy.ndarray, shape (n_times,)
+        Feature times in seconds from the start of the audio.
+    names : list of str
+        Channel names corresponding to the rows of ``x``.
+    fs : float
+        Actual feature sampling rate in Hz.
+
+    Notes
+    -----
+    Features before the common low-pass filter:
+
+    - ``'envelope'``: frame RMS amplitude (``env_rms``).
+    - ``'rectify'``: positive and inverted negative half-waves (``pos_rect``,
+      ``neg_rect``).
+    - ``'mel'``: magnitude in each mel frequency band.
+    - ``'flux'``: a single onset-strength trace (``flux``).
+    - ``'mel_onsets'``: onset strength per mel band.
+    - ``'pitch'``: fundamental frequency in Hz, zero in unvoiced frames (``f0_hz``).
+    - ``'pitch_voicing'``: log2 pitch centered over voiced frames, zero elsewhere,
+      and a voicing indicator (``log2_f0_centered``, ``voicing``).
+
+    Both pitch modes use a fixed 50-400 Hz search range. ``n_mels``, ``fmin``,
+    and ``fmax`` affect only mel-based features.
+    """
     y, sr = librosa.load(audio_path, sr=None, mono=True)
 
     # 1) lock hop_length to target_fs
