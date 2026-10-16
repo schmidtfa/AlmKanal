@@ -14,7 +14,7 @@ class VPixxCleaner(AlmKanalStep):
     """This class implements the eye cleaning tools by the ocular tracking gang in AlmKanal"""
 
     # vpixx config
-    eye_path: str | Path
+    eye_path: str | Path | list[str | Path]     
     screen_resolution: tuple[int, int] = (1920, 1080)
     screen_size: tuple[float, float] = (0.61, 0.34)
     screen_distance: float = 0.82
@@ -40,60 +40,80 @@ class VPixxCleaner(AlmKanalStep):
 
     def run(
         self,
-        data: mne.io.BaseRaw,
+        data: mne.io.BaseRaw | list[mne.io.BaseRaw],
         info: AlmKanalInfo,
     ) -> dict:
-        eye_data = load_eyetracking_data(
-            eye_path=self.eye_path,
-            config=VPixxConfig(
-                self.screen_resolution,
-                self.screen_size,
-                self.screen_distance,
-                self.calibration_model,
-                self.calibration_eye,
-                self.blink_buffer_vpixx,  # why are there two blink buffers?
-                self.digital_output_threshold,
-                self.missing_value,
-            ),
-            interpolate_blinks=self.interpolate_blinks,
-            blink_buffer=self.blink_buffer,
-            convert_to_radians=self.convert_to_radians,
-            include_raw_vpixx_channels=self.include_raw_vpixx_channels,
+        config = VPixxConfig(
+            self.screen_resolution,
+            self.screen_size,
+            self.screen_distance,
+            self.calibration_model,
+            self.calibration_eye,
+            self.blink_buffer_vpixx,
+            self.digital_output_threshold,
+            self.missing_value,
+        )
+        single_raw = isinstance(data, mne.io.BaseRaw)
+        raw_list = [data] if single_raw else list(data)
+
+        eye_paths = (
+            [self.eye_path]
+            if isinstance(self.eye_path, (str, Path))
+            else list(self.eye_path)
         )
 
-        align_eye_to_meg(
-            data,
-            eye_data,
-            meg_stim_channel=self.meg_stim_channel,
-            eye_stim_channel=self.eye_stim_channel,
-            meg_min_duration=self.meg_min_duration,
-            meg_max_trigger=self.meg_max_trigger,
-        )
-
-        data.load_data()
-        eye_data.load_data()
-
-        if data.info['sfreq'] != eye_data.info['sfreq']:
+        if len(raw_list) != len(eye_paths):
             raise ValueError(
-                'MEG and eye-tracking sampling frequencies differ after '
-                'alignment. Resample the eye-tracking data before adding it '
-                'to the MEG recording.'
+                f"Received {len(raw_list)} MEG recordings but "
+                f"{len(eye_paths)} eye-tracking paths. "
+                "Each MEG recording must have a corresponding eye-tracking file."
+            )
+        
+
+        for raw, eye_path in zip(raw_list, eye_paths):
+            eye_data = load_eyetracking_data(
+                eye_path=eye_path,
+                config=config,
+                interpolate_blinks=self.interpolate_blinks,
+                blink_buffer=self.blink_buffer,
+                convert_to_radians=self.convert_to_radians,
+                include_raw_vpixx_channels=self.include_raw_vpixx_channels,
             )
 
-        if data.n_times != eye_data.n_times:
-            raise ValueError(
-                'MEG and eye-tracking recordings have different numbers of '
-                'samples. They cannot be combined with Raw.add_channels(). '
-                'Check temporal alignment and recording durations.'
+
+            align_eye_to_meg(
+                raw,
+                eye_data,
+                meg_stim_channel=self.meg_stim_channel,
+                eye_stim_channel=self.eye_stim_channel,
+                meg_min_duration=self.meg_min_duration,
+                meg_max_trigger=self.meg_max_trigger,
             )
 
-        data.add_channels(
-            [eye_data],
-            force_update_info=True,
-        )
+            raw.load_data()
+            eye_data.load_data()
 
+            if raw.info['sfreq'] != eye_data.info['sfreq']:
+                raise ValueError(
+                    'MEG and eye-tracking sampling frequencies differ after '
+                    'alignment. Resample the eye-tracking data before adding it '
+                    'to the MEG recording.'
+                )
+
+            if raw.n_times != eye_data.n_times:
+                raise ValueError(
+                    'MEG and eye-tracking recordings have different numbers of '
+                    'samples. They cannot be combined with Raw.add_channels(). '
+                    'Check temporal alignment and recording durations.'
+                )
+
+            raw.add_channels(
+                [eye_data],
+                force_update_info=True,
+            )
+        result_data = raw_list[0] if single_raw else raw_list
         return {
-            'data': data,
+            'data': result_data,
             'eye_info': {
                 'screen_resolution': self.screen_resolution,
                 'screen_size': self.screen_size,

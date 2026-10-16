@@ -679,7 +679,38 @@ def align_eye_to_meg(
 
     logger.debug('MEG synchronization times: %s', t_meg)
     logger.debug('Eye synchronization times: %s', t_eye)
+    print("MEG sfreq:", meg_data.info["sfreq"])
+    print("Eye sfreq:", eye_data.info["sfreq"])
+    print("Number of matched events:", len(meg_matched))
 
+    print("MEG trigger codes:", meg_matched[:, 2])
+    print("Eye trigger codes:", eye_matched[:, 2])
+
+    print(
+        "Trigger codes agree:",
+        np.array_equal(meg_matched[:, 2], eye_matched[:, 2]),
+    )
+
+    print(
+        "MEG event times (s):",
+        (meg_matched[:, 0] - meg_data.first_samp)
+        / meg_data.info["sfreq"],
+    )
+
+    print(
+        "Eye event times (s):",
+        eye_matched[:, 0] / eye_data.info["sfreq"],
+    )
+
+    print(
+        "MEG times increasing:",
+        np.all(np.diff(meg_matched[:, 0]) > 0),
+    )
+
+    print(
+        "Eye times increasing:",
+        np.all(np.diff(eye_matched[:, 0]) > 0),
+    )
     mne.preprocessing.realign_raw(
         meg_data,
         eye_data,
@@ -726,11 +757,23 @@ def _match_events_by_code_and_order(
     matched_eye_array = np.asarray(matched_eye)
 
     order = np.argsort(matched_meg_array[:, 0])
+    matched_meg_array = matched_meg_array[order]
+    matched_eye_array = matched_eye_array[order]
 
-    return (
-        matched_meg_array[order],
-        matched_eye_array[order],
-    )
+    if np.any(np.diff(matched_eye_array[:, 0]) <= 0):
+        raise ValueError(
+            "Matched eye events are not chronological. "
+            "The trigger correspondence is inconsistent."
+        )
+
+    if not np.array_equal(
+        matched_meg_array[:, 2],
+        matched_eye_array[:, 2],
+    ):
+        raise ValueError("Matched trigger codes do not agree.")
+
+    return matched_meg_array, matched_eye_array
+
 
 
 def add_eye_tracking_data(
