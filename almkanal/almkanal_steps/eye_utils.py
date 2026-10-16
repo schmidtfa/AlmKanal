@@ -14,7 +14,7 @@ class VPixxCleaner(AlmKanalStep):
     """This class implements the eye cleaning tools by the ocular tracking gang in AlmKanal"""
 
     # vpixx config
-    eye_path: str | Path | list[str | Path]     
+    eye_path: str | Path | list[str | Path]
     screen_resolution: tuple[int, int] = (1920, 1080)
     screen_size: tuple[float, float] = (0.61, 0.34)
     screen_distance: float = 0.82
@@ -54,21 +54,20 @@ class VPixxCleaner(AlmKanalStep):
             self.missing_value,
         )
         single_raw = isinstance(data, mne.io.BaseRaw)
-        raw_list = [data] if single_raw else list(data)
 
-        eye_paths = (
-            [self.eye_path]
-            if isinstance(self.eye_path, (str, Path))
-            else list(self.eye_path)
-        )
+        if single_raw:
+            raw_list: list[mne.io.BaseRaw] = [data]
+        else:
+            raw_list = list(data)
+
+        eye_paths = [self.eye_path] if isinstance(self.eye_path, str | Path) else list(self.eye_path)
 
         if len(raw_list) != len(eye_paths):
             raise ValueError(
-                f"Received {len(raw_list)} MEG recordings but "
-                f"{len(eye_paths)} eye-tracking paths. "
-                "Each MEG recording must have a corresponding eye-tracking file."
+                f'Received {len(raw_list)} MEG recordings but '
+                f'{len(eye_paths)} eye-tracking paths. '
+                'Each MEG recording must have a corresponding eye-tracking file.'
             )
-        
 
         for raw, eye_path in zip(raw_list, eye_paths):
             eye_data = load_eyetracking_data(
@@ -79,7 +78,6 @@ class VPixxCleaner(AlmKanalStep):
                 convert_to_radians=self.convert_to_radians,
                 include_raw_vpixx_channels=self.include_raw_vpixx_channels,
             )
-
 
             align_eye_to_meg(
                 raw,
