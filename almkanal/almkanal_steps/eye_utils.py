@@ -33,8 +33,8 @@ class VPixxCleaner(AlmKanalStep):
     eye_stim_channel: str = 'Digital Output'
     meg_min_duration: float = 0.002
     meg_max_trigger: int = 4096
-
-    must_be_before: tuple = ('Epochs', 'Events')
+    concatenate_raws: bool = False
+    must_be_before: tuple = ('MultiBlockMaxwell', 'Maxwell', 'Epochs', 'Events')
     must_be_after: tuple = ()
     allow_repeated: bool = field(default=False, init=False)
 
@@ -68,7 +68,7 @@ class VPixxCleaner(AlmKanalStep):
                 f'{len(eye_paths)} eye-tracking paths. '
                 'Each MEG recording must have a corresponding eye-tracking file.'
             )
-
+        raw_list_preproc = []
         for raw, eye_path in zip(raw_list, eye_paths):
             eye_data = load_eyetracking_data(
                 eye_path=eye_path,
@@ -109,7 +109,14 @@ class VPixxCleaner(AlmKanalStep):
                 [eye_data],
                 force_update_info=True,
             )
-        result_data = raw_list[0] if single_raw else raw_list
+            raw_list_preproc.append(raw)
+        if single_raw:
+            result_data = raw_list_preproc[0]
+        elif not single_raw and self.concatenate_raws:
+            result_data = mne.concatenate_raws(raw_list_preproc)
+        elif not single_raw and not self.concatenate_raws:
+            result_data = raw_list_preproc
+
         return {
             'data': result_data,
             'eye_info': {
