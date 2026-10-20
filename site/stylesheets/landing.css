@@ -1,0 +1,141 @@
+/* 1. Local colors: only the homepage uses these variables. */
+.ak-home {
+  --ak-teal: #087c73;
+  --ak-on-teal: #ffffff;
+  --ak-ink: #163037;
+  --ak-muted: #627778;
+  --ak-line: #dfe8e4;
+}
+[data-md-color-scheme="slate"] .ak-home {
+  --ak-teal: #82d2bd;
+  --ak-on-teal: #112c33;
+  --ak-ink: #e3eee8;
+  --ak-muted: #9cb5b2;
+  --ak-line: #2c4345;
+}
+
+/* 2. Two columns: introduction on the left, native content tabs on the right. */
+.ak-home .ak-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 1.8rem;
+  margin: 1.2rem 0 2rem;
+}
+.ak-home .ak-hero > div { min-width: 0; }
+.ak-home h1 {
+  color: var(--ak-ink);
+  font-size: clamp(2.6rem, 5vw, 3.6rem);
+  font-weight: 750;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+  margin: 0.5rem 0 1rem;
+}
+.ak-home h1 span { color: var(--ak-teal); font-weight: 400; }
+.ak-home .ak-tagline {
+  color: var(--ak-ink);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+}
+.ak-home .ak-eyebrow {
+  color: var(--ak-teal);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ak-home .ak-note { color: var(--ak-muted); font-size: 0.65rem; }
+
+/* 3. Frame the native tabs; Zensical still handles tabs and code highlighting. */
+.ak-home .ak-demo {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--ak-line);
+  border-radius: 0.7rem;
+  box-shadow: 0 14px 40px #1630370c;
+}
+.ak-home .ak-demo pre code { font-size: 0.62rem; }
+
+/* 4. Buttons and cards: visual adjustments to the framework's own components. */
+.ak-home .md-button {
+  color: var(--ak-teal);
+  border: 1px solid var(--ak-line);
+  border-radius: 0.4rem;
+  padding: 0.6em 1em;
+  margin: 0.2rem 0.3rem 0.2rem 0;
+  font-size: 0.72rem;
+}
+.ak-home .md-button--primary,
+.ak-home .md-button:is(:hover, :focus-visible) {
+  background: var(--ak-teal);
+  border-color: var(--ak-teal);
+  color: var(--ak-on-teal);
+}
+.ak-home .grid.cards > ul > li {
+  border-color: var(--ak-line);
+  border-radius: 0.55rem;
+}
+
+/* 5. The four-stage strip is an ordinary Markdown grid, not a script. */
+.ak-home .ak-flow {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 1.5rem 0 1.8rem;
+  padding: 0.6rem 0;
+  border-block: 1px solid var(--ak-line);
+  color: var(--ak-muted);
+  font-size: 0.66rem;
+}
+.ak-home .ak-flow strong { color: var(--ak-ink); }
+
+/* 6. Stack the hero on smaller screens; keep all text and buttons accessible. */
+@media (max-width: 68.75em) {
+  .ak-home .ak-hero { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+}
+@media (max-width: 40em) {
+  .ak-home .ak-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Scientific Methods preview on the homepage */
+.ak-home .ak-methods-preview {
+  max-height: 25rem;
+  overflow-y: auto;
+  padding: 1rem 1.2rem;
+  margin: 0.7rem 0;
+  border: 1px solid var(--ak-line);
+  border-radius: 0.5rem;
+  background: var(--md-default-bg-color);
+  font-size: 0.7rem;
+  line-height: 1.65;
+}
+
+/* Section headings */
+.ak-home .ak-methods-preview h3 {
+  font-size: 1rem;
+  margin-top: 0;
+  color: var(--ak-ink);
+}
+
+.ak-home .ak-methods-preview h4 {
+  font-size: 0.78rem;
+  margin: 1rem 0 0.4rem;
+  color: var(--ak-teal);
+}
+
+/* More compact references */
+.ak-home .ak-methods-preview ol {
+  font-size: 0.62rem;
+  padding-left: 1.2rem;
+}
+
+.ak-home .ak-methods-preview li {
+  margin-bottom: 0.5rem;
+}
+
+/* Subtle disclaimer */
+.ak-home .ak-methods-preview blockquote {
+  margin: 1rem 0 0;
+  padding: 0.5rem 0.8rem;
+  border-left: 3px solid var(--ak-teal);
+  background: rgba(8, 124, 115, 0.06);
+}

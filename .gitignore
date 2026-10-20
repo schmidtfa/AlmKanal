@@ -44,3 +44,6 @@ local_tests
 .mypy_cache
 .pytest_cache
 .ruff_cache
+
+almkanal-demo
+almkanal-custom-demo

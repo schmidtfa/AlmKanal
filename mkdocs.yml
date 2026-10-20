@@ -1,0 +1,98 @@
+# AlmKanal documentation - initial migration to Zensical.
+# Compatible with both Zensical and Material for MkDocs.
+site_name: AlmKanal
+site_description: Flexible, modular and extendable preprocessing pipelines for M/EEG data
+site_url: https://schmidtfa.github.io/AlmKanal/
+repo_url: https://github.com/schmidtfa/AlmKanal
+repo_name: schmidtfa/AlmKanal
+
+theme:
+  name: material
+  variant: modern
+  logo: assets/almkanal.svg
+  favicon: assets/almkanal.svg
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: lucide/sun
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: lucide/moon
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Get started:
+      - Installation: installation.md
+      - Quick start: quickstart.md
+      - Example scripts: examples.md
+  - Use AlmKanal:
+      - Working with your data: pipelines.md
+      - Pipeline validation: validation.md
+      - Automatic Methods reporting: methods.md
+      - Step catalogue: steps.md
+  - Extend AlmKanal:
+      - Create a custom step: custom-steps.md
+      - Custom Methods templates: custom-reporting.md
+  - Multimodal data:
+      - Eye-tracking alignment: eye-tracking.md
+      - WAV alignment: audio-alignment.md
+
+  - Reference:
+      - Pipeline:
+          - Overview: api-core.md
+          - AlmKanal: reference/pipeline/almkanal.md
+          - AlmKanalStep: reference/pipeline/almkanal-step.md
+      - Preprocessing steps:
+          - Overview: reference/preprocessing/index.md
+          - Filtering and resampling: reference/preprocessing/filtering.md
+          - Maxwell filtering: reference/preprocessing/maxwell.md
+          - Channel cleaning and referencing: reference/preprocessing/channels.md
+          - Artifact correction and physiology: reference/preprocessing/artifacts.md
+          - Events and epoching: reference/preprocessing/epoching.md
+          - VPixx eye-tracking: reference/preprocessing/eye-tracking.md
+          - TRF and WAV alignment: reference/preprocessing/trf.md
+          - Spatial filtering: reference/preprocessing/spatial-filtering.md
+          - Source reconstruction: reference/preprocessing/source-reconstruction.md
+      - Reporting API: api-reporting.md
+  - Project:
+      - Contributing: https://github.com/schmidtfa/AlmKanal/blob/main/CONTRIBUTING.md
+      - About and citation: about.md
+
+
+markdown_extensions:
+  - admonition
+  - tables
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - md_in_html
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["."]
+          options:
+            docstring_style: numpy
+            docstring_options:
+              warn_unknown_params: false
+            show_root_heading: true
+            show_signature: true
+            show_source: false
+
+extra_css:
+  - stylesheets/landing.css

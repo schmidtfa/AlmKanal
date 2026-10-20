@@ -85,11 +85,23 @@ pymatreader = ">=1.3.2,<2"
 py311 = {dependencies = {python="3.11.*"}}
 py312 = {dependencies = {python="3.12.*"}}
 
+[tool.pixi.feature.docs.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.docs.pypi-dependencies]
+zensical = "==0.0.68"
+mkdocstrings-python = ">=2.0.10, <3"
+
+[tool.pixi.feature.docs.tasks]
+docs-serve = "zensical serve"
+docs-build = "zensical build"
+
 [tool.pixi.environments]
 default = {features = [], solve-group = "default"}
 jupyter = {features = ["jupyter"], solve-group = "default"}
 testpy311 = ['py311']
 testpy312 = ['py312']
+docs = { features = ["docs"], no-default-feature = true }
 
 [tool.hatch.version]
 source = "regex_commit"
@@ -138,3 +150,4 @@ disallow_untyped_defs = false
 [[tool.mypy.overrides]]
 module = "almkanal.*"
 disallow_untyped_defs = true
+
