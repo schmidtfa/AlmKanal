@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">
+  <title>AlmKanal three-wave mark</title>
+  <rect width="40" height="40" rx="11" fill="#087c73"/>
+  <g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round">
+    <path d="M10 14c4-5 6 5 10 0s6 5 10 0"/>
+    <path d="M10 20c4-5 6 5 10 0s6 5 10 0"/>
+    <path d="M10 26c4-5 6 5 10 0s6 5 10 0"/>
+  </g>
+</svg>
