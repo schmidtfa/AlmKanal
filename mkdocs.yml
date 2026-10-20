@@ -65,7 +65,6 @@ nav:
           - Spatial filtering: reference/preprocessing/spatial-filtering.md
           - Source reconstruction: reference/preprocessing/source-reconstruction.md
       - Reporting API: api-reporting.md
-      - Troubleshooting: troubleshooting.md
   - Project:
       - Contributing: https://github.com/schmidtfa/AlmKanal/blob/main/CONTRIBUTING.md
       - About and citation: about.md

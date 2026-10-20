@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://schmidtfa.github.io/AlmKanal/contributing/">
+        <link rel="canonical" href="https://schmidtfa.github.io/AlmKanal/api-reporting/">
       
       
-        <link rel="prev" href="../troubleshooting.md">
+        <link rel="prev" href="../reference/preprocessing/source-reconstruction/">
       
       
-        <link rel="next" href="../about/">
+        <link rel="next" href="https://github.com/schmidtfa/AlmKanal/blob/main/CONTRIBUTING.md">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Contributing - AlmKanal</title>
+        <title>Reporting API - AlmKanal</title>
       
     
     
@@ -117,7 +117,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Contributing
+              Reporting API
             
           </span>
         </div>
@@ -791,8 +791,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -803,11 +805,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
@@ -828,7 +830,7 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
             <label class="md-nav__title" for="__nav_6">
               <span class="md-nav__icon md-icon"></span>
               
@@ -1307,10 +1309,36 @@
                   
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../api-reporting.md" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reporting API
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1325,33 +1353,71 @@
   
 
       </a>
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../troubleshooting.md" class="md-nav__link">
+      
         
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
   
   
-  <span class="md-ellipsis">
+  
     
   
-  Troubleshooting
-
-    
-  </span>
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Example
+      </span>
+    </span>
+  </a>
   
-
-      </a>
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-jinja-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Custom Jinja templates
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API reference
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#almkanal.report.exporting.preprocessing_report" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        preprocessing_report
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1369,8 +1435,6 @@
       
   
   
-    
-  
   
   
     
@@ -1383,11 +1447,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
@@ -1408,7 +1472,7 @@
           </label>
         
         
-          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
             <label class="md-nav__title" for="__nav_7">
               <span class="md-nav__icon md-icon"></span>
               
@@ -1422,34 +1486,10 @@
                   
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Contributing
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="././" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="https://github.com/schmidtfa/AlmKanal/blob/main/CONTRIBUTING.md" class="md-nav__link">
         
   
   
@@ -1464,80 +1504,6 @@
   
 
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#start-with-a-focused-change" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Start with a focused change
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#set-up-a-development-checkout" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Set up a development checkout
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contribute-a-step-as-a-complete-feature" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Contribute a step as a complete feature
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#edit-this-website" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Edit this website
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#review-ai-assisted-contributions" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Review AI-assisted contributions
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1592,6 +1558,8 @@
                     
                     
                     
+                      
+                    
                     
                       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
                       <div class="md-sidebar-button__wrapper">
@@ -1607,6 +1575,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -1615,10 +1585,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#start-with-a-focused-change" class="md-nav__link">
+  <a href="#example" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Start with a focused change
+        Example
       </span>
     </span>
   </a>
@@ -1626,10 +1596,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#set-up-a-development-checkout" class="md-nav__link">
+  <a href="#custom-jinja-templates" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Set up a development checkout
+        Custom Jinja templates
       </span>
     </span>
   </a>
@@ -1637,10 +1607,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#contribute-a-step-as-a-complete-feature" class="md-nav__link">
+  <a href="#api-reference" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Contribute a step as a complete feature
+        API reference
       </span>
     </span>
   </a>
@@ -1648,21 +1618,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#edit-this-website" class="md-nav__link">
+  <a href="#almkanal.report.exporting.preprocessing_report" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Edit this website
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#review-ai-assisted-contributions" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Review AI-assisted contributions
+        preprocessing_report
       </span>
     </span>
   </a>
@@ -1689,30 +1648,59 @@
   
 
 
-  <h1>Contributing</h1>
+<h1 id="methods-reporting">Methods reporting</h1>
+<p>AlmKanal can automatically generate draft Methods text from the processing history saved after running a pipeline. The public interface for this is <code>preprocessing_report</code>, which uses Jinja templates to describe the preprocessing steps.</p>
+<h2 id="example">Example</h2>
+<p>After running a pipeline and saving its processing history:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">almkanal</span><span class="w"> </span><span class="kn">import</span> <span class="n">preprocessing_report</span>
 
-<h2 id="start-with-a-focused-change">Start with a focused change</h2>
-<p>Bug fixes, new steps, clearer examples, tests, and reporting templates are welcome contributions. Use the <a href="https://github.com/schmidtfa/AlmKanal/issues">issue tracker</a> to describe a reproducible problem or discuss a proposed feature, and follow the repository's <a href="https://github.com/schmidtfa/AlmKanal/blob/main/CONTRIBUTING.md">contribution guidelines</a>.</p>
-<h2 id="set-up-a-development-checkout">Set up a development checkout</h2>
-<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/schmidtfa/AlmKanal.git
-<span class="nb">cd</span><span class="w"> </span>AlmKanal
-pixi<span class="w"> </span>install
-pixi<span class="w"> </span>run<span class="w"> </span><span class="nb">test</span>
-pixi<span class="w"> </span>run<span class="w"> </span>lint_ci
-pixi<span class="w"> </span>run<span class="w"> </span>check_types
+<span class="n">pipeline</span><span class="o">.</span><span class="n">generate_json</span><span class="p">(</span><span class="s2">"history.json"</span><span class="p">)</span>
+
+<span class="n">methods_path</span> <span class="o">=</span> <span class="n">preprocessing_report</span><span class="p">(</span>
+    <span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="s2">"history.json"</span><span class="p">],</span>
+    <span class="n">out_path</span><span class="o">=</span><span class="s2">"methods.md"</span><span class="p">,</span>
+<span class="p">)</span>
 </code></pre></div>
-<p>These task names are defined in the inspected project configuration. Use a branch for your change and run the relevant checks before proposing it.</p>
-<h2 id="contribute-a-step-as-a-complete-feature">Contribute a step as a complete feature</h2>
-<p>Document supported input types, parameters and units, ordering rules, required metadata, and output representation. Add tests for expected results and clear failures. Include relevant QC content and explicit processing metadata.</p>
-<p>When the step is intended for scientific reporting, also add or extend its <code>StepSpec</code> and Jinja template. Test the generated text against known settings. A new processing function without a faithful record can leave users with incomplete Methods descriptions.</p>
-<h2 id="edit-this-website">Edit this website</h2>
-<p>The documentation lives in <code>docs/</code> as Markdown. Navigation and theme settings live in <code>mkdocs.yml</code>. Zensical generates the website; there is no custom Python builder or JavaScript search implementation.</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements-docs.txt
-zensical<span class="w"> </span>serve
+<p>The example writes the generated text to <code>methods.md</code>. Other output formats, such as Word documents or PDFs, require Pandoc (and, for PDF, a suitable PDF engine).</p>
+<h2 id="custom-jinja-templates">Custom Jinja templates</h2>
+<p>You can also use your own Jinja templates to customize the generated descriptions:</p>
+<div class="highlight"><pre><span></span><code><span class="n">methods_path</span> <span class="o">=</span> <span class="n">preprocessing_report</span><span class="p">(</span>
+    <span class="n">files</span><span class="o">=</span><span class="p">[</span><span class="s2">"history.json"</span><span class="p">],</span>
+    <span class="n">out_path</span><span class="o">=</span><span class="s2">"methods.md"</span><span class="p">,</span>
+    <span class="n">template_dir</span><span class="o">=</span><span class="s2">"my_templates"</span><span class="p">,</span>
+<span class="p">)</span>
 </code></pre></div>
-<p>Open the local address printed by Zensical. When ready, use <code>zensical build</code> to create the static <code>site/</code> directory. The documentation builder does not execute AlmKanal's scientific examples.</p>
-<h2 id="review-ai-assisted-contributions">Review AI-assisted contributions</h2>
-<p>Check code, tests, examples, scientific descriptions, and references regardless of how the initial draft was produced. Keep the <a href="../about/#ai-assistance">AI-use statement</a> consistent with the work actually performed and reviewed.</p>
+<p>See <a href="../custom-reporting/">Custom Methods templates</a> for instructions on creating and using your own templates.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Automatically generated Methods text should always be reviewed before use in a publication. Processing performed before the data entered AlmKanal needs to be documented separately.</p>
+</div>
+<h2 id="api-reference">API reference</h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="almkanal.report.exporting.preprocessing_report" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">almkanal</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">exporting</span><span class="o">.</span><span class="n">preprocessing_report</span><span class="p">(</span><span class="n">files</span><span class="p">,</span> <span class="n">out_path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">to</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">template_dir</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">master_template</span><span class="o">=</span><span class="s1">'methods_master.j2'</span><span class="p">,</span> <span class="n">step_packages</span><span class="o">=</span><span class="p">(</span><span class="s1">'almkanal.report.stepspecs'</span><span class="p">,),</span> <span class="n">metadata</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">extra_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pandoc_path</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Render Methods text from preprocessing JSON files and convert it with Pandoc.</p>
+<p>Examples:
+    render_methods_via_pandoc(files, "methods.docx", to="docx")
+    render_methods_via_pandoc(files, "methods.pdf", to="pdf", extra_args=["--pdf-engine=xelatex"])
+    render_methods_via_pandoc(files, "methods.html")  # 'to' inferred from suffix</p>
+<p>Returns:
+    The output Path.</p>
+
+
+    </div>
+
+</div>
 
 
 

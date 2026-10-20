@@ -18,7 +18,7 @@ def make_raw() -> mne.io.BaseRaw:
     data = signal[None, :] + rng.normal(0, 1e-6, (4, len(times)))
     info = mne.create_info(["Fz", "Cz", "Pz", "Oz"], sfreq, "eeg")
     raw = mne.io.RawArray(data, info)
-    raw.set_montage("standard_1020")
+    raw.set_montage("colin27_1020")
     return raw
 
 

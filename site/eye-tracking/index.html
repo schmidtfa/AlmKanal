@@ -1410,7 +1410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../api-reporting.md" class="md-nav__link">
+      <a href="../api-reporting/" class="md-nav__link">
         
   
   
@@ -1418,33 +1418,6 @@
     
   
   Reporting API
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-                
-              
-                
-                  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../troubleshooting.md" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Troubleshooting
 
     
   </span>
@@ -1523,7 +1496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../contributing/" class="md-nav__link">
+      <a href="https://github.com/schmidtfa/AlmKanal/blob/main/CONTRIBUTING.md" class="md-nav__link">
         
   
   
@@ -1720,9 +1693,8 @@
 <p>Keep the synchronization channels available until alignment has completed. The example's channel names and dimensions must be replaced when your setup differs.</p>
 <h2 id="check-the-result">Check the result</h2>
 <p>Check event correspondences and timing across the recording, channel names and units, blink handling, and retained samples. The implementation checks equal sampling rates and sample counts before adding eye channels. Matching dimensions alone are not evidence of correct synchronization.</p>
-<p>The inspected <code>VPixxCleaner.reports()</code> method does not add a dedicated eye-alignment QC panel. Plan an explicit visual or numerical alignment check; do not assume the returned MNE report proves alignment quality.</p>
 <h2 id="work-with-recording-blocks">Work with recording blocks</h2>
-<p>For several raw blocks, supply an equally long list of eye-tracking paths. Set <code>concatenate_raws=True</code> only when concatenation is appropriate; otherwise the step returns a list and subsequent steps must support it.</p>
+<p>For several raw blocks, supply an equally long list of eye-tracking paths. Set <code>concatenate_raws=True</code> only when concatenation is wanted; otherwise the step returns a list and subsequent steps must support it. This is important when you want to do <code>MultiBlockMaxwell</code> afterwards. If you are not using MEG data you probably want to <code>concatenate_raws=True</code> to avoid errors with subsequent steps. Currently only <code>VPIXXCleaner</code> and <code>MultiBlockMaxwell</code> accept lists of <code>Raw</code> or <code>Epoch</code> objects.</p>
 <h2 id="respect-ordering-requirements">Respect ordering requirements</h2>
 <p>When present together, <code>VPixxCleaner</code> is declared to run before <code>MultiBlockMaxwell</code>, <code>Maxwell</code>, <code>Epochs</code>, and <code>Events</code>. This step requires continuous data; it is not a way to align eye-tracking files to an arbitrary pre-existing <code>Epochs</code> object.</p>
 <p>Review the loader and alignment implementation for file-format details and acquisition assumptions before using it on a new recording system.</p>
