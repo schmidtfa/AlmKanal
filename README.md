@@ -1,4 +1,4 @@
-## Welcome to the AlmKanal
+# Welcome to the AlmKanal
 
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-green.svg)](https://opensource.org/licenses/BSD-3-Clause)
@@ -6,13 +6,11 @@
 [![Coverage Status](https://coveralls.io/repos/github/schmidtfa/AlmKanal/badge.svg?branch=main)](https://coveralls.io/github/schmidtfa/AlmKanal?branch=main)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-**Build readable M/EEG preprocessing pipelines in Python, check their processing order, and document what you did.**
+**Almkanal lets you build M/EEG preprocessing pipelines in Python, checks their processing order, and documents what you did.**
 
-AlmKanal is an open-source framework for modular magnetoencephalography (MEG) and electroencephalography (EEG) preprocessing, developed at the Salzburg Brain Dynamics Lab. It builds on [MNE-Python](https://mne.tools/stable/) and is inspired by the clear, composable pipeline design of [scikit-learn](https://scikit-learn.org/stable/modules/compose.html).
+AlmKanal is a flexible, modular and extendable preprocessing pipeline generator for magnetoencephalography (MEG) and electroencephalography (EEG) data, developed at the Salzburg Brain Dynamics Lab. It builds primarily on [MNE-Python](https://mne.tools/stable/) and its user interface is inspired by the clear, composable pipeline design of [scikit-learn](https://scikit-learn.org/stable/modules/compose.html).
 
-AlmKanal combines reusable preprocessing steps with an extensible Python API. It can be used to build a full preprocessing workflow or to apply only the next steps to data that have already been processed elsewhere. It also tracks processing settings and can generate draft text for the preprocessing section of a scientific Methods section.
-
-> **Development status:** AlmKanal is under active development (beta). Please check the [issue tracker](https://github.com/schmidtfa/AlmKanal/issues) and validate its output for your recording system and analysis before using it in a study.
+AlmKanal combines reusable preprocessing steps with an easily extendable Python API. It can be used to build a full preprocessing workflow or be applied to already preprocessed mne `Raw` or `Epochs` data to apply only a few additional steps. It also tracks processing settings and can be used to draft the preprocessing section of the Methods section of your scientific manuscript.
 
 ## Why AlmKanal?
 
@@ -65,29 +63,32 @@ processed_raw, qc_report = pipeline.run(raw)
 qc_report.save("preprocessing-report.html", overwrite=True, open_browser=False)
 ```
 
-The list of steps makes the processing sequence explicit. `AlmKanal` checks the supported ordering constraints when the pipeline is created, then `run()` processes the data sequentially and returns the result and an [MNE report](https://mne.tools/stable/generated/mne.Report.html).
-
-The same pattern can be applied to previously processed `Raw` or `Epochs` data, provided the selected steps support that input type. A pipeline does **not** need to include every earlier operation, and not every step is meaningful for both data representations.
+The list of steps makes the sequence of processing steps explicit. `AlmKanal` checks the supported ordering constraints when the pipeline is created, then `run()` processes the data sequentially and returns the result and an [MNE report](https://mne.tools/stable/generated/mne.Report.html).
+The same pattern can be applied to previously processed `Raw` or `Epochs` data.
 
 ### Automatically draft a preprocessing Methods section
 
-After running a pipeline, save its processing history and render that history into Methods text:
+After running a pipeline, save its preprocessing history: 
+
+```python
+pipeline.generate_json("sub-0X_preprocessing.json")
+```
+
+and afterwards render that history into the preprocessing part of your Methods section:
 
 ```python
 from almkanal import preprocessing_report
 
-pipeline.generate_json("sub-01_preprocessing.json")
-
 preprocessing_report(
     files=["sub-01_preprocessing.json",
-            "sub-02_preprocessing.json",],
-    out_path="methods.md",
+           "sub-02_preprocessing.json",],
+    out_path="methods.md", #can also be .docx or .tex
 )
 ```
 
-The resulting Markdown can be inspected and edited for a manuscript. The reporting tools also support output formats such as DOCX and HTML through [Pandoc](https://pandoc.org/).
+The resulting Markdown document can be inspected and edited for a manuscript. The reporting tools also support output formats such as DOCX and HTML through [Pandoc](https://pandoc.org/).
 
-For a study with multiple participants, `preprocessing_report()` can accept several processing-history JSON files. It checks that their recorded step sequences and relevant settings are consistent before combining them. Custom steps may require additional Methods templates to produce polished scientific prose.
+For a study with multiple participants, `preprocessing_report()` can accept several processing-history JSON files. It checks that their recorded step sequences and relevant settings are consistent before combining them. Additionally information like the number of dropped ICA components are aggregated adn reported respectively. Custom steps may require additional Methods templates to produce polished scientific prose. Importantly, prose is generated via Jinja templates that can be easily overridden by your reporting preferences.
 
 **Important:** Generated text documents the processing captured by AlmKanal. It cannot reconstruct steps carried out before the data entered the pipeline, and it should always be reviewed for accuracy, completeness, and scientific appropriateness before publication.
 
@@ -134,31 +135,11 @@ pipeline = AlmKanal(
 )
 ```
 
-The `must_be_before` declaration illustrates how a custom step can participate in pipeline-order checks. Constraints are evaluated when the referenced step is also present in the pipeline. Validation detects **encoded** dependencies and restrictions; it is not a substitute for checking the scientific validity of an analysis. In case you disagree with some of our `must_be_before` or `must_be_after` declarations let us know and we can adjust them if appropriate :-)
-
-Processing metadata can also be used in the Methods generator. For custom scientific prose, see the reporting infrastructure in [`almkanal/report/`](almkanal/report/), including its step specifications and Jinja templates.
-
-## Built-in processing and multimodal workflows
-
-The package includes building blocks for commonly used M/EEG operations, including:
-
-| Area | Examples |
-| --- | --- |
-| Sensor-level preprocessing | Filtering, resampling, referencing, Maxwell filtering, RANSAC-based bad-channel handling, ICA, and physiological-signal cleaning |
-| Events and epochs | Event handling and epoch creation |
-| Source-space analysis | Forward modeling, spatial filtering, and source reconstruction |
-| Time-locked and multimodal analyses | Preparation of audio-aligned data for TRF workflows, along with M/EEG alignment to VPixx eye-tracking recordings and WAV stimuli |
-| Reporting | Per-step QC reports, processing-history JSON, and draft preprocessing Methods text |
-
-The [template pipelines](template_pipelines/) offer starting points for more complete analyses. Availability and input requirements vary across steps; in particular, source analysis and acquisition-specific alignment require appropriate recording metadata and study-specific inputs.
-
-### Temporal alignment matters
-
-AlmKanal includes functionality to align M/EEG recordings with VPixx eye-tracking data and to relate neural recordings to external WAV stimuli. Such alignment is particularly important before time-sensitive analyses, such as TRF estimation or coherence analysis. Always inspect synchronization markers, relevant delays, and alignment quality for your acquisition setup. These capabilities prepare aligned data; they do not imply that every downstream analysis is performed automatically by AlmKanal.
+The `must_be_before` or `must_be_after` declarations illustrate how a custom step can participate in pipeline-order checks. Constraints are evaluated when the referenced step is also present in the pipeline. Validation detects **encoded** dependencies and restrictions; it is not a substitute for checking the scientific validity of an analysis. In case you disagree with some of our `must_be_before` or `must_be_after` declarations let us know and we can adjust them if appropriate :-)
 
 ## Design choices and limitations
 
-AlmKanal favors **Python-native composition**: a pipeline is an explicit sequence of Python `AlmKanalStep` objects, similar in spirit to scikit-learn pipelines. It is not intended to be API-compatible with `sklearn.pipeline.Pipeline`, nor does it require a separate YAML or JSON pipeline configuration file.
+AlmKanal favors **Python-native composition**: a pipeline is an explicit sequence of Python `AlmKanalStep` objects, similar in spirit to scikit-learn pipelines. It is not API-compatible with `sklearn.pipeline.Pipeline`, nor does it require a separate YAML or JSON pipeline configuration file.
 
 This design makes it convenient to integrate custom MNE operations and reuse only part of a workflow. For projects that need fully declarative or non-programmer-editable configurations, another pipeline architecture may be a better fit.
 
@@ -166,7 +147,7 @@ Some limitations to keep in mind:
 
 - Ordering validation covers constraints explicitly declared by the processing steps; it cannot catch every scientifically inappropriate pipeline.
 - Steps have different input requirements. Starting from any MNE `Raw` or `Epochs` object does not guarantee that every step can run on it.
-- Processing-history-based Methods text covers recorded operations, not undocumented preprocessing performed beforehand.
+- Generated preprocessing methods texts cover recorded operations, not undocumented preprocessing performed beforehand.
 - Experimental, acquisition-specific, or source-analysis functionality should be tested with representative datasets and reviewed before scientific use.
 
 ## Contributing and support
@@ -188,7 +169,7 @@ pixi run check_types
 
 ## Citation
 
-A JOSS manuscript is being prepared. Until a formal software citation is available, please cite the [AlmKanal repository](https://github.com/schmidtfa/AlmKanal) and identify the version or commit used in your analysis.
+A JOSS manuscript is currently being prepared. Until a formal software citation is available, please cite the [AlmKanal repository](https://github.com/schmidtfa/AlmKanal) and identify the version or commit used in your analysis.
 
 ## License and acknowledgements
 
