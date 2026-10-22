@@ -48,9 +48,9 @@ def test_generic_and_salzburg_profiles_have_distinct_hardware_assumptions():
         assert step.audio_channels == ('MISC007', 'MISC008')
         assert EpochTRF(step.gen_span_spec, '.', audio_channels=None).audio_channels is None
         assert EpochTRF(step.gen_span_spec, '.', audio_channels=['recorded']).audio_channels == ['recorded']
-        assert salzburg.eye.distance == 82
-        assert salzburg.eye.screen_width == 63
-        assert list(salzburg.eye.screen_rect) == [0, 0, 1920, 1080]
+        assert salzburg.vpixx.screen_distance == 0.82
+        assert salzburg.vpixx.screen_size == (0.61, 0.34)
+        assert salzburg.vpixx.screen_resolution == (1920, 1080)
 
 
 def test_configure_affects_new_steps_and_explicit_arguments_take_precedence():
@@ -151,11 +151,11 @@ def test_obviously_invalid_setting_types_are_rejected(overrides):
 def test_profile_settings_cannot_be_changed_through_mutable_aliases():
     original = Defaults.salzburg()
     filters = {'method': 'iir', 'iir_params': {'order': 4, 'ftype': 'butter'}}
-    geometry = {'screen_rect': [0, 0, 1280, 720]}
-    profile = original.with_overrides(name='custom', filter=filters, eye=geometry)
+    alignment = {'alignment_kwargs': {'audio_band': [80, 300]}}
+    profile = original.with_overrides(name='custom', filter=filters, trf=alignment)
 
     filters['iir_params']['order'] = 99
-    geometry['screen_rect'][2] = 1
+    alignment['alignment_kwargs']['audio_band'][1] = 1
     section = profile.section('filter')
     section['iir_params']['order'] = 98
     exported = profile.to_dict()
@@ -164,9 +164,9 @@ def test_profile_settings_cannot_be_changed_through_mutable_aliases():
     public_parameters['order'] = 96
 
     assert profile.filter.iir_params['order'] == 4
-    assert list(profile.eye.screen_rect) == [0, 0, 1280, 720]
+    assert profile.trf.alignment_kwargs['audio_band'] == [80, 300]
     assert original.filter.method == 'fir'
-    assert list(original.eye.screen_rect) == [0, 0, 1920, 1080]
+    assert original.trf.alignment_kwargs is None
     assert profile.name == 'custom'
     assert profile.version == original.version
     with pytest.raises((AttributeError, TypeError)):
@@ -390,14 +390,14 @@ def test_shortcuts_validate_before_changing_active_defaults(kwargs, error):
 
 
 def test_eye_hardware_must_be_configured_without_a_lab_profile():
-    from almkanal.almkanal_steps.eye_utils import clean_pixx_eye_data
+    from almkanal.eye_utils.gaze_utils import VPixxConfig, create_vpixx_calibration
 
-    with pytest.raises(ValueError, match='tpixx_fs, distance, and screen_width'):
-        clean_pixx_eye_data(None)
+    with pytest.raises(ValueError, match='screen_resolution, screen_size, and screen_distance'):
+        create_vpixx_calibration()
     with use_defaults('salzburg'):
         # Explicit None must not silently pick a hardware value from the profile.
-        with pytest.raises(ValueError, match='tpixx_fs, distance, and screen_width'):
-            clean_pixx_eye_data(None, distance=None)
+        with pytest.raises(ValueError, match='screen_resolution, screen_size, and screen_distance'):
+            create_vpixx_calibration(VPixxConfig(screen_distance=None))
 
 
 def test_standalone_maxwell_preserves_positional_overrides(monkeypatch):

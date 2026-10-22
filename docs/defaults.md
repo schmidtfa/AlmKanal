@@ -73,14 +73,11 @@ Scientific validity, such as whether a cutoff suits a recording's sampling
 rate, remains the responsibility of the processing step.
 
 A dictionary supplied as an option replaces that entire option; it is not
-deep-merged. For example, to change one eye-filter cutoff, supply both entries:
+deep-merged. For example, supply a complete IIR filter configuration:
 
 ```python
 lab = lab.with_overrides(
-    eye={"filter_settings": {
-        "pupil_diameter": (None, 20),
-        "xy_movements": (0.1, 40),
-    }},
+    filter={"method": "iir", "iir_params": {"order": 4, "ftype": "butter"}},
 )
 ```
 
@@ -141,7 +138,8 @@ Use section names as keyword arguments to `set_defaults()`, `use_defaults()`,
 or `with_overrides()`. The examples below
 are selected settings; `Defaults.generic().section("filter")` returns all
 settings in that section. The typed definitions in
-[`almkanal/_defaults_schema.py`](../almkanal/_defaults_schema.py) list every option.
+[`almkanal/_defaults_schema.py`](https://github.com/schmidtfa/AlmKanal/blob/feat/configurable-defaults/almkanal/_defaults_schema.py)
+list every option.
 
 | Section | Used for | Example settings |
 | --- | --- | --- |
@@ -159,7 +157,7 @@ settings in that section. The typed definitions in
 | `source_reconstruction` | `SourceReconstruction`, parcellation | `return_parc`, `atlas`, `label_mode` |
 | `trf` | `EpochTRF`, TRF epoch helpers | `hw_delay_s`, `epoch_len_s`, `fallback_drift_us_per_s` |
 | `pipeline` | `AlmKanal` | `pick_params` |
-| `eye` | `clean_pixx_eye_data` | `tpixx_fs`, `distance`, `screen_width`, `screen_rect` |
+| `vpixx` | `VPixxCleaner`, `VPixxConfig`, eye loading/alignment helpers | `screen_resolution`, `screen_size`, `screen_distance`, `meg_stim_channel`, `concatenate_raws` |
 | `ica_eog` | `eog_ica_from_meg` | `left_eog_chs`, `right_eog_chs`, `threshold`, `tol` |
 | `ica_train` | `find_train_ica` | `duration`, `overlap`, `hmax` |
 | `trials` | Trial span helpers | `end_triggers`, `infer_missing_ends`, `base_audio_path` |
@@ -180,11 +178,12 @@ The general profile removes these historical lab assumptions:
 | `trf.hw_delay_s` | `0.0` seconds | `0.0165` seconds |
 | `trf.fallback_drift_us_per_s` | `0.0` | `499.0` |
 | `trf.audio_channels` | `None` | `("MISC007", "MISC008")` |
-| `eye.trigger_ch_name` | `"stim"` | `"STI101"` |
-| `eye.tpixx_fs` | Must be configured | `2000` Hz |
-| `eye.distance` | Must be configured | `82` cm |
-| `eye.screen_width` | Must be configured | `63` cm |
-| `eye.screen_rect` | Must be configured | `[0, 0, 1920, 1080]` |
+| `vpixx.meg_stim_channel` | `None` (MNE detection) | `"STI101"` |
+| `vpixx.meg_min_duration` | `0.0` seconds | `0.002` seconds |
+| `vpixx.meg_max_trigger` | `None` (keep all codes) | `4096` (exclude this code and above) |
+| `vpixx.screen_distance` | Must be configured for radians | `0.82` m |
+| `vpixx.screen_size` | Must be configured for radians | `(0.61, 0.34)` m |
+| `vpixx.screen_resolution` | Must be configured for radians | `(1920, 1080)` pixels |
 | `ica_eog.left_eog_chs` | Must be configured when using the helper | `["MEG0121", "MEG0311"]` |
 | `ica_eog.right_eog_chs` | Must be configured when using the helper | `["MEG1211", "MEG1411"]` |
 
@@ -198,23 +197,70 @@ The Salzburg profile enables recorded-audio alignment using `MISC007` and
 recorded audio is unavailable, or override the profile with
 `set_defaults("salzburg", trf={"audio_channels": None})`.
 
-For eye tracking, provide sampling rate and geometry in the profile or in the
-`clean_pixx_eye_data()` call. For example:
+## VPixx eye tracking
+
+The new `VPixxCleaner` step and standalone eye-tracking functions share the
+`vpixx` section. The sampling rate is read from the recording's timestamps.
+Configure screen geometry in metres and pixels before constructing steps:
 
 ```python
-eye_lab = Defaults.generic().with_overrides(
+import almkanal as ak
+
+ak.set_defaults(
     name="our-eye-setup",
-    eye={
-        "tpixx_fs": 2000,
-        "distance": 65.0,
-        "screen_width": 53.0,
-        "screen_rect": [0, 0, 1920, 1080],
-        "trigger_ch_name": "TRIGGER",
+    vpixx={
+        "screen_resolution": (1920, 1080),
+        "screen_size": (0.53, 0.30),
+        "screen_distance": 0.65,
+        "meg_stim_channel": "TRIGGER",
+        "blink_buffer_vpixx": (0.05, 0.2),
+        "concatenate_raws": True,
     },
 )
+
+step = ak.VPixxCleaner(eye_path="eye.mat", interpolate_blinks=False)
 ```
 
 The numbers here illustrate the API; replace them with your equipment's values.
+`VPixxCleaner` captures the profile when constructed, retains it for each block,
+and records its resolved parameters in the pipeline JSON. `eye_path` remains a
+required input. `concatenate_raws` applies to list input; a single recording
+still returns a single Raw object.
+The `align` setting controls the standalone `add_eye_tracking_data()` helper;
+`VPixxCleaner` always aligns eye tracking to its input recordings.
+
+`VPixxConfig()` also captures omitted values at construction. The standalone
+`load_eyetracking_data()`, `add_eye_tracking_data()`, and `align_eye_to_meg()`
+resolve omitted options when called. An omitted or `None` `config` builds a
+fresh `VPixxConfig` from the active profile, replacing the former configuration
+object fixed at import time. An explicit config supplies its own geometry and
+calibration settings; loading and alignment options still use their corresponding
+defaults unless passed explicitly.
+
+`vpixx.blink_buffer_vpixx` supplies `VPixxConfig.blink_buffer`.
+`vpixx.blink_buffer` is the loading/interpolation override: `None` uses the
+config's buffer, and an explicit `(0.0, 0.0)` uses no padding. Explicit `None`
+also overrides a profile's non-None loading buffer.
+
+With the generic profile, conversion to radians raises a clear error until
+`screen_resolution`, `screen_size`, and `screen_distance` are supplied. For
+pixel-only processing, use `convert_to_radians=False`. Explicitly setting one
+geometry value to `None` does not silently restore the Salzburg value.
+`meg_max_trigger=None` retains all trigger codes, and `meg_stim_channel=None`
+uses MNE's stimulus-channel detection.
+
+### Migration from the previous eye helper
+
+Upstream replaced `clean_pixx_eye_data()` with the VPixx implementation. The old
+`eye` profile section is replaced by `vpixx`; old names now raise an unknown-section
+error. Replace `distance` in centimetres with `screen_distance` in metres,
+`screen_rect` with the two-value `screen_resolution`, and `screen_width` with
+both physical dimensions in `screen_size`. There is no `tpixx_fs` setting:
+timestamps determine the sampling rate. The Salzburg profile follows the new
+VPixx setup on main (61 × 34 cm screen, 82 cm distance); the former helper used
+a 63 cm screen width. The old `gaze_lims`, `filter_settings`, and `annotate_bads`
+options have no direct equivalents in the new loader.
+
 Surrogate EOG extraction likewise needs channel names appropriate to the
 recording. Configure `ica_eog` when using `eog_ica_from_meg`, or explicitly supply
 its channel arguments.

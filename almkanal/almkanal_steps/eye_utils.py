@@ -1,218 +1,153 @@
-from numbers import Real
+from pathlib import Path
+from typing import Literal
 
 import mne
-import numpy as np
-import pandas as pd
-from scipy.constants import pi
+from attrs import define, field
 
-from almkanal.defaults import function_defaults
-
-
-# TODO: Write function for MEG channel
-# TODO: TRF cleaner -> fit trf on blinks & saccades -> subtract prediction from eyedata
-@function_defaults('eye')
-def clean_pixx_eye_data(  # noqa PLR0915
-    eye_data: np.ndarray,
-    gaze_lims: dict = {'x': 6, 'y': 6},
-    filter_settings: dict = {'pupil_diameter': (None, 30), 'xy_movements': (0.1, 40)},
-    annotate_bads: bool = True,
-    trigger_ch_name: str = 'stim',
-    tpixx_fs: int | None = None,
-    distance: int | float | None = None,
-    screen_width: int | float | None = None,
-    screen_rect: list | tuple | None = None,
-    verbose: bool = False,
-) -> mne.io.BaseRaw:
-    """Preprocess eyetracking data recorded using a TRACKPixx3.
-
-    Sampling rate and screen geometry must be supplied explicitly or through
-    the active profile. Defaults.salzburg() supplies the Salzburg recording setup.
-
-    This function can be used to apply some basic preprocessing steps on the .mat file obtained
-    from the trackpixx eyetracker. The function returns an mne.io.Raw instance.
-
-    Parameters
-    ----------
-    eye_data : array
-        A numpy array containing the information obtained from the .mat file returned by the eyetracker.
-    gaze_lims : dict
-        The limits for the gaze in units of ° visual angle. This is used to identify excessive eye movements.
-    filter_settings : dict
-        The filter settings for the pupil diameter and the eye movements on the x and y axis.
-    annotate_bads : bool
-        Whether or not bad segments in the data like blinks and excessive eye movements should be annotated.
-    tpixx_fs : int
-        The sampling rate of the eyetracker
-    distance : int
-        The distance to the eye tracker in cm
-    screen_width : int
-        The screen width in cm
-    screen_rect : list | tuple
-        The screen rectangle in pixels: left, top, right, bottom.
-    verbose : bool
-        Whether or not we want a verbose output
+from almkanal.almkanal import AlmKanalStep
+from almkanal.defaults import default_field, step_with_defaults
+from almkanal.eye_utils.gaze_utils import VPixxConfig, align_eye_to_meg, load_eyetracking_data
+from almkanal.info import AlmKanalInfo
 
 
-    Returns
-    -------
-    raw : mne.io.Raw
-        Raw object.
+@define
+class VPixxCleaner(AlmKanalStep):
+    """Load, clean, and align VPixx eye tracking with continuous M/EEG data.
+
+    Omitted options use the active ``vpixx`` defaults at construction. The
+    general profile requires screen geometry when converting gaze to radians;
+    select the Salzburg profile or supply measured geometry for another setup.
+    Screen dimensions and viewing distance are in metres. ``eye_path`` is
+    required and must contain one path per recording when processing blocks.
     """
-    configuration_help = (
-        'Pass the hardware settings explicitly, configure the eye defaults section, '
-        'or select Defaults.salzburg() for the Salzburg recording setup.'
-    )
-    if tpixx_fs is None or distance is None or screen_width is None:
-        raise ValueError(f'tpixx_fs, distance, and screen_width must be configured. {configuration_help}')
-    for name, value in {'tpixx_fs': tpixx_fs, 'distance': distance, 'screen_width': screen_width}.items():
-        if not isinstance(value, Real) or isinstance(value, bool) or not np.isfinite(value) or value <= 0:
-            raise ValueError(f'{name} must be a finite positive number. {configuration_help}')
-    try:
-        rectangle = np.asarray(screen_rect, dtype=float)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f'screen_rect must contain four finite coordinates. {configuration_help}') from exc
-    rectangle_size = 4
-    if (
-        rectangle.shape != (rectangle_size,)
-        or not np.isfinite(rectangle).all()
-        or rectangle[2] <= rectangle[0]
-        or rectangle[3] <= rectangle[1]
-    ):
-        raise ValueError(
-            'screen_rect must contain [left, top, right, bottom] with positive width and height. ' + configuration_help
+
+    # vpixx config
+    eye_path: str | Path | list[str | Path]
+    screen_resolution: tuple[int, int] | None = default_field('vpixx', 'screen_resolution')
+    screen_size: tuple[float, float] | None = default_field('vpixx', 'screen_size')
+    screen_distance: float | None = default_field('vpixx', 'screen_distance')
+    calibration_model: str = default_field('vpixx', 'calibration_model')
+    calibration_eye: Literal['left', 'right'] = default_field('vpixx', 'calibration_eye')
+    blink_buffer_vpixx: tuple[float, float] = default_field('vpixx', 'blink_buffer_vpixx')
+    digital_output_threshold: float = default_field('vpixx', 'digital_output_threshold')
+    missing_value: float = default_field('vpixx', 'missing_value')
+    # loading setup
+    interpolate_blinks: bool = default_field('vpixx', 'interpolate_blinks')
+    blink_buffer: tuple[float, float] | None = default_field('vpixx', 'blink_buffer')
+    convert_to_radians: bool = default_field('vpixx', 'convert_to_radians')
+    include_raw_vpixx_channels: bool = default_field('vpixx', 'include_raw_vpixx_channels')
+    # align info
+    meg_stim_channel: str | None = default_field('vpixx', 'meg_stim_channel')
+    eye_stim_channel: str = default_field('vpixx', 'eye_stim_channel')
+    meg_min_duration: float = default_field('vpixx', 'meg_min_duration')
+    meg_max_trigger: int | None = default_field('vpixx', 'meg_max_trigger')
+    concatenate_raws: bool = default_field('vpixx', 'concatenate_raws')
+    must_be_before: tuple = ('MultiBlockMaxwell', 'Maxwell', 'Epochs', 'Events')
+    must_be_after: tuple = ()
+    allow_repeated: bool = field(default=False, init=False)
+
+    @step_with_defaults
+    def run(
+        self,
+        data: mne.io.BaseRaw | list[mne.io.BaseRaw],
+        info: AlmKanalInfo,
+    ) -> dict:
+        config = VPixxConfig(
+            self.screen_resolution,
+            self.screen_size,
+            self.screen_distance,
+            self.calibration_model,
+            self.calibration_eye,
+            self.blink_buffer_vpixx,
+            self.digital_output_threshold,
+            self.missing_value,
         )
+        single_raw = isinstance(data, mne.io.BaseRaw)
 
-    nan_value = 9999.0
-    va1_deg_cm = 2 * pi * distance / 360  # visual angle 1 deg [unit:cm]
-    screen_width_px = rectangle[2] - rectangle[0]
-    screen_height_px = rectangle[3] - rectangle[1]
-    px_in_cm = screen_width / screen_width_px
-    va1_deg_px = np.floor(va1_deg_cm / px_in_cm)
-    px2deg = 1 / va1_deg_px
-    gaze_xlim = (screen_width_px / gaze_lims['x']) * px2deg
-    gaze_ylim = (screen_height_px / gaze_lims['y']) * px2deg
+        if single_raw:
+            raw_list: list[mne.io.BaseRaw] = [data]
+        else:
+            raw_list = list(data)
 
-    # columns labels for the raw data we get from the trackpixx3
-    columns = [
-        'Time tag',
-        'Left Eye x',
-        'Left Eye y',
-        'Left Eye Pupil Diameter',
-        'Right Eye x',
-        'Right Eye y',
-        'Right Eye Pupil Diameter',
-        'Digital Input',
-        'Left Eye Blink',
-        'Right Eye Blink',
-        'Digital Output',
-        'Left Eye Fixation',
-        'Right Eye Fixation',
-        'Left Eye Saccade',
-        'Right Eye Saccade',
-        'Message code',
-        'Left Eye Raw x',
-        'Left Eye Raw y',
-        'Right Eye Raw x',
-        'Right Eye Raw y',
-    ]
+        eye_paths = [self.eye_path] if isinstance(self.eye_path, str | Path) else list(self.eye_path)
 
-    df = pd.DataFrame(eye_data, columns=columns)
+        if len(raw_list) != len(eye_paths):
+            raise ValueError(
+                f'Received {len(raw_list)} MEG recordings but '
+                f'{len(eye_paths)} eye-tracking paths. '
+                'Each MEG recording must have a corresponding eye-tracking file.'
+            )
+        raw_list_preproc = []
+        for raw, eye_path in zip(raw_list, eye_paths):
+            eye_data = load_eyetracking_data(
+                eye_path=eye_path,
+                config=config,
+                interpolate_blinks=self.interpolate_blinks,
+                blink_buffer=self.blink_buffer,
+                convert_to_radians=self.convert_to_radians,
+                include_raw_vpixx_channels=self.include_raw_vpixx_channels,
+            )
 
-    df['time'] = df['Time tag'] - df['Time tag'][0]
+            align_eye_to_meg(
+                raw,
+                eye_data,
+                meg_stim_channel=self.meg_stim_channel,
+                eye_stim_channel=self.eye_stim_channel,
+                meg_min_duration=self.meg_min_duration,
+                meg_max_trigger=self.meg_max_trigger,
+            )
 
-    if (np.greater(df['Digital Output'].to_numpy(), 256)).sum() > 1:  # just some high value
-        df['trigger'] = df['Digital Output'] / 256
-    else:
-        df['trigger'] = df['Digital Output']
+            raw.load_data()
+            eye_data.load_data()
 
-    df[df == nan_value] = np.nan  # bad values
+            if raw.info['sfreq'] != eye_data.info['sfreq']:
+                raise ValueError(
+                    'MEG and eye-tracking sampling frequencies differ after '
+                    'alignment. Resample the eye-tracking data before adding it '
+                    'to the MEG recording.'
+                )
 
-    def movmean(x: pd.Series, w: int) -> np.ndarray:
-        return np.convolve(x, np.ones(w), 'same') / w
+            if raw.n_times != eye_data.n_times:
+                raise ValueError(
+                    'MEG and eye-tracking recordings have different numbers of '
+                    'samples. They cannot be combined with Raw.add_channels(). '
+                    'Check temporal alignment and recording durations.'
+                )
 
-    t_exc = 0.1  # gaze
-    n_blk_smpl = int(tpixx_fs * t_exc)
-    blinks_l = movmean(df['Left Eye Blink'], n_blk_smpl) > 0
-    blinks_r = movmean(df['Right Eye Blink'], n_blk_smpl) > 0
+            raw.add_channels(
+                [eye_data],
+                force_update_info=True,
+            )
+            raw_list_preproc.append(raw)
+        if single_raw:
+            result_data = raw_list_preproc[0]
+        elif not single_raw and self.concatenate_raws:
+            result_data = mne.concatenate_raws(raw_list_preproc)
+        elif not single_raw and not self.concatenate_raws:
+            result_data = raw_list_preproc
 
-    t_exc = 0.3  # pupil
-    n_blk_smpl = int(tpixx_fs * t_exc)
-    blinks_l_pp = movmean(df['Left Eye Blink'], n_blk_smpl) > 0
-    blinks_r_pp = movmean(df['Right Eye Blink'], n_blk_smpl) > 0
+        return {
+            'data': result_data,
+            'eye_info': {
+                'screen_resolution': self.screen_resolution,
+                'screen_size': self.screen_size,
+                'screen_distance': self.screen_distance,
+                'calibration_model': self.calibration_model,
+                'calibration_eye': self.calibration_eye,
+                'blink_buffer_vpixx': self.blink_buffer_vpixx,
+                'digital_output_threshold': self.digital_output_threshold,
+                'missing_value': self.missing_value,
+                'interpolate_blinks': self.interpolate_blinks,
+                'blink_buffer': self.blink_buffer,
+                'convert_to_radians': self.convert_to_radians,
+                'include_raw_vpixx_channels': self.include_raw_vpixx_channels,
+                'meg_stim_channel': self.meg_stim_channel,
+                'eye_stim_channel': self.eye_stim_channel,
+                'meg_min_duration': self.meg_min_duration,
+                'meg_max_trigger': self.meg_max_trigger,
+                'concatenate_raws': self.concatenate_raws,
+            },
+        }
 
-    # % remove blinks...
-    df['Left Eye x'][blinks_l == 1] = np.nan
-    df['Right Eye x'][blinks_r == 1] = np.nan
-
-    df['Left Eye y'][blinks_l == 1] = np.nan
-    df['Right Eye y'][blinks_r == 1] = np.nan
-
-    df['Left Eye Pupil Diameter'][blinks_l_pp == 1] = np.nan
-    df['Right Eye Pupil Diameter'][blinks_r_pp == 1] = np.nan
-
-    # % we take the average across both eyes (should be fine unless you are a chameleon)
-    df['x'] = np.nanmean([df['Left Eye x'], df['Right Eye x']], axis=0)
-    df['y'] = np.nanmean([df['Left Eye y'], df['Right Eye y']], axis=0)
-    df['diameter'] = np.nanmean([df['Left Eye Pupil Diameter'], df['Right Eye Pupil Diameter']], axis=0)
-
-    # convert to °...
-    df['x'] *= px2deg
-    df['y'] *= px2deg
-
-    df['xy_thd'] = np.logical_or(np.abs(df['x']) > gaze_xlim, np.abs(df['y']) > gaze_ylim)
-
-    for param in ['x', 'y', 'diameter']:
-        if np.isnan(df[param].iloc[0]):
-            df[param].iloc[0] = np.nanmean(df[param])
-
-        if np.isnan(df[param].iloc[-1]):
-            df[param].iloc[-1] = np.nanmean(df[param])
-
-    # % interpolate nans
-    df['x'].interpolate(method='pchip', inplace=True)  # TODO: maybe linear
-    df['y'].interpolate(method='pchip', inplace=True)
-    df['diameter'].interpolate(method='pchip', inplace=True)
-    df['blinks'] = np.logical_and(blinks_l_pp, blinks_r_pp)
-
-    # TODO: do trf with blinks and saccades on x,y and diameter -> subtract prediction
-
-    # %move to mne python
-    # NOTE: The trigger channel
-    info = mne.create_info(
-        ch_names=['x', 'y', 'diameter', 'xy_thd', 'blinks'], sfreq=tpixx_fs, ch_types='misc', verbose=verbose
-    )
-    info_trigger = mne.create_info(ch_names=[trigger_ch_name], sfreq=tpixx_fs, ch_types='stim', verbose=verbose)
-    raw = mne.io.RawArray(
-        df[['x', 'y', 'diameter', 'xy_thd', 'blinks']].T, info=info, first_samp=df['Time tag'][0], verbose=verbose
-    )
-    raw_trigger = mne.io.RawArray([df['trigger']], info_trigger, verbose=verbose)
-
-    raw.add_channels([raw_trigger], force_update_info=True)
-    raw.set_channel_types(
-        {trigger_ch_name: 'stim'},
-        # on_unit_change='ignore',
-        verbose=verbose,
-    )  # a unit change is expected
-
-    xy = mne.pick_channels(ch_names=raw.ch_names, include=['x', 'y'])
-    dia = mne.pick_channels(ch_names=raw.ch_names, include=['diameter'])
-
-    # % filter
-    raw.filter(
-        filter_settings['xy_movements'][0], filter_settings['xy_movements'][1], verbose=verbose, picks=xy
-    )  # this needs a hp filter
-    raw.filter(
-        filter_settings['pupil_diameter'][0], filter_settings['pupil_diameter'][1], verbose=verbose, picks=dia
-    )  # this doesnt need a hp filter
-
-    # % annotate bad segments
-    if annotate_bads:
-        annot = mne.Annotations(
-            onset=raw['blinks'][1][raw['blinks'][0][0, :] == 1], duration=1 / tpixx_fs, description='bad_blinks'
-        )
-
-        annot.append(onset=raw['xy_thd'][1][raw['xy_thd'][0][0, :] == 1], duration=1 / tpixx_fs, description='bad_view')
-
-        raw.set_annotations(annot)
-
-    return raw
+    def reports(self, data: mne.io.BaseRaw, report: mne.Report, info: AlmKanalInfo) -> None:
+        pass

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence  # noqa: TCH003 - used by get_type_hints at runtime
 from typing import Any, Literal
 
-from attrs import field, frozen
+from attrs import frozen
 
 
 @frozen
@@ -197,16 +197,25 @@ class PipelineDefaults:
 
 
 @frozen
-class EyeDefaults:
-    gaze_lims: dict = field(factory=lambda: {'x': 6, 'y': 6})
-    filter_settings: dict = field(factory=lambda: {'pupil_diameter': (None, 30), 'xy_movements': (0.1, 40)})
-    annotate_bads: bool = True
-    trigger_ch_name: str = 'stim'
-    tpixx_fs: int | None = None
-    distance: float | None = None
-    screen_width: float | None = None
-    screen_rect: list[int] | tuple[int, ...] | None = None
-    verbose: bool = False
+class VPixxDefaults:
+    screen_resolution: tuple[int, int] | None = None
+    screen_size: tuple[float, float] | None = None
+    screen_distance: float | None = None
+    calibration_model: str = 'HV5'
+    calibration_eye: Literal['left', 'right'] = 'right'
+    blink_buffer_vpixx: tuple[float, float] = (0.05, 0.2)
+    digital_output_threshold: float = 256.0
+    missing_value: float = 9999.0
+    interpolate_blinks: bool = True
+    blink_buffer: tuple[float, float] | None = None
+    convert_to_radians: bool = True
+    include_raw_vpixx_channels: bool = False
+    meg_stim_channel: str | None = None
+    eye_stim_channel: str = 'Digital Output'
+    meg_min_duration: float = 0.0
+    meg_max_trigger: int | None = None
+    concatenate_raws: bool = False
+    align: bool = True
 
 
 @frozen
@@ -271,7 +280,7 @@ SECTION_TYPES = {
     'source_reconstruction': SourceReconstructionDefaults,
     'trf': EpochTRFDefaults,
     'pipeline': PipelineDefaults,
-    'eye': EyeDefaults,
+    'vpixx': VPixxDefaults,
     'ica_eog': ICAEOGDefaults,
     'ica_train': ICATrainDefaults,
     'trials': TrialDefaults,

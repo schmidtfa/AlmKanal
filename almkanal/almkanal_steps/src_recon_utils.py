@@ -127,7 +127,7 @@ class SourceReconstruction(AlmKanalStep):
         source space prepared by ForwardModel before returning or
         parcellating them. Default is True.
 
-        Returns
+    Returns
     -------
     dict | mne.SourceEstimate | dict | mne.VolSourceEstimate
         Source time courses or parcellated data.

@@ -94,12 +94,13 @@ class Defaults:
                 'fallback_drift_us_per_s': 499.0,
                 'audio_channels': ('MISC007', 'MISC008'),
             },
-            eye={
-                'trigger_ch_name': 'STI101',
-                'tpixx_fs': 2000,
-                'distance': 82,
-                'screen_width': 63,
-                'screen_rect': [0, 0, 1920, 1080],
+            vpixx={
+                'screen_resolution': (1920, 1080),
+                'screen_size': (0.61, 0.34),
+                'screen_distance': 0.82,
+                'meg_stim_channel': 'STI101',
+                'meg_min_duration': 0.002,
+                'meg_max_trigger': 4096,
             },
             ica_eog={'left_eog_chs': ['MEG0121', 'MEG0311'], 'right_eog_chs': ['MEG1211', 'MEG1411']},
         )
@@ -200,8 +201,8 @@ class Defaults:
         return deepcopy(self._sections['pipeline'])
 
     @property
-    def eye(self) -> schema.EyeDefaults:
-        return deepcopy(self._sections['eye'])
+    def vpixx(self) -> schema.VPixxDefaults:
+        return deepcopy(self._sections['vpixx'])
 
     @property
     def ica_eog(self) -> schema.ICAEOGDefaults:

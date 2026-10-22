@@ -96,14 +96,15 @@ class AlmKanalStep:
 
 @define
 class AlmKanal:
-    """
-    Initializes the pipeline.
+    """A pipeline for M/EEG preprocessing.
 
-    Parameters:
-    data (mne.io.Raw or mne.Epochs): The M/EEG data to process.
-    pick_params: A dictionary of parameters for channel/type picking via mne.pick_types.
-                   For example: {"meg": True, "eeg": False, "stim": False}
-    steps (list of callables): A list of functions that accept and return an M/EEG data object.
+    Parameters
+    ----------
+    steps : list[AlmKanalStep]
+        List of preprocessing steps in the order they should be applied.
+    pick_params : dict or None
+        Parameters passed to mne.pick_types for channel selection.
+        If None, no channel selection is performed.
     """
 
     steps: list[AlmKanalStep] = field()
