@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from almkanal import AlmKanal, EpochTRF, TRFSpanSpec, preprocessing_report
+from almkanal import AlmKanal, Defaults, EpochTRF, TRFSpanSpec, preprocessing_report, use_defaults
 from almkanal.almkanal_steps import trf_utils
 from almkanal.report.methods_context import build_context_from_files
 from almkanal.stim_utils.alignment_utils import assume_raw_wav_alignment
@@ -52,7 +52,7 @@ def no_audio_trial(tmp_path, monkeypatch):
         spec = TRFSpanSpec(spans, wav_by_label={label: wav for label in spans})
         step = EpochTRF(
             lambda raw: spec, tmp_path, realign_without_audio=True,
-            fallback_drift_us_per_s=rate, epoch_len_s=1, verbose=False,
+            audio_channels=None, fallback_drift_us_per_s=rate, epoch_len_s=1, verbose=False,
         )
         return raw, spec, step
 
@@ -97,16 +97,19 @@ def test_assumed_drift_resamples_meg_before_delay(no_audio_trial, rate, delay):
     assert 'residual_rms_ms' not in info['alignment_info']['summary']
 
 
-def test_public_builder_default_rate_and_repeated_trials(no_audio_trial):
+@pytest.mark.parametrize('profile, rate', [(Defaults.generic(), 0.0), (Defaults.salzburg(), 499.0)],
+                         ids=['generic', 'salzburg'])
+def test_public_builder_profile_rate_and_repeated_trials(no_audio_trial, profile, rate):
     make_trial, wav = no_audio_trial
-    raw, spec, step = make_trial(repeated=True)
-    epochs = trf_utils.build_trf_epochs(
-        raw, spec, wav.parent, realign_without_audio=True,
-        hw_delay_s=0, epoch_len_s=1, verbose=False,
-    )
-    assert EpochTRF(lambda raw: spec, wav.parent).fallback_drift_us_per_s == 499
+    raw, spec, step = make_trial(rate=rate, repeated=True)
+    with use_defaults(profile):
+        epochs = trf_utils.build_trf_epochs(
+            raw, spec, wav.parent, realign_without_audio=True,
+            audio_channels=None, hw_delay_s=0, epoch_len_s=1, verbose=False,
+        )
+        assert EpochTRF(lambda raw: spec, wav.parent).fallback_drift_us_per_s == rate
     assert len(epochs) == 40
-    assert epochs.metadata['drift_us_per_s'].eq(499).all()
+    assert epochs.metadata['drift_us_per_s'].eq(rate).all()
     np.testing.assert_array_equal(epochs.get_data()[:20], epochs.get_data()[20:])
     np.testing.assert_array_equal(epochs.metadata['wav_t_on'], list(range(20)) * 2)
     second_onset = (spec.spans_by_label['repeat'][0] - raw.first_samp) / 1000
@@ -172,7 +175,8 @@ def test_empty_wav_is_rejected(tmp_path):
 @pytest.mark.parametrize('inferred_end', [False, True])
 def test_fallback_reports_and_json_identify_assumptions(no_audio_trial, tmp_path, inferred_end):
     make_trial, _ = no_audio_trial
-    raw, spec, step = make_trial()
+    with use_defaults(Defaults.salzburg()):
+        raw, spec, step = make_trial()
     if inferred_end:
         spec.metadata_by_label['first'] = {
             'end_inferred': True, 'end_inference_drift_us_per_s': 499.0,

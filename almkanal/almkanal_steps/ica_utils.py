@@ -7,14 +7,16 @@ from pyrasa.irasa import irasa
 from pyrasa.utils.peak_utils import get_band_info
 
 from almkanal.almkanal import AlmKanalStep
+from almkanal.defaults import default_field, function_defaults, step_with_defaults
 from almkanal.info import AlmKanalInfo
 
 
+@function_defaults('ica_eog')
 def eog_ica_from_meg(
     raw: mne.io.Raw,
     ica: mne.preprocessing.ICA,
-    left_eog_chs: list = ['MEG0121', 'MEG0311'],
-    right_eog_chs: list = ['MEG1211', 'MEG1411'],
+    left_eog_chs: list | None = None,
+    right_eog_chs: list | None = None,
     threshold: float = 0.5,
     tol: float = 0.2,
 ) -> list:
@@ -33,9 +35,9 @@ def eog_ica_from_meg(
     ica : mne.preprocessing.ICA
         The fitted ICA object containing independent components.
     left_eog_chs : list, optional
-        List of MEG channels representing left-side eye movements. Defaults to ['MEG0121', 'MEG0311'].
+        MEG channels representing left-side eye movements. Required unless configured in the active profile.
     right_eog_chs : list, optional
-        List of MEG channels representing right-side eye movements. Defaults to ['MEG1211', 'MEG1411'].
+        MEG channels representing right-side eye movements. Required unless configured in the active profile.
     threshold : float, optional
         Correlation threshold for detecting EOG-related ICA components. Defaults to 0.5.
     tol: float, optional
@@ -47,6 +49,11 @@ def eog_ica_from_meg(
         Indices of ICA components identified as eye related activity.
     """
 
+    if not left_eog_chs or not right_eog_chs:
+        raise ValueError(
+            'Specify left_eog_chs and right_eog_chs, configure the ica_eog defaults section, '
+            'or select Defaults.salzburg() for the Salzburg MEG channel layout.'
+        )
     eog_list = left_eog_chs + right_eog_chs
     eog_indices, eog_scores = ica.find_bads_eog(raw, ch_name=eog_list, measure='correlation', threshold=threshold)
 
@@ -70,6 +77,7 @@ def eog_ica_from_meg(
     return eog_indices
 
 
+@function_defaults('ica')
 def run_ica(  # noqa: C901, PLR0912, PLR0915
     raw: mne.io.Raw,
     fit_only: bool = False,
@@ -77,7 +85,7 @@ def run_ica(  # noqa: C901, PLR0912, PLR0915
     method: str = 'picard',
     random_state: None | int = 42,
     fit_params: dict | None = None,
-    resample_freq: None | int = None,
+    resample_freq: None | int = 200,
     ica_hp_freq: None | float = 1.0,
     ica_lp_freq: None | float = None,
     eog: bool = True,
@@ -87,9 +95,9 @@ def run_ica(  # noqa: C901, PLR0912, PLR0915
     ecg_corr_thresh: float = 0.5,
     emg: bool = False,
     emg_thresh: float = 0.5,
-    train: bool = True,
+    train: bool = False,
     train_freq: float = 16.666,
-    train_thresh: float = 2,
+    train_thresh: float = 6.0,
 ) -> tuple[mne.io.Raw, mne.preprocessing.ICA, dict, list, list]:
     """
     Run ICA on raw MEG data to identify and remove artifacts (EOG, ECG, train).
@@ -107,7 +115,7 @@ def run_ica(  # noqa: C901, PLR0912, PLR0915
     fit_params : dict | None, optional
         Additional fitting parameters for ICA. Defaults to None.
     resample_freq : None | int, optional
-        Resampling frequency before ICA. Defaults to None.
+        Resampling frequency before ICA. Uses 200 Hz from the general profile; None disables resampling.
     ica_hp_freq : None | float, optional
         High-pass filter frequency for ICA preprocessing. Defaults to 1.0 Hz.
     ica_lp_freq : None | float, optional
@@ -121,9 +129,9 @@ def run_ica(  # noqa: C901, PLR0912, PLR0915
     ecg_corr_thresh : float, optional
         Correlation threshold for ECG artifact detection. Defaults to 0.5.
     train : bool, optional
-        Whether to identify and remove train artifacts. Defaults to True.
-    train_freq : int, optional
-        Frequency to use for train artifact detection. Defaults to 16 Hz.
+        Whether to remove train artifacts. False in the general profile; True in the Salzburg profile.
+    train_freq : float, optional
+        Frequency to use for train artifact detection. Defaults to 16.666 Hz.
 
     Returns
     -------
@@ -224,6 +232,7 @@ def run_ica(  # noqa: C901, PLR0912, PLR0915
     return raw, ica, components_dict, eog_scores, ecg_scores
 
 
+@function_defaults('ica_train', aliases={'peak_threshold': ('ica', 'train_thresh')})
 def find_train_ica(
     raw: mne.io.Raw,
     ica: mne.preprocessing.ICA,
@@ -242,16 +251,16 @@ def find_train_ica(
         The raw MEG data used during ICA fitting.
     ica : mne.preprocessing.ICA
         The ICA object containing the decomposition results.
-    train_freq : int
+    train_freq : float
         The target frequency of the train artifact (e.g., 16 Hz).
     duration : int, optional
-        Window duration (in seconds) for PSD computation. Defaults to 4.
+        Window duration (in seconds) for PSD computation. Defaults to 8.
     overlap : float, optional
         Overlap ratio for PSD computation windows. Defaults to 0.5.
     hmax : float, optional
         Maximum up/downsampling factor for IRASA. Defaults to 2.
     peak_threshold : float, optional
-        Standard deviation threshold for peak power detection. Defaults to 2.
+        Peak detection threshold. Uses the active profile's ica.train_thresh (general default: 6.0).
 
     Returns
     -------
@@ -353,11 +362,11 @@ class ICA(AlmKanalStep):
         Whether to identify components associated with muscle activity.
     emg_thresh : float, default=0.5
         Threshold used to classify components as EMG-related.
-    train : bool, default=True
+    train : bool, default=False
         Whether to identify components associated with the train-related artifact.
-    train_freq : int, default=16
+    train_freq : float, default=16.666
         Frequency, in Hz, around which the train-related artifact is detected.
-    train_thresh : float, default=2.0
+    train_thresh : float, default=6.0
         Threshold used to classify components as train-related.
     img_path : str | None, default=None
         Optional image-output path retained as part of the ICA step configuration.
@@ -397,27 +406,28 @@ class ICA(AlmKanalStep):
     must_be_after: tuple = ('Maxwell',)
     allow_repeated: bool = True
 
-    fit_only: bool = False
-    n_components: None | int | float = None
-    method: str = 'picard'
-    random_state: None | int = 42
-    fit_params: dict | None = None
-    ica_hp_freq: None | float = 1.0
-    ica_lp_freq: None | float = None
-    resample_freq: int = 200  # downsample to 200hz per default
-    eog: bool = True
-    surrogate_eog_chs: None | dict = None
-    eog_corr_thresh: float = 0.5
-    ecg: bool = True
-    ecg_corr_thresh: float = 0.5
-    emg: bool = False
-    emg_thresh: float = 0.5
-    train: bool = True
-    train_freq: float = 16.666
-    train_thresh: float = 6
-    img_path: None | str = None
-    fname: None | str = None
+    fit_only: bool = default_field('ica', 'fit_only')
+    n_components: None | int | float = default_field('ica', 'n_components')
+    method: str = default_field('ica', 'method')
+    random_state: None | int = default_field('ica', 'random_state')
+    fit_params: dict | None = default_field('ica', 'fit_params')
+    ica_hp_freq: None | float = default_field('ica', 'ica_hp_freq')
+    ica_lp_freq: None | float = default_field('ica', 'ica_lp_freq')
+    resample_freq: int | None = default_field('ica', 'resample_freq')
+    eog: bool = default_field('ica', 'eog')
+    surrogate_eog_chs: None | dict = default_field('ica', 'surrogate_eog_chs')
+    eog_corr_thresh: float = default_field('ica', 'eog_corr_thresh')
+    ecg: bool = default_field('ica', 'ecg')
+    ecg_corr_thresh: float = default_field('ica', 'ecg_corr_thresh')
+    emg: bool = default_field('ica', 'emg')
+    emg_thresh: float = default_field('ica', 'emg_thresh')
+    train: bool = default_field('ica', 'train')
+    train_freq: float = default_field('ica', 'train_freq')
+    train_thresh: float = default_field('ica', 'train_thresh')
+    img_path: None | str = default_field('ica', 'img_path')
+    fname: None | str = default_field('ica', 'fname')
 
+    @step_with_defaults
     def run(
         self,
         data: mne.io.Raw,

@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from almkanal import EpochTRF, TRFSpanSpec
+from almkanal import Defaults, EpochTRF, TRFSpanSpec, use_defaults
 from almkanal.almkanal_steps import trf_utils
 from almkanal.stim_utils.audio_utils import prepare_audio
 from almkanal.info import AlmKanalInfo
@@ -143,7 +143,7 @@ def test_alignment_disabled_retains_fixed_delay_processing(timing_data, monkeypa
     monkeypatch.setattr(trf_utils, 'estimate_raw_wav_alignment', unexpected)
     epochs = trf_utils.build_trf_epochs(
         timing_data['raw'], timing_data['spec'], timing_data['path'],
-        epoch_len_s=1.0, verbose=False,
+        hw_delay_s=0.0165, epoch_len_s=1.0, verbose=False,
     )
     assert len(epochs) == 4
     expected = timing_data['raw'].get_data(picks=['EEG 001'], start=408, stop=2408)
@@ -227,16 +227,17 @@ def meg_pulse_data(timing_data, monkeypatch, request) -> dict[str, Any]:
 
 @pytest.mark.parametrize('feature, channel', [('envelope', 'env_rms'), ('flux', 'flux')])
 @pytest.mark.parametrize('realign', [True, False])
-def test_default_advances_only_meg_and_negative_delay_warns(meg_pulse_data, feature, channel, realign) -> None:
+def test_salzburg_delay_advances_only_meg_and_negative_delay_warns(meg_pulse_data, feature, channel, realign) -> None:
     raw = meg_pulse_data['raw']
-    step = EpochTRF(
-        gen_span_spec=lambda raw: meg_pulse_data['spec'],
-        base_audio_path=meg_pulse_data['path'],
-        feature=feature,
-        audio_channels=['recorded'] if realign else None,
-        epoch_len_s=1.0,
-        verbose=False,
-    )
+    with use_defaults(Defaults.salzburg()):
+        step = EpochTRF(
+            gen_span_spec=lambda raw: meg_pulse_data['spec'],
+            base_audio_path=meg_pulse_data['path'],
+            feature=feature,
+            audio_channels=['recorded'] if realign else None,
+            epoch_len_s=1.0,
+            verbose=False,
+        )
     assert step.hw_delay_s == 0.0165
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter('always')
@@ -261,7 +262,7 @@ def test_default_advances_only_meg_and_negative_delay_warns(meg_pulse_data, feat
     # introduces up to one sample of MNE crop/resample rounding. At 1500 ppm
     # (and without realignment), require the exact 33-sample hardware shift.
     tolerance = 1 if realign and meg_pulse_data['alignment']['clock_slope'] == 1.2 else 0
-    assert peaks[1] - peaks[0] == pytest.approx(-33, abs=tolerance)  # Default: compensate tube delay.
+    assert peaks[1] - peaks[0] == pytest.approx(-33, abs=tolerance)  # Salzburg: compensate tube delay.
     assert peaks[2] - peaks[0] == pytest.approx(33, abs=tolerance)  # Negative: add lag.
     if realign:
         assert peaks[1] - 3000 == pytest.approx(200, abs=tolerance)  # Preserve 100 ms neural latency.

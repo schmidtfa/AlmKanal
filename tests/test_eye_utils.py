@@ -7,12 +7,20 @@ import numpy as np
 import pytest
 from scipy.io import savemat
 
+from almkanal import use_defaults
 from almkanal.eye_utils.gaze_utils import (
     add_eye_tracking_data,
     align_eye_to_meg,
     load_eyetracking_data,
     read_vpixx_mat,
 )
+
+
+@pytest.fixture(autouse=True)
+def salzburg_setup():
+    """These synthetic recordings reproduce the Salzburg acquisition setup."""
+    with use_defaults('salzburg'):
+        yield
 
 def make_synthetic_vpixx_mat(
     path: Path,

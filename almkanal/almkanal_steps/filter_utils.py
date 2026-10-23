@@ -6,6 +6,7 @@ import mne
 from attrs import define
 
 from almkanal import AlmKanalStep
+from almkanal.defaults import default_field, step_with_defaults
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -99,25 +100,26 @@ class Filter(AlmKanalStep):
         Filter epoched M/EEG data.
     """
 
-    highpass: float | None = 0.1
-    lowpass: float | None = 40.0
-    picks: str | npt.ArrayLike | slice | None = None
-    filter_length: str | int = 'auto'
-    l_trans_bandwidth: float | Literal['auto'] = 'auto'
-    h_trans_bandwidth: float | Literal['auto'] = 'auto'
-    n_jobs: int | str | None = None
-    method: str = 'fir'
-    iir_params: dict[str, Any] | None = None
-    phase: str = 'zero'
-    fir_window: str = 'hamming'
-    fir_design: str = 'firwin'
-    skip_by_annotation: str | tuple[str, ...] | list[str] = ('edge', 'bad_acq_skip')
-    pad: str = 'reflect_limited'
+    highpass: float | None = default_field('filter', 'highpass')
+    lowpass: float | None = default_field('filter', 'lowpass')
+    picks: str | npt.ArrayLike | slice | None = default_field('filter', 'picks')
+    filter_length: str | int = default_field('filter', 'filter_length')
+    l_trans_bandwidth: float | Literal['auto'] = default_field('filter', 'l_trans_bandwidth')
+    h_trans_bandwidth: float | Literal['auto'] = default_field('filter', 'h_trans_bandwidth')
+    n_jobs: int | str | None = default_field('filter', 'n_jobs')
+    method: str = default_field('filter', 'method')
+    iir_params: dict[str, Any] | None = default_field('filter', 'iir_params')
+    phase: str = default_field('filter', 'phase')
+    fir_window: str = default_field('filter', 'fir_window')
+    fir_design: str = default_field('filter', 'fir_design')
+    skip_by_annotation: str | tuple[str, ...] | list[str] = default_field('filter', 'skip_by_annotation')
+    pad: str = default_field('filter', 'pad')
 
     must_be_before: tuple[str, ...] = ()
     must_be_after: tuple[str, ...] = ()
     allow_repeated: bool = True
 
+    @step_with_defaults
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict[str, Any]:
         # --- compute transition bandwidths for REPORT (floats) and for API call (float | 'auto')
         l_tb_report: float | None = None
@@ -287,15 +289,16 @@ class Resample(AlmKanalStep):
     """
 
     sfreq: int
-    npad: str = 'auto'
-    window: str | tuple[str, float] = 'auto'
-    n_jobs: int | None = None
-    pad: str = 'auto'
-    method: Literal['fft', 'polyphase'] = 'fft'
+    npad: str = default_field('resample', 'npad')
+    window: str | tuple[str, float] = default_field('resample', 'window')
+    n_jobs: int | None = default_field('resample', 'n_jobs')
+    pad: str = default_field('resample', 'pad')
+    method: Literal['fft', 'polyphase'] = default_field('resample', 'method')
     must_be_before: tuple[str, ...] = ()
     must_be_after: tuple[str, ...] = ('Epochs',)
     allow_repeated: bool = True
 
+    @step_with_defaults
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict[str, Any]:
         if not (self.sfreq / 2 >= float(data.info['lowpass'])):
             lowpass = float(data.info['lowpass'])

@@ -66,6 +66,28 @@ qc_report.save("preprocessing-report.html", overwrite=True, open_browser=False)
 The list of steps makes the sequence of processing steps explicit. `AlmKanal` checks the supported ordering constraints when the pipeline is created, then `run()` processes the data sequentially and returns the result and an [MNE report](https://mne.tools/stable/generated/mne.Report.html).
 The same pattern can be applied to previously processed `Raw` or `Epochs` data.
 
+### Set defaults for your lab or study
+
+Use `set_defaults()` to choose shared settings for your whole lab or a specific
+study. For example, our Salzburg-Labs has its own defaults that are set before creating a pipeline:
+
+```python
+from almkanal import AlmKanal, Filter, Resample, set_defaults
+
+set_defaults("salzburg")
+
+pipeline = AlmKanal(
+    steps=[
+        Filter(highpass=1.0, lowpass=40.0),
+        Resample(sfreq=200),
+    ]
+)
+
+processed_raw, qc_report = pipeline.run(raw)
+```
+
+Values passed directly to a step still **override** the defaults.
+
 ### Automatically draft a preprocessing Methods section
 
 After running a pipeline, save its preprocessing history: 
