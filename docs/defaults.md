@@ -1,182 +1,137 @@
-# Defaults profiles
+# Defaults for your lab or study
 
-AlmKanal uses `Defaults.generic()` automatically. A profile supplies omitted
-optional arguments for pipeline steps and supported standalone functions.
-Select and customize one for your script with `set_defaults()`, or temporarily with
-`use_defaults()`. Explicit arguments always take precedence.
+AlmKanal lets you choose shared defaults for your whole lab or for a particular
+study. Values you supply in individual function calls still take precedence.
 
-## Select and customize a profile
+## Use a lab profile
+
+To use the built-in Salzburg settings, add this near the beginning of your script:
 
 ```python
 import almkanal as ak
 
-ak.set_defaults(
-    "salzburg",
-    name="our-lab",
-    filter={"lowpass": 80.0},
-    ica={"train": False},
-)
-
-step = ak.Filter()              # Uses lowpass=80.0
-custom = ak.Filter(lowpass=30)  # Explicit arguments still win
-
-with ak.use_defaults("generic", filter={"lowpass": 25.0}):
-    temporary_step = ak.Filter()
-
-assert ak.get_defaults().name == "our-lab"
-ak.set_defaults()  # Reset to the general profile.
+ak.set_defaults("salzburg")
 ```
 
-`set_defaults()` and `use_defaults()` accept `"generic"`, `"salzburg"`, or a
-`Defaults` object. Both accept the same section overrides and optional `name`
-and `version`. `set_defaults()` returns the activated profile, and
-`with use_defaults(...) as profile:` exposes the temporary profile.
-
-Each call starts from its selected profile, which is `"generic"` when omitted.
-It does not accumulate settings from earlier calls. To extend the active
-settings explicitly, use `ak.set_defaults(ak.get_defaults(), filter={"lowpass": 60})`.
-Invalid profiles or settings raise an error before changing the active defaults.
-
-For reusable lab profiles, construct a `Defaults` object separately. The
-lower-level `configure(profile)` activates an already-built object:
+Then build your pipeline as usual:
 
 ```python
-from almkanal import AlmKanal, Defaults, Filter, ICA, configure, get_defaults
+pipeline = ak.AlmKanal(
+    steps=[
+        ak.Filter(),
+        ak.Resample(sfreq=200),
+    ]
+)
+```
 
-lab = Defaults.generic().with_overrides(
+The steps use the selected defaults for any optional arguments you leave out.
+Once you have loaded your MNE recording as `raw`, run the pipeline with
+`processed_raw, report = pipeline.run(raw)`.
+
+If you do not select a profile, AlmKanal uses general defaults automatically.
+Calling `ak.set_defaults()` resets the active settings to those general defaults.
+
+## Adjust settings for a study
+
+You can start from a lab profile and change just the settings needed for a study:
+
+```python
+ak.set_defaults("salzburg", filter={"lowpass": 30.0})
+
+step = ak.Filter()              # Uses the study's 30 Hz low-pass setting.
+custom = ak.Filter(lowpass=20)  # Uses 20 Hz for this step only.
+```
+
+Options are grouped into sections such as `filter`, `ica`, `trf`, and `vpixx`.
+Unspecified options retain their values from the selected profile. The complete
+list of sections, types, and general defaults is at the end of this guide.
+
+## Create and save your own lab profile
+
+Another lab can define a reusable profile using `Defaults.generic()` as a
+starting point. Save the following in a file called `lab_defaults.py`, alongside
+your analysis scripts:
+
+```python
+# lab_defaults.py
+from almkanal import Defaults
+
+LAB_DEFAULTS = Defaults.generic().with_overrides(
     name="our-lab",
     version="1",
-    filter={"highpass": 0.5, "lowpass": 80.0},
-    ica={"random_state": 123, "train": False},
+    filter={"highpass": 0.5, "lowpass": 40.0},
     events={"stim_channel": "TRIGGER"},
 )
-configure(lab)
-
-pipeline = AlmKanal(steps=[Filter(), ICA(ecg=False)])
-assert get_defaults().name == "our-lab"
-assert pipeline.steps[0].lowpass == 80.0
 ```
 
-These examples construct pipelines without loading data. Run a constructed
-pipeline using `processed_data, report = pipeline.run(raw)`, where `raw` is
-your loaded MNE recording.
+Replace these example values with your lab's settings. `with_overrides()` creates
+a new profile and leaves the original unchanged. Defining a profile does not
+activate it.
 
-`Defaults()` and `Defaults.generic()` are equivalent. Use
-`configure(Defaults.generic())` to reset the active profile. Your profile can be
-defined in a shared Python module and imported by your lab's scripts. Loading
-profiles from TOML, YAML, or JSON files is not implemented.
+### Load and use the saved profile
 
-`with_overrides()` returns a new profile and leaves its source unchanged.
-Unspecified sections and options retain their previous values. Unknown section
-or option names and incompatible value types raise errors immediately.
-Scientific validity, such as whether a cutoff suits a recording's sampling
-rate, remains the responsibility of the processing step.
-
-A dictionary supplied as an option replaces that entire option; it is not
-deep-merged. For example, supply a complete IIR filter configuration:
+Import the profile in any analysis script and activate it with `set_defaults()`:
 
 ```python
-lab = lab.with_overrides(
-    filter={"method": "iir", "iir_params": {"order": 4, "ftype": "butter"}},
+import almkanal as ak
+from lab_defaults import LAB_DEFAULTS
+
+ak.set_defaults(LAB_DEFAULTS)
+
+pipeline = ak.AlmKanal(
+    steps=[
+        ak.Filter(),
+        ak.Resample(sfreq=200),
+    ]
 )
 ```
 
-Call `configure(lab)` again to activate this new profile. Give shared profiles
-a descriptive name and update their version when changing agreed settings.
+Importing `lab_defaults.py` recreates the profile from the saved values. To share
+it across projects, put the module in a shared Python package that your scripts
+can import. Keeping this file under version control also records changes to your
+lab's settings. Update its `version` when changing an agreed configuration.
 
-## Temporarily select defaults
+The profile's `name` is a label for processing records; it does not register a
+new string shortcut. Use `ak.set_defaults(LAB_DEFAULTS)` to load your own profile.
+The built-in string shortcuts are `"generic"` and `"salzburg"`.
 
-```python
-from almkanal import Defaults, Filter, configure, get_defaults, use_defaults
+Profiles are saved here as ordinary Python files. Built-in loaders for JSON,
+YAML, or TOML profile files are not currently available.
 
-configure(Defaults.generic())
+### Derive a study profile from your lab profile
 
-with use_defaults(Defaults.salzburg()):
-    salzburg_filter = Filter()
-    with use_defaults(Defaults.generic().with_overrides(filter={"lowpass": 25.0})):
-        comparison_filter = Filter()
-    assert get_defaults().name == "salzburg"
-
-assert get_defaults().name == "generic"
-assert comparison_filter.lowpass == 25.0
-```
-
-Contexts can be nested and restore the previous profile even if an exception
-leaves the block. Steps built inside the block can be run outside it.
-
-## When values are resolved
-
-Pipeline steps capture their profile and omitted defaults **when constructed**.
-Configure the profile before writing `Filter()`, `ICA()`, or other step
-constructors. Changing the active profile later does not change existing steps.
-Built-in steps run their internal helpers and callbacks under their captured
-profile, so a delayed callback sees the same defaults as its owning step. An
-explicit `EpochTRF(fallback_drift_us_per_s=...)` also becomes the default for
-trial-end inference inside its span callback. An explicit argument inside the
-callback still takes precedence.
-
-Standalone functions resolve their omitted arguments when called. Explicit
-positional and keyword arguments take precedence, including `None`, `False`,
-and `0` wherever those values are supported:
+A study can reuse the lab settings while overriding a few values:
 
 ```python
-from almkanal import Defaults, Filter, ICA, use_defaults
+# study_defaults.py
+from lab_defaults import LAB_DEFAULTS
 
-with use_defaults(Defaults.salzburg()):
-    unfiltered_lowpass = Filter(lowpass=None)
-    without_train_removal = ICA(train=False)
+STUDY_DEFAULTS = LAB_DEFAULTS.with_overrides(
+    name="auditory-study",
+    version="1",
+    filter={"lowpass": 30.0},
+)
 ```
 
-Required inputs remain required. For example, `Resample(sfreq=200)` still needs
-`sfreq`, `ForwardModel` still needs `subject_id` and `subjects_dir`, and
-`EpochTRF` still needs its span callback and audio path. Profiles do not supply
-recordings or replace the pipeline's step ordering requirements.
+The lab profile stays unchanged. Save this definition in `study_defaults.py`,
+then load it in your analysis script:
 
-## Supported sections
+```python
+import almkanal as ak
+from study_defaults import STUDY_DEFAULTS
 
-Use section names as keyword arguments to `set_defaults()`, `use_defaults()`,
-or `with_overrides()`. The examples below
-are selected settings; `Defaults.generic().section("filter")` returns all
-settings in that section. The typed definitions in
-[`almkanal/_defaults_schema.py`](https://github.com/schmidtfa/AlmKanal/blob/feat/configurable-defaults/almkanal/_defaults_schema.py)
-list every option.
+ak.set_defaults(STUDY_DEFAULTS)
+```
 
-| Section | Used for | Example settings |
-| --- | --- | --- |
-| `filter` | `Filter` | `highpass`, `lowpass`, `method`, `iir_params` |
-| `resample` | `Resample` | `npad`, `window`, `method` |
-| `ica` | `ICA`, `run_ica` | `method`, `resample_freq`, `eog`, `ecg`, `train` |
-| `events` | `Events` | `stim_channel`, `shortest_event`, `mask` |
-| `physio` | `PhysioCleaner`, `run_bio_preproc` | `ecg`, `resp`, `eog`, `emg` |
-| `maxwell` | Maxwell processing | `mw_coord_frame`, `mw_calibration_file`, `mw_st_duration` |
-| `ransac` | `EEGRANSAC` | `ransac_epoch_duration`, `min_corr`, `n_jobs` |
-| `rereference` | `ReReference` | `ref_channels`, `projection`, `ch_type` |
-| `epochs` | `Epochs` | `tmin`, `tmax`, `baseline`, `reject` |
-| `forward_model` | `ForwardModel`, `make_fwd` | `source`, `spacing`, `bem_conductivity` |
-| `spatial_filter` | `SpatialFilter`, `comp_spatial_filters` | `lcmv_reg`, `lcmv_pick_ori`, `lcmv_weight_norm` |
-| `source_reconstruction` | `SourceReconstruction`, parcellation | `return_parc`, `atlas`, `label_mode` |
-| `trf` | `EpochTRF`, TRF epoch helpers | `hw_delay_s`, `epoch_len_s`, `fallback_drift_us_per_s` |
-| `pipeline` | `AlmKanal` | `pick_params` |
-| `vpixx` | `VPixxCleaner`, `VPixxConfig`, eye loading/alignment helpers | `screen_resolution`, `screen_size`, `screen_distance`, `meg_stim_channel`, `concatenate_raws` |
-| `ica_eog` | `eog_ica_from_meg` | `left_eog_chs`, `right_eog_chs`, `threshold`, `tol` |
-| `ica_train` | `find_train_ica` | `duration`, `overlap`, `hmax` |
-| `trials` | Trial span helpers | `end_triggers`, `infer_missing_ends`, `base_audio_path` |
-| `alignment` | Raw/WAV alignment | `sync_sfreq`, `max_lag_s`, `min_corr` |
-| `audio` | Audio feature extraction | `feature`, `target_fs`, `cutoff_hz`, `n_mels` |
+## General and Salzburg settings
 
-Related helpers share settings where appropriate. In particular, trial span
-inference and TRF processing use `trf.fallback_drift_us_per_s`, and
-`find_train_ica` uses `ica.train_thresh` for its `peak_threshold` argument.
-
-## General defaults and migration from Salzburg defaults
-
-The general profile removes these historical lab assumptions:
+The Salzburg profile starts from the general defaults and changes these values:
 
 | Setting | General profile | Salzburg profile |
 | --- | --- | --- |
 | `ica.train` | `False` | `True` |
 | `trf.hw_delay_s` | `0.0` seconds | `0.0165` seconds |
-| `trf.fallback_drift_us_per_s` | `0.0` | `499.0` |
+| `trf.fallback_drift_us_per_s` | `0.0` µs/s | `499.0` µs/s |
 | `trf.audio_channels` | `None` | `("MISC007", "MISC008")` |
 | `vpixx.meg_stim_channel` | `None` (MNE detection) | `"STI101"` |
 | `vpixx.meg_min_duration` | `0.0` seconds | `0.002` seconds |
@@ -187,114 +142,508 @@ The general profile removes these historical lab assumptions:
 | `ica_eog.left_eog_chs` | Must be configured when using the helper | `["MEG0121", "MEG0311"]` |
 | `ica_eog.right_eog_chs` | Must be configured when using the helper | `["MEG1211", "MEG1411"]` |
 
-To retain those assumptions in an existing Salzburg script, add
-`set_defaults("salzburg")` before constructing its steps or calling its
-helpers. General defaults do not establish the correct hardware calibration for
-another lab; configure measured values for your setup.
+For another setup, supply its measured geometry, timing values, and channel
+names. Selecting a profile does not check whether its hardware settings match
+your recording.
 
-The Salzburg profile enables recorded-audio alignment using `MISC007` and
-`MISC008`. Pass `audio_channels=None` to `EpochTRF` or `build_trf_epochs` when
-recorded audio is unavailable, or override the profile with
-`set_defaults("salzburg", trf={"audio_channels": None})`.
+Salzburg's audio channels enable recorded-audio alignment during TRF processing.
+If a recording has no audio channels, use
+`ak.set_defaults("salzburg", trf={"audio_channels": None})` or pass
+`audio_channels=None` to the individual `EpochTRF` step.
+
+## When settings take effect
+
+Set defaults **before constructing your steps**. Existing steps keep the values
+and profile they captured when they were created:
+
+```python
+ak.set_defaults("generic", filter={"lowpass": 30.0})
+first = ak.Filter()
+
+ak.set_defaults("generic", filter={"lowpass": 40.0})
+second = ak.Filter()
+
+print(first.lowpass)   # 30.0
+print(second.lowpass)  # 40.0
+```
+
+Built-in steps also run their internal helpers and callbacks under their
+captured profile. Standalone functions resolve omitted arguments when called.
+
+Explicit arguments always win, including `None`, `False`, and `0` where those
+values are supported:
+
+```python
+ak.set_defaults("salzburg")
+
+unfiltered_lowpass = ak.Filter(lowpass=None)
+without_train_removal = ak.ICA(train=False)
+```
+
+Required inputs remain required. For example, `Resample` still needs `sfreq`,
+`ForwardModel` needs `subject_id` and `subjects_dir`, and `EpochTRF` needs its
+span callback and audio path. Profiles do not replace the pipeline's step
+ordering requirements.
+
+### Repeated calls and validation
+
+Each `set_defaults()` call starts from the selected profile, which is
+`"generic"` when omitted. It does not accumulate earlier customizations. To
+extend your active settings explicitly, pass `get_defaults()`:
+
+```python
+ak.set_defaults("salzburg", filter={"lowpass": 30.0})
+ak.set_defaults(ak.get_defaults(), ica={"random_state": 123})
+```
+
+This keeps the 30 Hz low-pass setting and changes the ICA random seed.
+`set_defaults()` returns the activated profile if you want to keep it in a
+variable.
+
+Unknown sections or options and incompatible value types raise an error before
+the active defaults change. Processing functions still check scientific
+constraints, such as whether a cutoff suits the recording's sampling rate.
+
+A dictionary supplied as an option replaces that whole option; dictionaries
+are not recursively merged. For example, supply a complete IIR configuration:
+
+```python
+ak.set_defaults(
+    LAB_DEFAULTS,
+    filter={"method": "iir", "iir_params": {"order": 4, "ftype": "butter"}},
+)
+```
+
+The lower-level `configure(profile)` activates an already-built `Defaults`
+object. For most scripts, `set_defaults()` is sufficient.
 
 ## VPixx eye tracking
 
-The new `VPixxCleaner` step and standalone eye-tracking functions share the
-`vpixx` section. The sampling rate is read from the recording's timestamps.
-Configure screen geometry in metres and pixels before constructing steps:
+`VPixxCleaner` and the standalone eye-tracking helpers share the `vpixx`
+section. Sampling rate comes from the recording's timestamps. Screen size and
+viewing distance are in metres; resolution is in pixels:
 
 ```python
-import almkanal as ak
-
 ak.set_defaults(
-    name="our-eye-setup",
+    LAB_DEFAULTS,
     vpixx={
         "screen_resolution": (1920, 1080),
         "screen_size": (0.53, 0.30),
         "screen_distance": 0.65,
         "meg_stim_channel": "TRIGGER",
-        "blink_buffer_vpixx": (0.05, 0.2),
-        "concatenate_raws": True,
     },
 )
 
 step = ak.VPixxCleaner(eye_path="eye.mat", interpolate_blinks=False)
 ```
 
-The numbers here illustrate the API; replace them with your equipment's values.
-`VPixxCleaner` captures the profile when constructed, retains it for each block,
-and records its resolved parameters in the pipeline JSON. `eye_path` remains a
-required input. `concatenate_raws` applies to list input; a single recording
-still returns a single Raw object.
-The `align` setting controls the standalone `add_eye_tracking_data()` helper;
+Replace the example geometry with your equipment's values. The general profile
+requires these three geometry settings for conversion to radians. Pixel-only
+processing with `convert_to_radians=False` does not require geometry.
+
+`eye_path` remains required. Set `concatenate_raws=True` to combine a list of
+recording blocks after cleaning; a single recording returns a single Raw object.
+The `align` option controls only the standalone `add_eye_tracking_data()` helper;
 `VPixxCleaner` always aligns eye tracking to its input recordings.
 
-`VPixxConfig()` also captures omitted values at construction. The standalone
+`VPixxConfig()` captures its omitted values at construction. The standalone
 `load_eyetracking_data()`, `add_eye_tracking_data()`, and `align_eye_to_meg()`
-resolve omitted options when called. An omitted or `None` `config` builds a
-fresh `VPixxConfig` from the active profile, replacing the former configuration
-object fixed at import time. An explicit config supplies its own geometry and
-calibration settings; loading and alignment options still use their corresponding
-defaults unless passed explicitly.
+resolve omitted options at call time. An omitted or `None` `config` builds a
+fresh `VPixxConfig` from the active profile. An explicit config supplies its own
+geometry and calibration settings; other loading and alignment arguments still
+use the active profile unless explicitly supplied.
 
 `vpixx.blink_buffer_vpixx` supplies `VPixxConfig.blink_buffer`.
-`vpixx.blink_buffer` is the loading/interpolation override: `None` uses the
-config's buffer, and an explicit `(0.0, 0.0)` uses no padding. Explicit `None`
-also overrides a profile's non-None loading buffer.
+`vpixx.blink_buffer` overrides that buffer during loading; `None` uses the
+config's buffer and `(0.0, 0.0)` uses no padding. Explicit `None` also overrides
+a profile's non-None loading buffer.
 
-With the generic profile, conversion to radians raises a clear error until
-`screen_resolution`, `screen_size`, and `screen_distance` are supplied. For
-pixel-only processing, use `convert_to_radians=False`. Explicitly setting one
-geometry value to `None` does not silently restore the Salzburg value.
-`meg_max_trigger=None` retains all trigger codes, and `meg_stim_channel=None`
-uses MNE's stimulus-channel detection.
+`meg_max_trigger=None` retains all trigger codes. `meg_stim_channel=None` uses
+MNE's stimulus-channel detection.
 
-### Migration from the previous eye helper
+## Temporary settings
 
-Upstream replaced `clean_pixx_eye_data()` with the VPixx implementation. The old
-`eye` profile section is replaced by `vpixx`; old names now raise an unknown-section
-error. Replace `distance` in centimetres with `screen_distance` in metres,
-`screen_rect` with the two-value `screen_resolution`, and `screen_width` with
-both physical dimensions in `screen_size`. There is no `tpixx_fs` setting:
-timestamps determine the sampling rate. The Salzburg profile follows the new
-VPixx setup on main (61 × 34 cm screen, 82 cm distance); the former helper used
-a 63 cm screen width. The old `gaze_lims`, `filter_settings`, and `annotate_bads`
-options have no direct equivalents in the new loader.
+For a temporary comparison, `use_defaults()` accepts the same profile and
+section overrides as `set_defaults()`:
 
-Surrogate EOG extraction likewise needs channel names appropriate to the
-recording. Configure `ica_eog` when using `eog_ica_from_meg`, or explicitly supply
-its channel arguments.
+```python
+ak.set_defaults("salzburg")
 
-The standalone `run_ica()` now shares the step's `ica.resample_freq` default of
-200 Hz. It previously defaulted to `None`. Pass `resample_freq=None` directly to
-that helper to preserve its previous no-resampling behavior.
+with ak.use_defaults("generic", filter={"lowpass": 25.0}):
+    comparison_filter = ak.Filter()
 
-## Inspecting and recording settings
+# Salzburg is active again; comparison_filter keeps its 25 Hz setting.
+```
 
-Profiles are immutable through their public API and protect nested values by
-copying them. `profile.filter` returns a typed section copy;
-`profile.section("filter")` returns a detached dictionary; `profile.to_dict()`
-returns a detached snapshot of all sections plus the profile name and version.
-Changing a returned dictionary does not change the active profile. Use
-`with_overrides()` for customization.
+Blocks can be nested. The previous profile is restored even if an exception
+leaves the block. Steps created inside can be run afterward.
 
-After a pipeline runs, each built-in step's result includes `defaults` metadata
-with `profile`, `version`, and resolved `parameters` for its configurable fields.
-This metadata is included by `pipeline.generate_json()` alongside existing step
-information. Explicit overrides are reflected in the resolved parameters.
-Profile names alone are not a substitute for saving those settings and the
-profile definition, particularly when callbacks use additional helper defaults.
+## Inspect and record settings
 
-The JSON output contains an ordered `processing_history` list. Each entry has
-`step` and `info` fields, with defaults metadata inside `info`. Repeated steps
-retain their individual settings and results whenever the step allows repeated
-use.
+```python
+profile = ak.get_defaults()
+
+print(profile.name)
+print(profile.filter.lowpass)
+filter_settings = profile.section("filter")
+all_settings = profile.to_dict()
+```
+
+Profiles protect their values from accidental changes. Section objects and
+returned dictionaries are independent copies; editing them does not change the
+active profile. Use `with_overrides()` or `set_defaults()` to customize it.
+
+After a pipeline runs, each built-in step records its profile name, version,
+and resolved configurable parameters, including explicit overrides. Save the
+processing history with:
+
+```python
+pipeline.generate_json("preprocessing.json")
+```
+
+The JSON contains an ordered `processing_history` list, with separate settings
+for each occurrence of a step. It is a processing record, not a loadable lab
+profile. Keep your profile's Python file alongside the analysis, particularly
+when callbacks also use helper defaults.
 
 ## Concurrent execution
 
-The active profile is stored in a Python `ContextVar`. Async tasks inherit the
-context in which they are created; subsequent changes remain local to each
-task. New threads do not inherit the profile unless their context is explicitly
-copied. Configure worker processes explicitly or send already-constructed,
-serialized steps, which retain their captured profiles. Do not rely on one
-process calling `configure()` to configure all workers.
+Active settings are local to the current execution context. Async tasks inherit
+the context in which they are created; later changes remain local to each task.
+Configure worker threads and processes explicitly, or pass an appropriate
+context or already-constructed steps. Setting a profile in one process does not
+configure every worker.
+
+## Complete settings reference
+
+Use these section names as keyword arguments to `set_defaults()`,
+`use_defaults()`, or `with_overrides()`. Every configurable option is listed below
+with its accepted type and **general-profile default**. The Salzburg differences
+are listed earlier in this guide.
+
+`None` is an explicit value, not an instruction to fall back to another profile.
+`Literal[...]` lists allowed choices; `Sequence` accepts lists or tuples and
+`Mapping` accepts dictionaries. `Any` means that the profile does not restrict
+the value's type; the processing function determines which inputs it supports.
+
+Related helpers share settings where appropriate. Trial span inference uses
+`trf.fallback_drift_us_per_s`, and `find_train_ica` uses `ica.train_thresh` for its
+`peak_threshold` argument. An explicit `EpochTRF(fallback_drift_us_per_s=...)`
+also supplies the default inside its span callback; an explicit callback
+argument still takes precedence.
+
+### `filter`
+
+Used by `Filter`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `highpass` | <code>float &#124; None</code> | `0.1` |
+| `lowpass` | <code>float &#124; None</code> | `40.0` |
+| `picks` | <code>Any</code> | `None` |
+| `filter_length` | <code>str &#124; int</code> | `'auto'` |
+| `l_trans_bandwidth` | <code>float &#124; Literal['auto']</code> | `'auto'` |
+| `h_trans_bandwidth` | <code>float &#124; Literal['auto']</code> | `'auto'` |
+| `n_jobs` | <code>int &#124; str &#124; None</code> | `None` |
+| `method` | <code>str</code> | `'fir'` |
+| `iir_params` | <code>dict[str, Any] &#124; None</code> | `None` |
+| `phase` | <code>str</code> | `'zero'` |
+| `fir_window` | <code>str</code> | `'hamming'` |
+| `fir_design` | <code>str</code> | `'firwin'` |
+| `skip_by_annotation` | <code>str &#124; tuple[str, ...] &#124; list[str]</code> | `('edge', 'bad_acq_skip')` |
+| `pad` | <code>str</code> | `'reflect_limited'` |
+
+### `resample`
+
+Used by `Resample` (the target `sfreq` is required separately).
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `npad` | <code>str</code> | `'auto'` |
+| `window` | <code>str &#124; tuple[str, float]</code> | `'auto'` |
+| `n_jobs` | <code>int &#124; None</code> | `None` |
+| `pad` | <code>str</code> | `'auto'` |
+| `method` | <code>Literal['fft', 'polyphase']</code> | `'fft'` |
+
+### `ica`
+
+Used by `ICA` and `run_ica`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `fit_only` | <code>bool</code> | `False` |
+| `n_components` | <code>None &#124; int &#124; float</code> | `None` |
+| `method` | <code>str</code> | `'picard'` |
+| `random_state` | <code>None &#124; int</code> | `42` |
+| `fit_params` | <code>dict &#124; None</code> | `None` |
+| `ica_hp_freq` | <code>None &#124; float</code> | `1.0` |
+| `ica_lp_freq` | <code>None &#124; float</code> | `None` |
+| `resample_freq` | <code>int &#124; None</code> | `200` |
+| `eog` | <code>bool</code> | `True` |
+| `surrogate_eog_chs` | <code>None &#124; dict</code> | `None` |
+| `eog_corr_thresh` | <code>float</code> | `0.5` |
+| `ecg` | <code>bool</code> | `True` |
+| `ecg_corr_thresh` | <code>float</code> | `0.5` |
+| `emg` | <code>bool</code> | `False` |
+| `emg_thresh` | <code>float</code> | `0.5` |
+| `train` | <code>bool</code> | `False` |
+| `train_freq` | <code>float</code> | `16.666` |
+| `train_thresh` | <code>float</code> | `6.0` |
+| `img_path` | <code>None &#124; str</code> | `None` |
+| `fname` | <code>None &#124; str</code> | `None` |
+
+### `events`
+
+Used by `Events` and trigger selection in trial helpers.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `stim_channel` | <code>str &#124; list[str] &#124; None</code> | `None` |
+| `output` | <code>str</code> | `'onset'` |
+| `consecutive` | <code>bool &#124; str</code> | `'increasing'` |
+| `min_duration` | <code>float</code> | `0.0` |
+| `shortest_event` | <code>int</code> | `2` |
+| `mask` | <code>int &#124; None</code> | `None` |
+| `uint_cast` | <code>bool</code> | `False` |
+| `mask_type` | <code>str</code> | `'and'` |
+| `initial_event` | <code>bool</code> | `False` |
+| `verbose` | <code>bool &#124; str &#124; int &#124; None</code> | `None` |
+
+### `physio`
+
+Used by `PhysioCleaner` and `run_bio_preproc`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `ecg` | <code>None &#124; str &#124; list</code> | `None` |
+| `resp` | <code>None &#124; str &#124; list</code> | `None` |
+| `eog` | <code>None &#124; str &#124; list</code> | `None` |
+| `emg` | <code>None &#124; str &#124; list</code> | `None` |
+
+### `maxwell`
+
+Used by `Maxwell`, `MultiBlockMaxwell`, and `run_maxwell`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `mw_coord_frame` | <code>str</code> | `'head'` |
+| `mw_destination` | <code>Any</code> | `None` |
+| `mw_calibration_file` | <code>str &#124; bool &#124; None</code> | `None` |
+| `mw_cross_talk_file` | <code>str &#124; bool &#124; None</code> | `None` |
+| `mw_st_duration` | <code>float &#124; None</code> | `None` |
+| `mw_st_correlation` | <code>float</code> | `0.98` |
+
+### `ransac`
+
+Used by `EEGRANSAC`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `ransac_epoch_duration` | <code>int &#124; float</code> | `4` |
+| `n_resample` | <code>int</code> | `50` |
+| `min_channels` | <code>float</code> | `0.25` |
+| `min_corr` | <code>float</code> | `0.75` |
+| `unbroken_time` | <code>float</code> | `0.4` |
+| `n_jobs` | <code>int</code> | `1` |
+| `verbose` | <code>bool</code> | `False` |
+| `random_state` | <code>int &#124; None</code> | `435656` |
+
+### `rereference`
+
+Used by `ReReference`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `ref_channels` | <code>str &#124; list[str] &#124; dict</code> | `'average'` |
+| `projection` | <code>bool</code> | `False` |
+| `ch_type` | <code>str &#124; list[str]</code> | `'auto'` |
+| `forward` | <code>Any</code> | `None` |
+| `joint` | <code>bool</code> | `False` |
+| `verbose` | <code>bool &#124; str &#124; int &#124; None</code> | `False` |
+
+### `epochs`
+
+Used by `Epochs`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `tmin` | <code>float</code> | `-0.15` |
+| `tmax` | <code>float</code> | `0.5` |
+| `events` | <code>Any</code> | `None` |
+| `event_id` | <code>None &#124; dict</code> | `None` |
+| `baseline` | <code>None &#124; tuple</code> | `None` |
+| `preload` | <code>bool</code> | `True` |
+| `picks` | <code>Any</code> | `None` |
+| `reject` | <code>dict &#124; None</code> | `None` |
+| `flat` | <code>dict &#124; None</code> | `None` |
+| `proj` | <code>bool &#124; str</code> | `True` |
+| `reject_tmin` | <code>float &#124; None</code> | `None` |
+| `reject_tmax` | <code>float &#124; None</code> | `None` |
+| `detrend` | <code>int &#124; None</code> | `None` |
+| `on_missing` | <code>str</code> | `'raise'` |
+| `reject_by_annotation` | <code>bool</code> | `True` |
+| `metadata` | <code>Any</code> | `None` |
+| `event_repeated` | <code>str</code> | `'error'` |
+| `verbose` | <code>bool &#124; str &#124; int &#124; None</code> | `None` |
+
+### `forward_model`
+
+Used by `ForwardModel` and optional arguments of `make_fwd`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `pick_dict` | <code>dict &#124; None</code> | `None` |
+| `source` | <code>str</code> | `'surface'` |
+| `redo_hdm` | <code>bool</code> | `True` |
+| `spacing` | <code>str</code> | `'oct6'` |
+| `source_ico` | <code>int</code> | `4` |
+| `bem_conductivity` | <code>float &#124; Sequence[float]</code> | `(0.3,)` |
+| `volume_pos` | <code>float</code> | `5.0` |
+| `use_template_mri` | <code>bool</code> | `True` |
+| `min_dist_src` | <code>float</code> | `5.0` |
+| `meg` | <code>bool</code> | `True` |
+| `eeg` | <code>bool</code> | `False` |
+| `redo_bem` | <code>bool</code> | `False` |
+
+### `spatial_filter`
+
+Used by `SpatialFilter` and optional arguments of `comp_spatial_filters`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `fwd` | <code>Any</code> | `None` |
+| `pick_dict` | <code>dict &#124; None</code> | `None` |
+| `data_cov` | <code>Any</code> | `None` |
+| `noise_cov` | <code>Any</code> | `None` |
+| `empty_room` | <code>Any</code> | `None` |
+| `nearest_empty_room` | <code>bool</code> | `False` |
+| `chans2keep` | <code>list[str] &#124; None</code> | `None` |
+| `lcmv_reg` | <code>float</code> | `0.05` |
+| `lcmv_pick_ori` | <code>str &#124; None</code> | `'max-power'` |
+| `lcmv_weight_norm` | <code>str &#124; None</code> | `'nai'` |
+| `lcmv_reduce_rank` | <code>bool</code> | `False` |
+
+### `source_reconstruction`
+
+Used by `SourceReconstruction` and parcellation helpers.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `filters` | <code>Any</code> | `None` |
+| `return_parc` | <code>bool</code> | `False` |
+| `label_mode` | <code>str</code> | `'pca_flip'` |
+| `atlas` | <code>str</code> | `'glasser'` |
+| `morph2fsaverage` | <code>bool</code> | `True` |
+
+### `trf`
+
+Used by `EpochTRF`, TRF epoch helpers, and fallback drift in trial helpers.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `feature` | <code>str</code> | `'envelope'` |
+| `audio_cutoff_hz` | <code>float</code> | `80.0` |
+| `hw_delay_s` | <code>float</code> | `0.0` |
+| `epoch_len_s` | <code>float</code> | `5.0` |
+| `audio_channels` | <code>Sequence[str] &#124; None</code> | `None` |
+| `alignment_kwargs` | <code>Mapping[str, Any] &#124; None</code> | `None` |
+| `preserve_annotations` | <code>bool</code> | `True` |
+| `on_alignment_error` | <code>Literal['raise', 'skip']</code> | `'raise'` |
+| `verbose` | <code>bool</code> | `True` |
+| `realign_without_audio` | <code>bool</code> | `False` |
+| `fallback_drift_us_per_s` | <code>float</code> | `0.0` |
+
+### `pipeline`
+
+Used by `AlmKanal`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `pick_params` | <code>dict &#124; None</code> | `None` |
+
+### `vpixx`
+
+Used by `VPixxCleaner`, `VPixxConfig`, and eye loading/alignment helpers.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `screen_resolution` | <code>tuple[int, int] &#124; None</code> | `None` |
+| `screen_size` | <code>tuple[float, float] &#124; None</code> | `None` |
+| `screen_distance` | <code>float &#124; None</code> | `None` |
+| `calibration_model` | <code>str</code> | `'HV5'` |
+| `calibration_eye` | <code>Literal['left', 'right']</code> | `'right'` |
+| `blink_buffer_vpixx` | <code>tuple[float, float]</code> | `(0.05, 0.2)` |
+| `digital_output_threshold` | <code>float</code> | `256.0` |
+| `missing_value` | <code>float</code> | `9999.0` |
+| `interpolate_blinks` | <code>bool</code> | `True` |
+| `blink_buffer` | <code>tuple[float, float] &#124; None</code> | `None` |
+| `convert_to_radians` | <code>bool</code> | `True` |
+| `include_raw_vpixx_channels` | <code>bool</code> | `False` |
+| `meg_stim_channel` | <code>str &#124; None</code> | `None` |
+| `eye_stim_channel` | <code>str</code> | `'Digital Output'` |
+| `meg_min_duration` | <code>float</code> | `0.0` |
+| `meg_max_trigger` | <code>int &#124; None</code> | `None` |
+| `concatenate_raws` | <code>bool</code> | `False` |
+| `align` | <code>bool</code> | `True` |
+
+### `ica_eog`
+
+Used by `eog_ica_from_meg`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `left_eog_chs` | <code>list[str] &#124; None</code> | `None` |
+| `right_eog_chs` | <code>list[str] &#124; None</code> | `None` |
+| `threshold` | <code>float</code> | `0.5` |
+| `tol` | <code>float</code> | `0.2` |
+
+### `ica_train`
+
+Used by `find_train_ica`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `duration` | <code>int</code> | `8` |
+| `overlap` | <code>float</code> | `0.5` |
+| `hmax` | <code>float</code> | `2.0` |
+
+### `trials`
+
+Used by `find_audio_trials` and `TRFSpanSpec.from_events`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `end_triggers` | <code>int &#124; Sequence[int] &#124; None</code> | `None` |
+| `infer_missing_ends` | <code>bool</code> | `False` |
+| `base_audio_path` | <code>Any</code> | `None` |
+
+### `alignment`
+
+Used by `estimate_raw_wav_alignment`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `sync_sfreq` | <code>float</code> | `500.0` |
+| `audio_band` | <code>tuple[float, float]</code> | `(80.0, 400.0)` |
+| `envelope_lowpass` | <code>float</code> | `30.0` |
+| `window_s` | <code>float</code> | `10.0` |
+| `step_s` | <code>float</code> | `5.0` |
+| `max_lag_s` | <code>float</code> | `0.25` |
+| `min_corr` | <code>float</code> | `0.3` |
+| `min_anchors` | <code>int</code> | `5` |
+| `reject_outliers` | <code>bool</code> | `True` |
+| `warn_residual_rms_ms` | <code>float</code> | `10.0` |
+| `verbose` | <code>bool</code> | `True` |
+
+### `audio`
+
+Used by `prepare_audio`.
+
+| Option | Type | General default |
+| --- | --- | --- |
+| `feature` | <code>str</code> | `'envelope'` |
+| `target_fs` | <code>float</code> | `100.0` |
+| `cutoff_hz` | <code>float</code> | `80.0` |
+| `n_mels` | <code>int</code> | `32` |
+| `fmin` | <code>float</code> | `50.0` |
+| `fmax` | <code>float</code> | `8000.0` |

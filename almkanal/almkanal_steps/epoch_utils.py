@@ -78,7 +78,7 @@ class Epochs(AlmKanalStep):
 
     The processing metadata returned by :meth:`run` is stored under
     ``'epochs_info'`` and contains the event array together with the effective epoch
-    construction, baseline, channel-selection, rejection, decimation, detrending,
+    construction, baseline, channel-selection, rejection, detrending,
     and metadata settings.
 
     ``Epochs`` can occur only once in a pipeline and is expected to run after

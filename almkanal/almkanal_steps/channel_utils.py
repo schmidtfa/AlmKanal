@@ -219,6 +219,10 @@ class MultiBlockMaxwell(AlmKanalStep):
     mw_st_duration : float | None, default=None
         Temporal Signal Space Separation (tSSS) buffer duration, in seconds.
         ``None`` disables temporal SSS.
+    mw_st_correlation : float, default=0.98
+        Correlation threshold used by temporal Signal Space Separation (tSSS)
+        for each recording block. Only relevant when ``mw_st_duration`` is not
+        ``None``.
 
     Notes
     -----
@@ -255,8 +259,8 @@ class MultiBlockMaxwell(AlmKanalStep):
 
     mw_coord_frame: str = default_field('maxwell', 'mw_coord_frame')
     mw_destination: None | ArrayLike = default_field('maxwell', 'mw_destination')
-    mw_calibration_file: None | str = default_field('maxwell', 'mw_calibration_file')
-    mw_cross_talk_file: None | str = default_field('maxwell', 'mw_cross_talk_file')
+    mw_calibration_file: str | bool | None = default_field('maxwell', 'mw_calibration_file')
+    mw_cross_talk_file: str | bool | None = default_field('maxwell', 'mw_cross_talk_file')
     mw_st_duration: float | None = default_field('maxwell', 'mw_st_duration')
     mw_st_correlation: float = default_field('maxwell', 'mw_st_correlation')
 
@@ -327,6 +331,9 @@ class MultiBlockMaxwell(AlmKanalStep):
                 'calibration_file': self.mw_calibration_file,
                 'cross_talk_file': self.mw_cross_talk_file,
                 'st_duration': self.mw_st_duration,
+                'st_correlation': self.mw_st_correlation,
+                'calibration_applied': all(calibration_per_block),
+                'cross_talk_applied': all(cross_talk_per_block),
             },
         }
 

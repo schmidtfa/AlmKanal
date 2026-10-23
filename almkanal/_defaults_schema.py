@@ -125,7 +125,6 @@ class EpochsDefaults:
     reject: dict | None = None
     flat: dict | None = None
     proj: bool | str = True
-    decim: int = 1
     reject_tmin: float | None = None
     reject_tmax: float | None = None
     detrend: int | None = None

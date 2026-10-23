@@ -68,26 +68,25 @@ The same pattern can be applied to previously processed `Raw` or `Epochs` data.
 
 ### Set defaults for your lab or study
 
-AlmKanal uses general defaults automatically. Select a lab profile and apply
-study-specific settings before constructing your steps:
+Use `set_defaults()` to choose shared settings for your whole lab or a specific
+study. For example, our Salzburg-Labs has its own defaults that are set before creating a pipeline:
 
 ```python
-import almkanal as ak
+from almkanal import AlmKanal, Filter, Resample, set_defaults
 
-ak.set_defaults("salzburg", filter={"lowpass": 80.0})
-step = ak.Filter()                # Uses 80 Hz from the profile.
-custom = ak.Filter(lowpass=30.0)  # Explicit arguments take precedence.
+set_defaults("salzburg")
 
-with ak.use_defaults("generic", filter={"lowpass": 25.0}):
-    comparison = ak.Filter()
+pipeline = AlmKanal(
+    steps=[
+        Filter(highpass=1.0, lowpass=40.0),
+        Resample(sfreq=200),
+    ]
+)
 
-ak.set_defaults()  # Reset to general defaults for newly constructed steps.
+processed_raw, qc_report = pipeline.run(raw)
 ```
 
-The Salzburg profile includes the lab's audio channels and VPixx geometry.
-Other labs can pass a reusable `Defaults` object or configure sections such as
-`vpixx` directly. Existing steps keep their captured settings. See the
-[defaults guide](docs/defaults.md) for profiles, scope, and override rules.
+Values passed directly to a step still **override** the defaults.
 
 ### Automatically draft a preprocessing Methods section
 
