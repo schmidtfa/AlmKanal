@@ -45,6 +45,19 @@ Subclass the base `AlmKanalStep` class and implement `run(data, info)` and `repo
 Use `must_be_before`, `must_be_after`, and `allow_repeated` for supported construction-time checks. See [validation](validation.md) for their exact scope.
 
 
+## Defaults API
+
+`set_defaults(profile="generic", **sections)` selects general defaults, the
+`"salzburg"` profile, or a `Defaults` object and applies optional section overrides.
+It returns the activated profile. Each call starts from the selected profile;
+pass `get_defaults()` to extend the active settings. `use_defaults()` accepts
+the same arguments within a temporary `with` block.
+
+`Defaults.generic()` and `Defaults.salzburg()` construct reusable profiles;
+`profile.with_overrides(...)` returns a customized copy. `configure(profile)`
+activates an already-built profile. See [Defaults and lab profiles](defaults.md)
+for available sections, capture timing, and examples.
+
 ## Further documentation
 
 For detailed documentation of individual classes and parameters, see the automatically generated API reference for AlmKanal, AlmKanalStep, and the preprocessing steps. The API reference is generated directly from the Python docstrings.

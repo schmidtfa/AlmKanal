@@ -6768,7 +6768,7 @@ packages:
 - pypi: ./
   name: almkanal
   version: 1.0.0.dev0
-  sha256: 26e6be2e030086d64765029047493de2154727f9bcbed551e502586e3cf8a34b
+  sha256: 2d6ec85940e990b4382ead487cdfa68d7bfdf56df3432dcb5a8e4889b0ac343f
   requires_dist:
   - attrs
   - autoreject>=0.4.3
@@ -6780,6 +6780,7 @@ packages:
   - neurokit2
   - nibabel>=5.3.2
   - pandoc
+  - pymatreader>=1.3.2
   - pyrasa @ git+https://github.com/schmidtfa/pyrasa.git@8a65a6d
   - python-picard>=0.8
   requires_python: '>=3.11'

@@ -9,6 +9,7 @@ from attrs import define, field
 
 from almkanal import AlmKanalStep
 from almkanal.almkanal_steps.channel_utils import run_maxwell
+from almkanal.defaults import default_field, function_defaults, step_with_defaults
 from almkanal.info import AlmKanalInfo, StepInfo
 
 
@@ -190,6 +191,7 @@ def process_empty_room(
     return true_rank, noise_cov
 
 
+@function_defaults('spatial_filter')
 def comp_spatial_filters(
     data: mne.io.BaseRaw | mne.BaseEpochs,
     fwd: mne.Forward,
@@ -387,17 +389,17 @@ class SpatialFilter(AlmKanalStep):
         Produce the forward solution used for spatial filtering.
     """
 
-    fwd: mne.Forward | None = None
-    pick_dict: dict | None = None
-    data_cov: None | mne.Covariance = None
-    noise_cov: None | mne.Covariance = None
-    empty_room: None | str | mne.io.BaseRaw = None
-    nearest_empty_room: bool = False
-    chans2keep: list[str] | None = None
-    lcmv_reg: float = 0.05
-    lcmv_pick_ori: str | None = 'max-power'
-    lcmv_weight_norm: str | None = 'nai'
-    lcmv_reduce_rank: bool = False
+    fwd: mne.Forward | None = default_field('spatial_filter', 'fwd')
+    pick_dict: dict | None = default_field('spatial_filter', 'pick_dict')
+    data_cov: None | mne.Covariance = default_field('spatial_filter', 'data_cov')
+    noise_cov: None | mne.Covariance = default_field('spatial_filter', 'noise_cov')
+    empty_room: None | str | mne.io.BaseRaw = default_field('spatial_filter', 'empty_room')
+    nearest_empty_room: bool = default_field('spatial_filter', 'nearest_empty_room')
+    chans2keep: list[str] | None = default_field('spatial_filter', 'chans2keep')
+    lcmv_reg: float = default_field('spatial_filter', 'lcmv_reg')
+    lcmv_pick_ori: str | None = default_field('spatial_filter', 'lcmv_pick_ori')
+    lcmv_weight_norm: str | None = default_field('spatial_filter', 'lcmv_weight_norm')
+    lcmv_reduce_rank: bool = default_field('spatial_filter', 'lcmv_reduce_rank')
 
     must_be_before: tuple = ('SourceReconstruction',)
     must_be_after: tuple = (
@@ -407,6 +409,7 @@ class SpatialFilter(AlmKanalStep):
     )
     allow_repeated: bool = field(default=False, init=False)
 
+    @step_with_defaults
     def run(self, data: mne.io.BaseRaw | mne.BaseEpochs, info: AlmKanalInfo) -> dict:
         pick_dict = self.pick_dict
 

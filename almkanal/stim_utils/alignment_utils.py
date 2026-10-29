@@ -11,6 +11,7 @@ import numpy as np
 from scipy.signal import butter, correlate, hilbert, sosfiltfilt
 from scipy.stats import theilslopes
 
+from almkanal.defaults import function_defaults
 from almkanal.stim_utils.audio_utils import resample_poly_exact
 
 if TYPE_CHECKING:
@@ -21,13 +22,27 @@ if TYPE_CHECKING:
 VARIANCE_EPSILON = 1e-12
 ENERGY_EPSILON = 1e-20
 MIN_ANCHORS_FOR_DRIFT = 2
-DEFAULT_FALLBACK_DRIFT_US_PER_S = 499.0
+DEFAULT_FALLBACK_DRIFT_US_PER_S = 0.0  # General profile; Salzburg uses +499 us/s.
 LAG_LIMIT_MARGIN_FRACTION = 0.05
 MIN_ANCHOR_TIME_COVERAGE = 0.5
 
 
 def resolve_stim_channel(raw: mne.io.BaseRaw, stim_channel: str | None) -> str:
-    """Return an explicit stim-channel name, requiring an unambiguous choice."""
+    """Resolve the trigger channel, requiring an unambiguous choice.
+
+    Parameters
+    ----------
+    raw : mne.io.BaseRaw
+        Recording whose channel names and types are inspected.
+    stim_channel : str | None
+        Explicit channel name, or ``None`` to select the sole stim channel.
+
+    Returns
+    -------
+    name : str
+        Trigger channel name. Raises if the named channel is absent or automatic
+        selection finds zero or multiple stim channels.
+    """
     if stim_channel is not None:
         if stim_channel not in raw.ch_names:
             raise ValueError(f'Stim channel {stim_channel!r} is not present in the Raw object.')
@@ -81,6 +96,13 @@ def _infer_audio_trial_end(
     }
 
 
+@function_defaults(
+    'trials',
+    aliases={
+        'stim_channel': ('events', 'stim_channel'),
+        'fallback_drift_us_per_s': ('trf', 'fallback_drift_us_per_s'),
+    },
+)
 def find_audio_trials(  # noqa: C901, PLR0912, PLR0915
     raw: mne.io.BaseRaw,
     onset_trigger_to_wav: Mapping[int, str | Path],
@@ -91,15 +113,46 @@ def find_audio_trials(  # noqa: C901, PLR0912, PLR0915
     base_audio_path: str | Path | None = None,
     fallback_drift_us_per_s: float = DEFAULT_FALLBACK_DRIFT_US_PER_S,
 ) -> list[dict[str, Any]]:
-    """Find trials, optionally inferring missing ends from WAV duration and drift.
+    """Pair audio onset/end triggers, optionally inferring missing endpoints.
 
-    Inference is opt-in and applies separately to each missing end; real end
-    triggers take precedence. With no end codes, pass end_triggers=None and
-    infer_missing_ends=True. Relative WAV paths require base_audio_path.
-    The inferred duration on the raw clock is WAV duration * (1 + drift / 1e6).
-    Positive drift therefore lengthens the span. This is only an endpoint
-    estimate, not a replacement for cross-correlation or a physical delay.
-    Inferred spans may not extend past the next onset or the recording end.
+    Defaults below describe the general profile; omitted settings use the
+    active defaults profile.
+
+    Parameters
+    ----------
+    raw : mne.io.BaseRaw
+        Continuous recording containing the stimulus triggers.
+    onset_trigger_to_wav : mapping of int to str | pathlib.Path
+        Onset trigger codes mapped to WAV paths. Repeated codes create
+        separate trials referencing the same WAV.
+    end_triggers : int | sequence of int | None, default=None
+        Codes that end a trial. ``None`` requires ``infer_missing_ends=True``.
+    stim_channel : str | None, default=None
+        Trigger channel name. ``None`` requires exactly one stim channel.
+    infer_missing_ends : bool, default=False
+        Estimate missing endpoints from WAV duration and assumed drift.
+        Recorded end triggers take precedence.
+    base_audio_path : str | pathlib.Path | None, default=None
+        WAV directory, required for relative paths when inferring ends.
+    fallback_drift_us_per_s : float, default=0.0
+        Assumed drift in microseconds per second for end inference.
+        Positive values lengthen the span; Salzburg defaults to +499.
+
+    Returns
+    -------
+    trials : list of dict
+        Trials in trigger order with ``onset_code``, ``end_code``, ``wav_file``,
+        ``onset_sample``, and ``end_sample``. Samples include ``raw.first_samp``.
+        Inferred ends also include ``end_inferred`` and the drift/duration used.
+
+    Notes
+    -----
+    Inference uses ``WAV duration * (1 + drift / 1e6)`` on the raw clock and
+    raises if the endpoint exceeds the next onset or recording end. It does not
+    alter triggers, resample data, or correct physical delay.
+
+    Without inference, a new onset before an end raises an error; a final trial
+    without an end emits a warning and is omitted. Unrelated triggers are ignored.
     """
     if not onset_trigger_to_wav:
         raise ValueError('onset_trigger_to_wav must contain at least one onset-trigger/WAV pair.')
@@ -315,6 +368,7 @@ def _alignment_quality_warnings(
     return reasons
 
 
+@function_defaults('alignment')
 def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
     raw_trial: mne.io.BaseRaw,
     wav_file: str | Path,
@@ -332,26 +386,73 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
     warn_residual_rms_ms: float = 10.0,
     verbose: bool = True,
 ) -> dict[str, Any]:
-    """Estimate ``t_raw = offset + clock_slope * t_wav`` for one trial.
+    """Estimate clock offset and drift by matching recorded audio to a WAV.
 
-    max_lag_s is the search half-width around zero lag for EVERY window; the
-    search does not follow accumulated drift. Choose it to exceed the largest
-    absolute ``offset_s + drift_us_per_s * t / 1e6`` over the full stimulus,
-    with additional margin. Stimulus duration therefore matters: +500 us/s
-    accumulates 0.63 s over 1260 s, exceeding the default +/-0.25 s search even
-    with zero initial offset. For that example, max_lag_s=1.0 allows margin.
-    Inferring a missing trial end does not widen this search range.
+    Defaults below describe the general profile; omitted settings use the
+    active alignment defaults.
 
-    RuntimeWarning flags potentially unreliable fits when inlier residual RMS
-    exceeds warn_residual_rms_ms (default 10 ms), accepted lags or fitted
-    endpoint lags approach the search limit (within 5% or one synchronization
-    sample), or inlier anchors span less than half the evaluated time range.
-    These are heuristic checks, not a guarantee of correct alignment; residual
-    RMS measures agreement with the fitted line, not absolute timing accuracy.
-    Warnings are emitted even with verbose=False and their reasons are returned
-    in quality_warnings. The fit is still returned without changing the search
-    range or rejecting the trial. Inspect the audio match and adjust max_lag_s
-    or the configurable residual warning threshold as appropriate.
+    Parameters
+    ----------
+    raw_trial : mne.io.BaseRaw
+        Recording cropped to one trial, starting at its onset trigger.
+    wav_file : str | pathlib.Path
+        Reference WAV path, absolute or relative to the working directory.
+    audio_channels : sequence of str
+        Recorded audio channel names. All recorded/WAV channel pairs are tried;
+        the pair with the highest median window correlation is used.
+    sync_sfreq : float, default=500.0
+        Sampling rate in Hz for the envelopes used to estimate alignment.
+    audio_band : tuple of float, default=(80.0, 400.0)
+        Band-pass limits in Hz before envelope extraction. The upper limit is
+        capped below each signal's Nyquist frequency.
+    envelope_lowpass : float, default=30.0
+        Envelope low-pass cutoff in Hz; must be below both input and sync Nyquist
+        frequencies. Independent of EpochTRF's WAV feature cutoff.
+    window_s : float, default=10.0
+        Duration in seconds of each window used to estimate a lag.
+    step_s : float, default=5.0
+        Spacing in seconds between window centers.
+    max_lag_s : float, default=0.25
+        Search half-width in seconds around zero lag for every window.
+        Must cover initial offset plus drift across the full WAV; see Notes.
+    min_corr : float, default=0.30
+        Minimum normalized correlation, from -1 to 1, for accepting a window
+        lag as a synchronization anchor.
+    min_anchors : int, default=5
+        Required anchor count before and after outlier rejection; at least two.
+    reject_outliers : bool, default=True
+        Reject lag outliers using a robust preliminary fit before fitting drift.
+    warn_residual_rms_ms : float, default=10.0
+        Positive residual-RMS threshold in milliseconds for a quality warning.
+        Exceeding it does not reject the fit.
+    verbose : bool, default=True
+        Log fitted offset, drift, and residual RMS. Quality warnings always emit.
+
+    Returns
+    -------
+    alignment : dict
+        Clock mapping (``offset_s``, ``clock_slope``, ``drift_us_per_s``), WAV
+        duration and sample rates, selected channels, anchor counts, residuals,
+        correlations, and ``quality_warnings``. Usable by ``apply_raw_wav_alignment``.
+
+    Notes
+    -----
+    The fitted mapping is ``t_raw = offset_s + clock_slope * t_wav``, where
+    raw time is relative to the trial start and ``clock_slope = 1 + drift / 1e6``.
+    This function estimates alignment without modifying or resampling the input.
+
+    The lag search stays centered on zero; it does not follow accumulated drift.
+    Choose ``max_lag_s`` above the largest absolute
+    ``offset_s + drift_us_per_s * t / 1e6`` over the WAV, with margin. For example,
+    +500 microseconds/s adds 0.63 s over 1260 s, so ``max_lag_s=1.0`` allows margin
+    at zero initial offset. Missing-end inference does not widen this range.
+
+    ``RuntimeWarning`` flags excessive residual RMS, lags near the search limit
+    (within 5% or one sync sample), or inlier anchors covering less than half the
+    evaluated time range. Warnings are returned in ``quality_warnings`` even with
+    ``verbose=False``; the fit is still returned. Residual RMS measures agreement
+    with the fitted line, not absolute timing accuracy. Inspect the audio match
+    before adjusting the search range or warning threshold.
     """
     if not isinstance(raw_trial, mne.io.BaseRaw):
         raise TypeError('raw_trial must be an MNE Raw object.')
@@ -537,6 +638,7 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
     return alignment
 
 
+@function_defaults('trf')
 def assume_raw_wav_alignment(
     wav_file: str | Path,
     raw_sfreq: float,
@@ -545,9 +647,30 @@ def assume_raw_wav_alignment(
 ) -> dict[str, Any]:
     """Construct a clock correction from WAV duration and an assumed drift.
 
+    Defaults below describe the general profile; omitted drift uses the active
+    TRF defaults.
+
+    Parameters
+    ----------
+    wav_file : str | pathlib.Path
+        Reference WAV path, absolute or relative to the working directory.
+    raw_sfreq : float
+        Recording sampling rate in Hz, stored for later alignment validation.
+    fallback_drift_us_per_s : float, default=0.0
+        Assumed drift in microseconds per second; must be finite and greater
+        than -1,000,000. Salzburg defaults to +499.
+
+    Returns
+    -------
+    alignment : dict
+        Assumed clock slope, zero offset, WAV duration, and recording sample
+        rate. Fit-quality metrics are ``None`` and anchor counts are zero.
+
+    Notes
+    -----
     The trial onset is assumed to coincide with WAV time zero. Positive drift
-    lengthens the trial on the recording clock: t_raw = (1 + drift / 1e6) * t_wav.
-    No audio is measured, so offset and fit quality cannot be estimated.
+    lengthens the trial on the recording clock:
+    ``t_raw = (1 + drift / 1e6) * t_wav``. No recorded audio is measured.
     """
     slope = 1.0 + fallback_drift_us_per_s / 1e6
     if not np.isfinite(slope) or slope <= 0:
@@ -585,9 +708,35 @@ def apply_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
 ) -> mne.io.BaseRaw:
     """Extract and clock-correct one trial using MNE's device realignment.
 
-    ``padding_s`` retains real recording data before/after the WAV, measured
-    on the corrected WAV clock. This permits subsequent physical-delay
-    correction without discarding trial endpoints or adding synthetic data.
+    Parameters
+    ----------
+    raw : mne.io.BaseRaw
+        Continuous recording covering the full trial and requested padding.
+        The input is not modified.
+    onset_sample : int
+        Trial onset in raw sample coordinates, including ``raw.first_samp``.
+    alignment : mapping
+        Clock correction with ``offset_s``, ``clock_slope``, ``wav_duration_s``,
+        and ``raw_sfreq``, as returned by the estimate/assume alignment helpers.
+    preserve_annotations : bool, default=True
+        Retain annotations and transform their timing with the data.
+        ``False`` removes them from the extracted segment.
+    padding_s : tuple of float, default=(0.0, 0.0)
+        Non-negative ``(before, after)`` margins in seconds on the corrected WAV
+        clock. Uses real recording samples to allow later delay correction.
+    verbose : bool, default=True
+        Emit MNE processing messages.
+
+    Returns
+    -------
+    segment : mne.io.BaseRaw
+        Loaded copy resampled onto the WAV clock at the original sampling rate,
+        including padding. No WAV feature channels or physical delay are added.
+
+    Notes
+    -----
+    Raises if the recording cannot cover the full WAV plus padding or if its
+    sample rate differs from ``alignment['raw_sfreq']``.
     """
     if not isinstance(raw, mne.io.BaseRaw):
         raise TypeError('raw must be an MNE Raw object.')
@@ -677,10 +826,24 @@ def apply_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
 
 
 def summarize_alignments(trials: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, float | int]]:
-    """Store complete trial statistics even when JSON export truncates trial lists.
+    """Summarize alignment diagnostics across trials.
 
-    SD uses the population convention (ddof=0). Counts and moments permit
-    exact pooling across recordings with different numbers of trials.
+    Parameters
+    ----------
+    trials : sequence of mapping
+        Per-trial alignment results. Missing or ``None`` metrics are omitted
+        independently, allowing measured and assumed alignments to be mixed.
+
+    Returns
+    -------
+    summary : dict of str to dict
+        ``n``, ``mean``, ``sd``, ``min``, and ``max`` per available metric.
+        Offset is converted to milliseconds; other metrics retain their units.
+
+    Notes
+    -----
+    Standard deviations use ``ddof=0``. Counts and moments support pooling
+    across recordings, even when JSON export truncates the per-trial lists.
     """
     metrics = {
         'offset_ms': ('offset_s', 1000.0),

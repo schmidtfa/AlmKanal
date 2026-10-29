@@ -6,6 +6,12 @@ You need a supported eye-tracking file for each raw recording, identifiable sync
 
 ## Configure the step
 
+`VPixxCleaner` uses the active `vpixx` [defaults profile](defaults.md). The generic
+profile leaves screen geometry unset; supply it as below, or call
+`set_defaults("salzburg")` before creating the step to use the Salzburg setup.
+Screen dimensions and viewing distance are in metres. Pixel-only processing
+with `convert_to_radians=False` does not require screen geometry.
+
 ```python
 import mne
 from almkanal import AlmKanal, VPixxCleaner
@@ -31,6 +37,21 @@ pipeline.generate_json("eye_preprocessing.json")
 ```
 
 Keep the synchronization channels available until alignment has completed. The example's channel names and dimensions must be replaced when your setup differs.
+
+To reuse settings across scripts and standalone helpers:
+
+```python
+from almkanal import set_defaults, VPixxCleaner
+from almkanal.eye_utils.gaze_utils import load_eyetracking_data
+
+set_defaults("salzburg", vpixx={"blink_buffer_vpixx": (0.05, 0.25)})
+step = VPixxCleaner("eye.mat")
+eye = load_eyetracking_data("eye.mat")
+```
+
+The step captures settings at construction; the standalone loader reads the
+active profile at call time. Explicit arguments override profile values. The
+loader obtains its sampling rate from the MAT-file timestamps.
 
 ## Check the result
 

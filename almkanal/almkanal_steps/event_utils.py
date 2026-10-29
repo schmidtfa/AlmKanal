@@ -2,6 +2,7 @@ import mne
 from attrs import define, field
 
 from almkanal import AlmKanalStep
+from almkanal.defaults import default_field, step_with_defaults
 from almkanal.info import AlmKanalInfo
 
 
@@ -64,21 +65,22 @@ class Events(AlmKanalStep):
         Create epochs from explicitly supplied or previously detected events.
     """
 
-    stim_channel: str | list[str] | None = None
-    output: str = 'onset'
-    consecutive: bool | str = 'increasing'
-    min_duration: float = 0.0
-    shortest_event: int = 2
-    mask: int | None = None
-    uint_cast: bool = False
-    mask_type: str = 'and'
-    initial_event: bool = False
-    verbose: bool | str | int | None = None
+    stim_channel: str | list[str] | None = default_field('events', 'stim_channel')
+    output: str = default_field('events', 'output')
+    consecutive: bool | str = default_field('events', 'consecutive')
+    min_duration: float = default_field('events', 'min_duration')
+    shortest_event: int = default_field('events', 'shortest_event')
+    mask: int | None = default_field('events', 'mask')
+    uint_cast: bool = default_field('events', 'uint_cast')
+    mask_type: str = default_field('events', 'mask_type')
+    initial_event: bool = default_field('events', 'initial_event')
+    verbose: bool | str | int | None = default_field('events', 'verbose')
 
     must_be_before: tuple = ('Epochs', 'ForwardModel', 'SpatialFilter', 'SourceReconstruction')
     must_be_after: tuple = ()
     allow_repeated: bool = field(default=False, init=False)
 
+    @step_with_defaults
     def run(
         self,
         data: mne.io.BaseRaw,

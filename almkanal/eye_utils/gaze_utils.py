@@ -11,13 +11,15 @@ therefore be used independently of MEG recordings.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
 import mne
 import numpy as np
 from pymatreader import read_mat
+
+from almkanal.defaults import function_defaults, get_defaults
 
 from .blink_utils import call_blink_annotations, vpixx_default_blinkmap
 
@@ -26,9 +28,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class VPixxConfig:
-    # this corresponds to the standard vpixx configurations in the Lab
-    # at the Christian-Doppler Klinik in Salzburg. Adjust if needed.
     """Configuration for VPixx eye-tracking preprocessing.
+
+    Omitted fields are captured from the active ``vpixx`` profile. General
+    defaults leave screen geometry unset; it is required for conversion to
+    radians. Pixel-only processing can use a configuration without geometry.
 
     Parameters
     ----------
@@ -51,43 +55,36 @@ class VPixxConfig:
         Value used by the VPixx recording to indicate missing data.
     """
 
-    screen_resolution: tuple[int, int] = (1920, 1080)
-    screen_size: tuple[float, float] = (0.61, 0.34)
-    screen_distance: float = 0.82
-    calibration_model: str = 'HV5'
-    calibration_eye: Literal['left', 'right'] = 'right'
-    blink_buffer: tuple[float, float] = (0.05, 0.2)
-    digital_output_threshold: float = 256.0
-    missing_value: float = 9999.0
+    screen_resolution: tuple[int, int] | None = field(default_factory=lambda: get_defaults().vpixx.screen_resolution)
+    screen_size: tuple[float, float] | None = field(default_factory=lambda: get_defaults().vpixx.screen_size)
+    screen_distance: float | None = field(default_factory=lambda: get_defaults().vpixx.screen_distance)
+    calibration_model: str = field(default_factory=lambda: get_defaults().vpixx.calibration_model)
+    calibration_eye: Literal['left', 'right'] = field(default_factory=lambda: get_defaults().vpixx.calibration_eye)
+    blink_buffer: tuple[float, float] = field(default_factory=lambda: get_defaults().vpixx.blink_buffer_vpixx)
+    digital_output_threshold: float = field(default_factory=lambda: get_defaults().vpixx.digital_output_threshold)
+    missing_value: float = field(default_factory=lambda: get_defaults().vpixx.missing_value)
 
     def __post_init__(self) -> None:
         """Validate configuration."""
-        if len(self.screen_resolution) != TWO_INPUT_VALUES:
-            raise ValueError('screen_resolution must contain two values.')
+        for name, values in (('screen_resolution', self.screen_resolution), ('screen_size', self.screen_size)):
+            if values is not None:
+                if len(values) != TWO_INPUT_VALUES:
+                    raise ValueError(f'{name} must contain two values.')
+                if any(not np.isfinite(x) or x <= 0 for x in values):
+                    raise ValueError(f'{name} values must be finite and positive.')
 
-        if any(x <= 0 for x in self.screen_resolution):
-            raise ValueError('screen_resolution values must be positive.')
-
-        if len(self.screen_size) != TWO_INPUT_VALUES:
-            raise ValueError('screen_size must contain two values.')
-
-        if any(x <= 0 for x in self.screen_size):
-            raise ValueError('screen_size values must be positive.')
-
-        if self.screen_distance <= 0:
-            raise ValueError('screen_distance must be positive.')
+        if self.screen_distance is not None and (not np.isfinite(self.screen_distance) or self.screen_distance <= 0):
+            raise ValueError('screen_distance must be finite and positive.')
 
         if len(self.blink_buffer) != TWO_INPUT_VALUES:
             raise ValueError('blink_buffer must contain two values.')
 
-        if any(x < 0 for x in self.blink_buffer):
-            raise ValueError('blink_buffer values must be non-negative.')
+        if any(not np.isfinite(x) or x < 0 for x in self.blink_buffer):
+            raise ValueError('blink_buffer values must be finite and non-negative.')
 
 
 TWO_INPUT_VALUES = 2
 BLINK_PROBABILITY_THRESHOLD = 0.5
-
-DEFAULT_VPIXX_CONFIG = VPixxConfig()
 
 VPIXX_CHANNELS = (
     'Left Eye x',
@@ -232,20 +229,29 @@ def make_eye_mne(
 
 
 def create_vpixx_calibration(
-    config: VPixxConfig = DEFAULT_VPIXX_CONFIG,
+    config: VPixxConfig | None = None,
 ) -> mne.preprocessing.eyetracking.Calibration:
     """Create an MNE calibration object for VPixx data.
 
     Parameters
     ----------
     config
-        VPixx preprocessing configuration.
+        VPixx preprocessing configuration. If None, construct one from the
+        active profile. All three screen geometry values must be configured.
 
     Returns
     -------
     calibration
         MNE eye-tracking calibration object.
     """
+    if config is None:
+        config = VPixxConfig()
+    if config.screen_resolution is None or config.screen_size is None or config.screen_distance is None:
+        raise ValueError(
+            'screen_resolution, screen_size, and screen_distance must be configured to convert gaze to radians. '
+            'Supply VPixxConfig, set the vpixx defaults section, or select the Salzburg profile. '
+            'Screen size and distance are in metres.'
+        )
     return mne.preprocessing.eyetracking.Calibration(
         onset=-10,
         model=config.calibration_model,
@@ -347,10 +353,11 @@ def _make_derived_channel(
 
 
 # main preprocessing functions
+@function_defaults('vpixx')
 def load_eyetracking_data(  # noqa PLR0915
     eye_path: str | Path,
     *,
-    config: VPixxConfig = DEFAULT_VPIXX_CONFIG,
+    config: VPixxConfig | None = None,
     interpolate_blinks: bool = True,
     blink_buffer: tuple[float, float] | None = None,
     convert_to_radians: bool = True,
@@ -378,7 +385,8 @@ def load_eyetracking_data(  # noqa PLR0915
     eye_path
         Path to the VPixx MAT file.
     config
-        VPixx configuration.
+        VPixx configuration. If None, construct one from the active profile.
+        An explicit config supplies its own geometry and calibration settings.
     interpolate_blinks
         Whether to interpolate gaze data around detected blinks.
     blink_buffer
@@ -419,6 +427,10 @@ def load_eyetracking_data(  # noqa PLR0915
     This function does not perform any MEG alignment. Eye tracking can
     therefore be used completely independently of MEG.
     """
+    if config is None:
+        config = VPixxConfig()
+    # Validate required geometry before reading a recording or modifying data.
+    calibration = create_vpixx_calibration(config) if convert_to_radians else None
     if blink_buffer is None:
         blink_buffer = config.blink_buffer
 
@@ -440,8 +452,6 @@ def load_eyetracking_data(  # noqa PLR0915
     raw = make_eye_mne(eye_data, sfreq)
 
     if convert_to_radians:
-        calibration = create_vpixx_calibration(config)
-
         raw = mne.preprocessing.eyetracking.convert_units(
             raw,
             calibration=calibration,
@@ -576,14 +586,15 @@ def load_eyetracking_data(  # noqa PLR0915
     return raw_clean
 
 
+@function_defaults('vpixx')
 def align_eye_to_meg(
     meg_data: mne.io.BaseRaw,
     eye_data: mne.io.BaseRaw,
     *,
-    meg_stim_channel: str = 'STI101',
+    meg_stim_channel: str | None = None,
     eye_stim_channel: str = 'Digital Output',
-    meg_min_duration: float = 0.002,
-    meg_max_trigger: int = 4096,
+    meg_min_duration: float = 0.0,
+    meg_max_trigger: int | None = None,
 ) -> mne.io.BaseRaw:
     """Align an eye-tracking Raw object to an MEG Raw object.
 
@@ -597,13 +608,15 @@ def align_eye_to_meg(
     eye_data
         Preprocessed eye-tracking recording.
     meg_stim_channel
-        MEG stimulus channel containing synchronization triggers.
+        MEG stimulus channel containing synchronization triggers. None uses
+        MNE's stimulus-channel detection.
     eye_stim_channel
         Eye-tracker stimulus channel containing synchronization triggers.
     meg_min_duration
         Minimum event duration passed to :func:`mne.find_events`.
     meg_max_trigger
         Triggers at or above this value are ignored in the MEG recording.
+        None keeps all trigger codes.
 
     Returns
     -------
@@ -627,7 +640,7 @@ def align_eye_to_meg(
     if not isinstance(eye_data, mne.io.BaseRaw):
         raise TypeError('eye_data must be an MNE Raw object.')
 
-    if meg_stim_channel not in meg_data.ch_names:
+    if meg_stim_channel is not None and meg_stim_channel not in meg_data.ch_names:
         raise ValueError(f'MEG stimulus channel {meg_stim_channel!r} ' 'was not found in the recording.')
 
     if eye_stim_channel not in eye_data.ch_names:
@@ -650,7 +663,8 @@ def align_eye_to_meg(
     eye_events = eye_events[eye_events[:, 1] == 0]
 
     meg_events = meg_events[meg_events[:, 1] == 0]
-    meg_events = meg_events[meg_events[:, 2] < meg_max_trigger]
+    if meg_max_trigger is not None:
+        meg_events = meg_events[meg_events[:, 2] < meg_max_trigger]
 
     if len(eye_events) == 0:
         raise ValueError('No synchronization events found in eye tracking.')
@@ -771,18 +785,21 @@ def _match_events_by_code_and_order(
     return matched_meg_array, matched_eye_array
 
 
+@function_defaults('vpixx')
 def add_eye_tracking_data(
     meg_data: mne.io.BaseRaw,
     eye_path: str | Path,
     *,
     align: bool = True,
-    config: VPixxConfig = DEFAULT_VPIXX_CONFIG,
+    config: VPixxConfig | None = None,
     interpolate_blinks: bool = True,
     blink_buffer: tuple[float, float] | None = None,
     convert_to_radians: bool = True,
     include_raw_vpixx_channels: bool = False,
-    meg_stim_channel: str = 'STI101',
+    meg_stim_channel: str | None = None,
     eye_stim_channel: str = 'Digital Output',
+    meg_min_duration: float = 0.0,
+    meg_max_trigger: int | None = None,
 ) -> mne.io.BaseRaw:
     """Add preprocessed eye tracking to an MEG recording.
 
@@ -796,7 +813,7 @@ def add_eye_tracking_data(
         If True, align eye tracking to MEG using synchronization triggers.
         If False, no temporal alignment is performed.
     config
-        VPixx preprocessing configuration.
+        VPixx preprocessing configuration. If None, use the active profile.
     interpolate_blinks
         Whether to interpolate gaze data around blinks.
     blink_buffer
@@ -806,9 +823,13 @@ def add_eye_tracking_data(
     include_raw_vpixx_channels
         Retain all original VPixx channels in addition to derived channels.
     meg_stim_channel
-        MEG synchronization trigger channel.
+        MEG synchronization trigger channel. None uses MNE's detection.
     eye_stim_channel
         Eye-tracker synchronization trigger channel.
+    meg_min_duration
+        Minimum MEG event duration in seconds.
+    meg_max_trigger
+        Ignore MEG trigger codes at or above this value. None keeps all codes.
 
     Returns
     -------
@@ -846,6 +867,8 @@ def add_eye_tracking_data(
             eye_data,
             meg_stim_channel=meg_stim_channel,
             eye_stim_channel=eye_stim_channel,
+            meg_min_duration=meg_min_duration,
+            meg_max_trigger=meg_max_trigger,
         )
     else:
         logger.info('Eye-tracking/MEG alignment disabled; ' 'adding eye tracking without synchronization.')

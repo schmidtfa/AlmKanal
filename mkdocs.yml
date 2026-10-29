@@ -38,6 +38,7 @@ nav:
       - Example scripts: examples.md
   - Use AlmKanal:
       - Working with your data: pipelines.md
+      - Defaults and lab profiles: defaults.md
       - Pipeline validation: validation.md
       - Automatic Methods reporting: methods.md
       - Step catalogue: steps.md
