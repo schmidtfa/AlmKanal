@@ -105,6 +105,24 @@ class Defaults:
             ica_eog={'left_eog_chs': ['MEG0121', 'MEG0311'], 'right_eog_chs': ['MEG1211', 'MEG1411']},
         )
 
+    @classmethod
+    def salzburg_trf(cls) -> Defaults:
+        """Salzburg defaults for TRF Analysis."""
+        return cls.salzburg().with_overrides(
+            name='salzburg_trf',
+            filter={'highpass': 0.5,
+                    'lowpass': 40},
+        )
+
+    @classmethod
+    def salzburg_rest(cls) -> Defaults:
+        """Salzburg defaults for Resting State Analysis."""
+        return cls.salzburg().with_overrides(
+            name='salzburg_trf',
+            filter={'highpass': 0.1,
+                    'lowpass': None},
+        )
+
     def with_overrides(
         self, *, name: str | None = None, version: str | None = None, **sections: Mapping[str, Any]
     ) -> Defaults:
