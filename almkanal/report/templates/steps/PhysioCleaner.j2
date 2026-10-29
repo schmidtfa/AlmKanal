@@ -1,0 +1,96 @@
+{# steps/PhysioCleaner.j2 — reporting for NeuroKit2-based biosignal preprocessing #}
+{# Expected s.settings structure (your current output):
+   {
+     "bio_info": {
+       "sampling_rate": 1000,
+       "ecg": {
+         "clean_method": "neurokit",
+         "powerline_hz": 50,
+         "rpeak_method": "neurokit",
+         "channels": ["ECG"]
+       },
+       "eog": {
+         "clean_method": "neurokit",
+         "bandpass_hz": [0.25, 7.5],
+         "blink_method": "mne",
+         "channels": ["VEOG", "HEOG"]
+       },
+       "emg": {
+         "clean_method": "biosppy",
+         "amplitude": {"lowcut": 10, "highcut": 400, "envelope_lp": 8},
+         "activation_method": "threshold",
+         "channels": ["EMG1", "EMG2"]
+       },
+       "rsp": { ... }  # optional, same spirit
+     }
+   }
+#}
+
+{# Bind the bio_info mapping even if nested differently #}
+{% set B = (
+    s.settings.bio_info
+    if s.settings.bio_info is defined
+    else (
+      s.settings.physio_info.bio_info
+      if s.settings.physio_info is defined and s.settings.physio_info.bio_info is defined
+      else s.settings
+    )
+) %}
+
+{# Small helpers #}
+{% macro join_oxford(xs) -%}
+  {%- if xs|length == 0 -%}{% elif xs|length == 1 -%}{{ xs[0] }}{%- else -%}{{ xs[:-1]|join(', ') }} and {{ xs[-1] }}{%- endif -%}
+{%- endmacro %}
+
+{# References: NeuroKit2 (generic); add more if you like #}
+{% set _ = ref('Makowski2021',
+  'Makowski, D., Pham, T., Lau, Z. J., Brammer, J. C., Lespinasse, F., Pham, H., Schölzel, C., & Chen, S. H. A. (2021). '
+  'NeuroKit2: A Python toolbox for neurophysiological signal processing. *Journal of Open Source Software*.') %}
+
+#### Physiological signal processing
+
+{% set mods = [] -%}
+{% if B.ecg.ecg %}{% set _ = mods.append('ECG ') %}{% endif %}
+{% if B.eog.eog %}{% set _ = mods.append('EOG ') %}{% endif %}
+{% if B.emg.emg %}{% set _ = mods.append('EMG ') %}{% endif %}
+{% if B.rsp is defined %}{% set _ = mods.append('respiration') %}{% endif %}
+{% if mods %} {{ mods|join(', ') }}{% endif %}
+data were preprocessed with NeuroKit2 ({{ ref('Makowski2021') }})
+{% if B.sampling_rate is defined %} at {{ B.sampling_rate }} Hz{% endif %}.
+{# ----------------------- ECG ----------------------- #}
+{% if B.ecg.ecg %}
+{%- set ecg = B.ecg %}
+The ECG was cleaned using the {% if ecg.clean_method is defined %} {{ ecg.clean_method }} {% else %} default {%- endif %} method in NeuroKit2.
+{%- if ecg.powerline_hz is defined %} Powerline removal assumed {{ ecg.powerline_hz }} Hz.{% endif -%}
+R-peak detection used the {%- if ecg.rpeak_method is defined %} {{ ecg.rpeak_method }}{%- else %} default{% endif -%} detector.{%- if ecg.channels is defined and ecg.channels|length > 0 %} Channels: {{ join_oxford(ecg.channels) }}.{% endif %}
+{% endif %}
+{# ----------------------- EOG ----------------------- #}
+{% if B.eog.eog %}
+{%- set eog = B.eog %}
+The EOG was cleaned using the {% if eog.clean_method is defined %} {{ eog.clean_method }} {% else %} default {% endif -%} method
+{%- if eog.bandpass_hz is defined and eog.bandpass_hz|length == 2 %}, with a {{ eog.bandpass_hz[0] }}–{{ eog.bandpass_hz[1] }} Hz band-pass{% endif -%}. Blink detection used the
+{%- if eog.blink_method is defined %} {{ eog.blink_method }} {%- else %} default {% endif -%} approach. {%- if eog.channels is defined and eog.channels|length > 0 %} Channels: {{ join_oxford(eog.channels) }}.{% endif %}
+{% endif %}
+{# ----------------------- EMG ----------------------- #}
+{% if B.emg.emg %}
+{%- set emg = B.emg %}
+The EMG was cleaned using the
+{%- if emg.clean_method is defined %} {{ emg.clean_method }}{%- else %} default{% endif -%} method.
+Amplitude extraction used
+{%- if emg.amplitude is defined and emg.amplitude.lowcut is defined and emg.amplitude.highcut is defined -%}
+ a {{ emg.amplitude.lowcut }}–{{ emg.amplitude.highcut }} Hz band-pass
+{%- else -%}
+ NeuroKit2 defaults
+{%- endif -%}
+{%- if emg.amplitude is defined and emg.amplitude.envelope_lp is defined %}, followed by an {{ emg.amplitude.envelope_lp }} Hz envelope low-pass{% endif -%}.
+Activation detection used the
+{%- if emg.activation_method is defined %} {{ emg.activation_method }}{%- else %} default{% endif -%} rule.
+{%- if emg.channels is defined and emg.channels|length > 0 %} Channels: {{ join_oxford(emg.channels) }}.{% endif %}
+{% endif %}
+{# ----------------------- RSP (optional) ----------------------- #}
+{% if B.rsp is defined %}
+{%- set rsp = B.rsp %}
+Respiration was preprocessed using NeuroKit2 defaults
+{%- if rsp.clean_method is defined %} ({{ rsp.clean_method }}){% endif -%}.
+{%- if rsp.channels is defined and rsp.channels|length > 0 %} Channels: {{ join_oxford(rsp.channels) }}.{% endif %}
+{% endif %} Cleaned and processed signals were afterwards combined with stimulus channels and re-inserted into the MNE object (with the channel type “bio”).

@@ -1,0 +1,62 @@
+{# steps/ReReference.j2 #}
+
+{% set ref = s.settings.ref_channels %}
+{% set projection = s.settings.projection %}
+{% set ch_type = s.settings.resolved_ch_type %}
+{% set joint = s.settings.joint %}
+
+{# Human-readable channel-type labels #}
+{% set type_labels = {
+    'eeg': 'EEG',
+    'ecog': 'ECoG',
+    'seeg': 'sEEG',
+    'dbs': 'DBS'
+} %}
+
+{% if ch_type is sequence and ch_type is not string %}
+    {% set ns = namespace(labels=[]) %}
+    {% for ct in ch_type %}
+        {% set _ = ns.labels.append(type_labels.get(ct, ct)) %}
+    {% endfor %}
+    {% set channel_label = ns.labels | join(' and ') %}
+{% else %}
+    {% set channel_label = type_labels.get(ch_type, ch_type) %}
+{% endif %}
+
+#### ReReferencing
+
+{% if ref == 'average' %}
+
+    {% if projection %}
+An average-reference projection was added to the {{ channel_label }} data but was not applied at this stage.
+    {% elif ch_type is sequence and ch_type is not string and not joint %}
+The {{ channel_label }} data were re-referenced separately within each channel type to the average of all clean channels of that type.
+    {% elif ch_type is sequence and ch_type is not string and joint %}
+The {{ channel_label }} data were jointly re-referenced to the average of all clean channels across the selected channel types.
+    {% else %}
+The {{ channel_label }} data were re-referenced to the average of all clean {{ channel_label }} channels.
+    {% endif %}
+
+{% elif ref == 'REST' %}
+
+The {{ channel_label }} data were re-referenced to infinity using the Reference Electrode Standardization Technique (REST) and a forward model
+({{ ref('Yao2001', 'Yao, D. (2001). A method to standardize a reference of scalp EEG recordings to a point at infinity. Physiological Measurement, 22(4), 693–711. doi:10.1088/0967-3334/22/4/305') }}).
+{% elif ref is mapping %}
+
+The {{ channel_label }} data were re-referenced using channel-specific reference mappings.
+
+{% elif ref is sequence and ref is not string %}
+
+    {% if ref | length == 0 %}
+No re-referencing was applied to the {{ channel_label }} data.
+    {% elif ref | length == 1 %}
+The {{ channel_label }} data were re-referenced to channel {{ ref[0] }}.
+    {% else %}
+The {{ channel_label }} data were re-referenced to the average of channels {{ ref | join(', ') }}.
+    {% endif %}
+
+{% elif ref is not none %}
+
+The {{ channel_label }} data were re-referenced to channel {{ ref }}.
+
+{% endif %}
