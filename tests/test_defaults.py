@@ -21,6 +21,7 @@ from almkanal import (
 )
 from almkanal.almkanal_steps import trf_utils
 from almkanal.stim_utils import alignment_utils
+from numpy.typing import ArrayLike
 
 
 @pytest.fixture(autouse=True)
@@ -348,11 +349,11 @@ def test_set_defaults_resets_to_selected_profile_and_can_explicitly_extend_curre
 
     set_defaults(filter={'highpass': 1.0})
     assert Filter().highpass == 1.0
-    assert Filter().lowpass == 40.0
+    assert Filter().lowpass == None
     assert ICA().train is False
 
     set_defaults()
-    assert Filter().highpass == 0.1
+    assert Filter().highpass == None
     assert get_defaults().name == 'generic'
 
 
@@ -455,7 +456,7 @@ def test_profiles_include_new_main_parameters():
     from almkanal import EEGRANSAC, ForwardModel, MultiBlockMaxwell, Resample
 
     assert ICA().train_freq == 16.666
-    assert ICA().train_thresh == 6.0
+    assert ICA().train_thresh == 3.0
     assert get_defaults().ica_train.duration == 8
     with use_defaults(
         'generic',

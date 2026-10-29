@@ -9,7 +9,7 @@ from almkanal import AlmKanalStep
 from almkanal.defaults import default_field, step_with_defaults
 
 if TYPE_CHECKING:
-    import numpy.typing as npt
+    from numpy.typing import ArrayLike
 
     from almkanal.info import AlmKanalInfo
 
@@ -102,7 +102,7 @@ class Filter(AlmKanalStep):
 
     highpass: float | None = default_field('filter', 'highpass')
     lowpass: float | None = default_field('filter', 'lowpass')
-    picks: str | npt.ArrayLike | slice | None = default_field('filter', 'picks')
+    picks: str | ArrayLike | slice | None = default_field('filter', 'picks')
     filter_length: str | int = default_field('filter', 'filter_length')
     l_trans_bandwidth: float | Literal['auto'] = default_field('filter', 'l_trans_bandwidth')
     h_trans_bandwidth: float | Literal['auto'] = default_field('filter', 'h_trans_bandwidth')

@@ -5,10 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence  # noqa: TCH003 - used by get_type_hints at runtime
 from typing import Any, Literal
 
+# cant run this in a type_chceking block as get_type_hints evaluates annotations at runtime
+import mne  # noqa: TCH002
+import pandas as pd  # noqa: TCH002
 from attrs import frozen
-import mne
-from numpy.typing import ArrayLike
-import pandas as pd
+from numpy.typing import ArrayLike  # noqa: TCH002
 
 
 @frozen
@@ -118,7 +119,7 @@ class ReReferenceDefaults:
 
 @frozen
 class EpochsDefaults:
-    tmin: float = 0.
+    tmin: float = 0.0
     tmax: float = 0.5
     events: None | ArrayLike = None
     event_id: None | dict = None

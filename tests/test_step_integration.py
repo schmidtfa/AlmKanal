@@ -10,7 +10,7 @@ import almkanal as ak
 from almkanal.info import AlmKanalInfo
 from almkanal.report.methods_context import build_context_from_files
 from almkanal.report.rendering import render_methods
-
+import pandas as pd
 
 @pytest.fixture(autouse=True)
 def isolated_defaults():
