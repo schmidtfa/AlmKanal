@@ -106,7 +106,7 @@ class PhysioCleaner(AlmKanalStep):
     ----------
     ecg : str | list | None, default=None
         ECG channel or channels to preprocess. ``None`` disables ECG
-        preprocessing.
+        preprocessing. 
     resp : str | list | None, default=None
         Respiratory channel or channels to preprocess. ``None`` disables
         respiratory preprocessing.

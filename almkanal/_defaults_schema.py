@@ -6,13 +6,16 @@ from collections.abc import Mapping, Sequence  # noqa: TCH003 - used by get_type
 from typing import Any, Literal
 
 from attrs import frozen
+import mne
+from numpy.typing import ArrayLike
+import pandas as pd
 
 
 @frozen
 class FilterDefaults:
-    highpass: float | None = 0.1
-    lowpass: float | None = 40.0
-    picks: Any = None
+    highpass: float | None = None
+    lowpass: float | None = None
+    picks: str | ArrayLike | slice | None = None
     filter_length: str | int = 'auto'
     l_trans_bandwidth: float | Literal['auto'] = 'auto'
     h_trans_bandwidth: float | Literal['auto'] = 'auto'
@@ -40,21 +43,21 @@ class ICADefaults:
     fit_only: bool = False
     n_components: None | int | float = None
     method: str = 'picard'
-    random_state: None | int = 42
+    random_state: None | int = None
     fit_params: dict | None = None
     ica_hp_freq: None | float = 1.0
     ica_lp_freq: None | float = None
     resample_freq: int | None = 200
     eog: bool = True
     surrogate_eog_chs: None | dict = None
-    eog_corr_thresh: float = 0.5
+    eog_corr_thresh: float = 0.4
     ecg: bool = True
-    ecg_corr_thresh: float = 0.5
+    ecg_corr_thresh: float = 0.4
     emg: bool = False
     emg_thresh: float = 0.5
     train: bool = False
     train_freq: float = 16.666
-    train_thresh: float = 6.0
+    train_thresh: float = 3.0
     img_path: None | str = None
     fname: None | str = None
 
@@ -84,7 +87,7 @@ class PhysioCleanerDefaults:
 @frozen
 class MaxwellDefaults:
     mw_coord_frame: str = 'head'
-    mw_destination: Any = None
+    mw_destination: None | ArrayLike = None
     mw_calibration_file: str | bool | None = None
     mw_cross_talk_file: str | bool | None = None
     mw_st_duration: float | None = None
@@ -100,7 +103,7 @@ class EEGRANSACDefaults:
     unbroken_time: float = 0.4
     n_jobs: int = 1
     verbose: bool = False
-    random_state: int | None = 435656
+    random_state: int | None = None
 
 
 @frozen
@@ -108,20 +111,20 @@ class ReReferenceDefaults:
     ref_channels: str | list[str] | dict = 'average'
     projection: bool = False
     ch_type: str | list[str] = 'auto'
-    forward: Any = None
+    forward: mne.Forward | None = None
     joint: bool = False
     verbose: bool | str | int | None = False
 
 
 @frozen
 class EpochsDefaults:
-    tmin: float = -0.15
+    tmin: float = 0.
     tmax: float = 0.5
-    events: Any = None
+    events: None | ArrayLike = None
     event_id: None | dict = None
     baseline: None | tuple = None
     preload: bool = True
-    picks: Any = None
+    picks: str | ArrayLike | None = None
     reject: dict | None = None
     flat: dict | None = None
     proj: bool | str = True
@@ -130,7 +133,7 @@ class EpochsDefaults:
     detrend: int | None = None
     on_missing: str = 'raise'
     reject_by_annotation: bool = True
-    metadata: Any = None
+    metadata: None | pd.DataFrame = None
     event_repeated: str = 'error'
     verbose: bool | str | int | None = None
 
@@ -153,11 +156,11 @@ class ForwardModelDefaults:
 
 @frozen
 class SpatialFilterDefaults:
-    fwd: Any = None
+    fwd: mne.Forward | None = None
     pick_dict: dict | None = None
-    data_cov: Any = None
-    noise_cov: Any = None
-    empty_room: Any = None
+    data_cov: None | mne.Covariance = None
+    noise_cov: None | mne.Covariance = None
+    empty_room: None | str | mne.io.BaseRaw = None
     nearest_empty_room: bool = False
     chans2keep: list[str] | None = None
     lcmv_reg: float = 0.05
@@ -168,7 +171,7 @@ class SpatialFilterDefaults:
 
 @frozen
 class SourceReconstructionDefaults:
-    filters: Any = None
+    filters: None | mne.beamformer.Beamformer = None
     return_parc: bool = False
     label_mode: str = 'pca_flip'
     atlas: str = 'glasser'

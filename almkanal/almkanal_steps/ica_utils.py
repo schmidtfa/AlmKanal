@@ -335,7 +335,7 @@ class ICA(AlmKanalStep):
         components, while a float specifies the fraction of explained variance.
     method : str, default='picard'
         ICA fitting method passed to :class:`mne.preprocessing.ICA`.
-    random_state : int | None, default=42
+    random_state : int | None, default=None
         Random seed used during ICA fitting.
     fit_params : dict | None, default=None
         Additional method-specific parameters passed to the ICA fitting procedure.
@@ -352,11 +352,11 @@ class ICA(AlmKanalStep):
     surrogate_eog_chs : dict | None, default=None
         Definition of surrogate EOG channels used when dedicated EOG channels are
         unavailable.
-    eog_corr_thresh : float, default=0.5
+    eog_corr_thresh : float, default=0.4
         Correlation threshold used to classify components as EOG-related.
     ecg : bool, default=True
         Whether to identify components associated with cardiac artifacts.
-    ecg_corr_thresh : float, default=0.5
+    ecg_corr_thresh : float, default=0.4
         Correlation threshold used to classify components as ECG-related.
     emg : bool, default=False
         Whether to identify components associated with muscle activity.
@@ -366,7 +366,7 @@ class ICA(AlmKanalStep):
         Whether to identify components associated with the train-related artifact.
     train_freq : float, default=16.666
         Frequency, in Hz, around which the train-related artifact is detected.
-    train_thresh : float, default=6.0
+    train_thresh : float, default=3.0
         Threshold used to classify components as train-related.
     img_path : str | None, default=None
         Optional image-output path retained as part of the ICA step configuration.

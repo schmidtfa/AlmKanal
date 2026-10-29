@@ -21,7 +21,7 @@ class Epochs(AlmKanalStep):
 
     Parameters
     ----------
-    tmin : float, default=-0.15
+    tmin : float, default=0.
         Start of each epoch relative to the event, in seconds.
     tmax : float, default=0.5
         End of each epoch relative to the event, in seconds.

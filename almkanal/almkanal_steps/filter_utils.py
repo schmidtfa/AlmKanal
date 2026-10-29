@@ -31,10 +31,10 @@ class Filter(AlmKanalStep):
 
     Parameters
     ----------
-    highpass : float | None, default=0.1
+    highpass : float | None, default=None
         High-pass cutoff frequency, in Hz. Passed to MNE as ``l_freq``.
         ``None`` disables high-pass filtering.
-    lowpass : float | None, default=40.0
+    lowpass : float | None, default=None
         Low-pass cutoff frequency, in Hz. Passed to MNE as ``h_freq``.
         ``None`` disables low-pass filtering.
     picks : str | array-like | slice | None, default=None
