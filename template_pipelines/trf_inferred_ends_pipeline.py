@@ -1,10 +1,10 @@
 """TRF example: recorded audio with missing end triggers.
 
 make_spans uses WAV duration and an assumed drift to infer missing trial ends.
-EpochTRF then MEASURES the onset offset and drift from recorded audio and
+EpochStimuls then MEASURES the onset offset and drift from recorded audio and
 resamples the neural data. The endpoint prior does not fix the measured drift.
 
-realign_without_audio belongs only to EpochTRF and is unnecessary here.
+realign_without_audio belongs only to EpochStimuls and is unnecessary here.
 For a recording without audio channels, use trf_assumed_drift_pipeline.py.
 See trf_pipeline.py for the overview of all four examples.
 """
@@ -15,7 +15,7 @@ import joblib
 import mne
 from plus_slurm import Job
 
-from almkanal import AlmKanal, EpochTRF, TRFSpanSpec
+from almkanal import AlmKanal, EpochStimuls, StimulusSpanSpec
 
 
 class TRFInferredEndsPipe(Job):
@@ -37,8 +37,8 @@ class TRFInferredEndsPipe(Job):
         pick_dict = {'meg': True, 'eog': True, 'ecg': True, 'eeg': False, 'stim': True, 'misc': True}
         onset_trigger_to_wav = {11: 'story_a.wav', 12: 'story_b.wav'}
 
-        def make_spans(current_raw: mne.io.BaseRaw) -> TRFSpanSpec:
-            return TRFSpanSpec.from_events(
+        def make_spans(current_raw: mne.io.BaseRaw) -> StimulusSpanSpec:
+            return StimulusSpanSpec.from_events(
                 current_raw,
                 onset_trigger_to_wav=onset_trigger_to_wav,
                 # If only SOME ends are missing, set this to the actual code
@@ -53,7 +53,7 @@ class TRFInferredEndsPipe(Job):
         ak = AlmKanal(
             pick_params=pick_dict,
             steps=[
-                EpochTRF(
+                EpochStimuls(
                     gen_span_spec=make_spans,
                     base_audio_path=audio_path,
                     audio_channels=audio_channels,
@@ -73,7 +73,7 @@ class TRFInferredEndsPipe(Job):
                     on_alignment_error='raise',
                 ),
                 # Keep the recorded audio channels and their bandwidth until
-                # EpochTRF has run. Filter and downsample afterward as needed.
+                # EpochStimuls has run. Filter and downsample afterward as needed.
             ],
         )
         epochs, report = ak.run(raw)

@@ -100,7 +100,7 @@ def _infer_audio_trial_end(
     'trials',
     aliases={
         'stim_channel': ('events', 'stim_channel'),
-        'fallback_drift_us_per_s': ('trf', 'fallback_drift_us_per_s'),
+        'fallback_drift_us_per_s': ('stimuli', 'fallback_drift_us_per_s'),
     },
 )
 def find_audio_trials(  # noqa: C901, PLR0912, PLR0915
@@ -407,7 +407,7 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
         capped below each signal's Nyquist frequency.
     envelope_lowpass : float, default=30.0
         Envelope low-pass cutoff in Hz; must be below both input and sync Nyquist
-        frequencies. Independent of EpochTRF's WAV feature cutoff.
+        frequencies. Independent of EpochStimuls's WAV feature cutoff.
     window_s : float, default=10.0
         Duration in seconds of each window used to estimate a lag.
     step_s : float, default=5.0
@@ -638,7 +638,7 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
     return alignment
 
 
-@function_defaults('trf')
+@function_defaults('stimuli')
 def assume_raw_wav_alignment(
     wav_file: str | Path,
     raw_sfreq: float,
@@ -648,7 +648,7 @@ def assume_raw_wav_alignment(
     """Construct a clock correction from WAV duration and an assumed drift.
 
     Defaults below describe the general profile; omitted drift uses the active
-    TRF defaults.
+    stimulus defaults.
 
     Parameters
     ----------

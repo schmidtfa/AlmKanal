@@ -10,7 +10,7 @@ These names are exported by the inspected `almkanal` package. This catalogue is 
 | Artifact and physiological processing | `ICA`, `PhysioCleaner` | Independent-component and physiological-signal workflows |
 | Events | `Events`, `Epochs` | Trigger extraction and epoch creation |
 | Eye tracking | `VPixxCleaner` | Load, clean, and align supported VPixx recordings |
-| Audio-linked epochs | `EpochTRF`, `TRFSpanSpec` | Trial specifications, WAV features, and aligned epochs |
+| Stimulus epochs | `EpochStimuls`, `StimulusSpanSpec` | Trial specifications, WAV features, and aligned epochs |
 | Source analysis | `ForwardModel`, `SpatialFilter`, `SourceReconstruction` | Building blocks for source-space workflows |
 | Pipeline and output | `AlmKanal`, `AlmKanalStep`, `preprocessing_report` | Composition, extension, and scientific reporting |
 

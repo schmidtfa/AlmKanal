@@ -1,6 +1,6 @@
 ## Define trials and their WAV files
 
-`TRFSpanSpec` describes raw-sample trial spans and their corresponding stimuli. `EpochTRF` uses a function that creates this specification from the input recording, prepares WAV features, and returns fixed-length epochs.
+`StimulusSpanSpec` describes raw-sample trial spans and their corresponding stimuli. `EpochStimuls` uses a function that creates this specification from the input recording, prepares WAV features, and returns fixed-length epochs.
 
 The following is an acquisition-dependent example. It assumes known onset/end trigger codes and a recorded-audio channel. Replace those values with your experiment's mapping.
 
@@ -8,12 +8,12 @@ The following is an acquisition-dependent example. It assumes known onset/end tr
 from pathlib import Path
 
 import mne
-from almkanal import AlmKanal, EpochTRF, TRFSpanSpec
+from almkanal import AlmKanal, EpochStimuls, StimulusSpanSpec
 
 AUDIO_DIR = Path("stimuli")
 
 def make_spans(raw):
-    return TRFSpanSpec.from_events(
+    return StimulusSpanSpec.from_events(
         raw,
         onset_trigger_to_wav={1: "story.wav"},
         end_triggers=[2],
@@ -23,7 +23,7 @@ def make_spans(raw):
 
 raw = mne.io.read_raw_fif("your_recording_raw.fif", preload=True)
 pipeline = AlmKanal([
-    EpochTRF(
+    EpochStimuls(
         gen_span_spec=make_spans,
         base_audio_path=AUDIO_DIR,
         audio_channels=["AUDIO"],  # Your actual recorded-audio channel.
@@ -104,5 +104,30 @@ feature extraction details are described by `prepare_audio`. Features share the
 output sampling grid; only the common recording/feature duration contributes
 epochs, and incomplete trailing epochs are discarded.
 
-The standalone `build_trf_epochs` helper accepts the same `feature` and
-`resample_sfreq` parameters with an existing `TRFSpanSpec`.
+The standalone `build_stimulus_epochs` helper accepts the same `feature` and
+`resample_sfreq` parameters with an existing `StimulusSpanSpec`.
+
+## Share stimulus-processing defaults
+
+Use the `stimuli` defaults section to configure shared settings for
+`EpochStimuls`, `build_stimulus_epochs`, trial-end inference, and assumed drift:
+
+```python
+from almkanal import Defaults, set_defaults
+
+profile = Defaults.generic().with_overrides(
+    stimuli={
+        "resample_sfreq": 200.0,
+        "feature": ["envelope", "pitch_voicing"],
+        "epoch_len_s": 5.0,
+    },
+)
+set_defaults(profile)
+
+# Inspect a detached copy of the stimulus settings.
+settings = profile.stimuli
+```
+
+Explicit step or helper arguments take precedence over profile settings. Each
+step captures its profile when constructed; changing the active defaults later
+does not change an existing step's configuration.

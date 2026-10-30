@@ -2,16 +2,16 @@
 
 The same assumed rate serves two purposes:
 1. make_spans estimates each missing end from WAV duration and drift.
-2. EpochTRF resamples neural data using that drift. This is the only correction.
+2. EpochStimuls resamples neural data using that drift. This is the only correction.
 
-realign_without_audio=True belongs ONLY on EpochTRF. Pass no alignment_kwargs:
+realign_without_audio=True belongs ONLY on EpochStimuls. Pass no alignment_kwargs:
 there is no recorded-audio correlation to configure. The WAV must begin at the
 sound onset represented by the onset trigger; an initial offset cannot be
 measured. Positive drift means t_raw = (1 + drift / 1e6) * t_wav, relative to
 each trial onset. At +499 us/s, a 1000-s WAV spans 1000.499 s on the raw clock.
 
 If end triggers exist, use end_triggers=99 (your actual code). Set
-infer_missing_ends=False when all ends are present; the EpochTRF settings stay
+infer_missing_ends=False when all ends are present; the EpochStimuls settings stay
 the same. End triggers do not determine the assumed drift rate.
 See trf_pipeline.py for the overview of all four examples.
 """
@@ -22,7 +22,7 @@ import joblib
 import mne
 from plus_slurm import Job
 
-from almkanal import AlmKanal, EpochTRF, TRFSpanSpec
+from almkanal import AlmKanal, EpochStimuls, StimulusSpanSpec
 
 
 class TRFAssumedDriftPipe(Job):
@@ -43,8 +43,8 @@ class TRFAssumedDriftPipe(Job):
         pick_dict = {'meg': True, 'eog': True, 'ecg': True, 'eeg': False, 'stim': True, 'misc': False}
         onset_trigger_to_wav = {11: 'story_a.wav', 12: 'story_b.wav'}
 
-        def make_spans(current_raw: mne.io.BaseRaw) -> TRFSpanSpec:
-            return TRFSpanSpec.from_events(
+        def make_spans(current_raw: mne.io.BaseRaw) -> StimulusSpanSpec:
+            return StimulusSpanSpec.from_events(
                 current_raw,
                 onset_trigger_to_wav=onset_trigger_to_wav,
                 end_triggers=None,
@@ -58,7 +58,7 @@ class TRFAssumedDriftPipe(Job):
         ak = AlmKanal(
             pick_params=pick_dict,
             steps=[
-                EpochTRF(
+                EpochStimuls(
                     gen_span_spec=make_spans,
                     base_audio_path=audio_path,
                     audio_channels=None,

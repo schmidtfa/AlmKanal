@@ -43,7 +43,7 @@ def epochs_spec() -> StepSpec:
     )
 
 
-def _summarize_trf(infos: list[dict[str, Any]]) -> dict[str, Any]:
+def _summarize_stimuli(infos: list[dict[str, Any]]) -> dict[str, Any]:
     """Pool all successful trials, using saved moments rather than truncated lists."""
     resampling = [info['resample_info'] for info in infos if info.get('resample_info')]
     inference_counts: dict[str, int] = {}
@@ -88,7 +88,8 @@ def _summarize_trf(infos: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 @register_step('EpochTRF')
-def epochs_trf_spec() -> StepSpec:
+@register_step('EpochStimuls')
+def epochs_stimuls_spec() -> StepSpec:
     return StepSpec(
         settings_fn=keys_selector(
             'epoch_len_s',
@@ -107,5 +108,5 @@ def epochs_trf_spec() -> StepSpec:
             'preserve_annotations',
             'on_alignment_error',
         ),
-        summarize_fn=_summarize_trf,
+        summarize_fn=_summarize_stimuli,
     )

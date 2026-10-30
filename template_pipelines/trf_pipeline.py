@@ -8,7 +8,7 @@ Choose the example that matches your recording:
 
 Each file is a self-contained Job template. Adapt channel names, trigger codes,
 WAV names, and input paths to your dataset. Span generation locates trials;
-EpochTRF performs the clock correction and attaches WAV-derived features.
+EpochStimuls performs the clock correction and attaches WAV-derived features.
 """
 
 from pathlib import Path
@@ -17,7 +17,7 @@ import joblib
 import mne
 from plus_slurm import Job
 
-from almkanal import AlmKanal, EpochTRF, TRFSpanSpec
+from almkanal import AlmKanal, EpochStimuls, StimulusSpanSpec
 
 
 class TRFPipe(Job):
@@ -52,9 +52,9 @@ class TRFPipe(Job):
             12: 'story_b.wav',
         }
 
-        def make_spans(raw: mne.io.BaseRaw) -> TRFSpanSpec:
+        def make_spans(raw: mne.io.BaseRaw) -> StimulusSpanSpec:
             # Repeated presentations receive distinct trial labels.
-            return TRFSpanSpec.from_events(
+            return StimulusSpanSpec.from_events(
                 raw,
                 onset_trigger_to_wav=onset_trigger_to_wav,
                 end_triggers=99,
@@ -64,7 +64,7 @@ class TRFPipe(Job):
         ak = AlmKanal(
             pick_params=pick_dict,
             steps=[
-                EpochTRF(
+                EpochStimuls(
                     gen_span_spec=make_spans,
                     base_audio_path=audio_path,
                     # Estimate onset offset AND drift from recorded audio.
@@ -88,7 +88,7 @@ class TRFPipe(Job):
                     epoch_len_s=epoch_len_s,
                     on_alignment_error='raise',
                 ),
-                # Keep sufficient audio bandwidth until EpochTRF has run.
+                # Keep sufficient audio bandwidth until EpochStimuls has run.
                 # Use resample_sfreq above to compute features at a lower output rate.
             ],
         )

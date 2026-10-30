@@ -9,17 +9,17 @@ import pytest
 from almkanal import (
     ICA,
     Defaults,
-    EpochTRF,
+    EpochStimuls,
     Events,
     Filter,
     Maxwell,
-    TRFSpanSpec,
+    StimulusSpanSpec,
     configure,
     get_defaults,
     set_defaults,
     use_defaults,
 )
-from almkanal.almkanal_steps import trf_utils
+from almkanal.almkanal_steps import stimulus_utils
 from almkanal.stim_utils import alignment_utils
 from numpy.typing import ArrayLike
 
@@ -35,20 +35,20 @@ def test_generic_and_salzburg_profiles_have_distinct_hardware_assumptions():
     generic = get_defaults()
     assert generic.name == Defaults.generic().name
     assert ICA().train is False
-    assert generic.trf.hw_delay_s == 0.0
-    assert generic.trf.fallback_drift_us_per_s == 0.0
-    assert generic.trf.audio_channels is None
+    assert generic.stimuli.hw_delay_s == 0.0
+    assert generic.stimuli.fallback_drift_us_per_s == 0.0
+    assert generic.stimuli.audio_channels is None
 
     with use_defaults(Defaults.salzburg()):
         salzburg = get_defaults()
         assert ICA().train is True
-        assert salzburg.trf.hw_delay_s == 0.0165
-        assert salzburg.trf.fallback_drift_us_per_s == 499.0
-        assert salzburg.trf.audio_channels == ('MISC007', 'MISC008')
-        step = EpochTRF(lambda raw: TRFSpanSpec({}), '.')
+        assert salzburg.stimuli.hw_delay_s == 0.0165
+        assert salzburg.stimuli.fallback_drift_us_per_s == 499.0
+        assert salzburg.stimuli.audio_channels == ('MISC007', 'MISC008')
+        step = EpochStimuls(lambda raw: StimulusSpanSpec({}), '.')
         assert step.audio_channels == ('MISC007', 'MISC008')
-        assert EpochTRF(step.gen_span_spec, '.', audio_channels=None).audio_channels is None
-        assert EpochTRF(step.gen_span_spec, '.', audio_channels=['recorded']).audio_channels == ['recorded']
+        assert EpochStimuls(step.gen_span_spec, '.', audio_channels=None).audio_channels is None
+        assert EpochStimuls(step.gen_span_spec, '.', audio_channels=['recorded']).audio_channels == ['recorded']
         assert salzburg.vpixx.screen_distance == 0.82
         assert salzburg.vpixx.screen_size == (0.61, 0.34)
         assert salzburg.vpixx.screen_resolution == (1920, 1080)
@@ -141,7 +141,7 @@ def test_unknown_sections_and_settings_are_rejected(overrides):
     [
         {'filter': {'lowpass': 'thirty'}},
         {'ica': {'train': 'yes'}},
-        {'trf': {'fallback_drift_us_per_s': 'slow'}},
+        {'stimuli': {'fallback_drift_us_per_s': 'slow'}},
     ],
 )
 def test_obviously_invalid_setting_types_are_rejected(overrides):
@@ -153,7 +153,7 @@ def test_profile_settings_cannot_be_changed_through_mutable_aliases():
     original = Defaults.salzburg()
     filters = {'method': 'iir', 'iir_params': {'order': 4, 'ftype': 'butter'}}
     alignment = {'alignment_kwargs': {'audio_band': [80, 300]}}
-    profile = original.with_overrides(name='custom', filter=filters, trf=alignment)
+    profile = original.with_overrides(name='custom', filter=filters, stimuli=alignment)
 
     filters['iir_params']['order'] = 99
     alignment['alignment_kwargs']['audio_band'][1] = 1
@@ -165,9 +165,9 @@ def test_profile_settings_cannot_be_changed_through_mutable_aliases():
     public_parameters['order'] = 96
 
     assert profile.filter.iir_params['order'] == 4
-    assert profile.trf.alignment_kwargs['audio_band'] == [80, 300]
+    assert profile.stimuli.alignment_kwargs['audio_band'] == [80, 300]
     assert original.filter.method == 'fir'
-    assert original.trf.alignment_kwargs is None
+    assert original.stimuli.alignment_kwargs is None
     assert profile.name == 'custom'
     assert profile.version == original.version
     with pytest.raises((AttributeError, TypeError)):
@@ -217,7 +217,7 @@ def test_standalone_step_run_uses_its_captured_profile_and_records_resolved_valu
 
 @pytest.mark.parametrize('explicit_step_drift', [False, True])
 @pytest.mark.parametrize('explicit_callback_drift', [False, True])
-def test_trf_callback_and_helpers_keep_the_step_profile_after_scope_exit(
+def test_stimulus_callback_and_helpers_keep_the_step_profile_after_scope_exit(
     monkeypatch,
     tmp_path,
     explicit_step_drift,
@@ -226,7 +226,7 @@ def test_trf_callback_and_helpers_keep_the_step_profile_after_scope_exit(
     profile = Defaults.generic().with_overrides(
         name='recording_setup',
         events={'stim_channel': 'TRIGGER'},
-        trf={'fallback_drift_us_per_s': 125.0, 'hw_delay_s': 0.012},
+        stimuli={'fallback_drift_us_per_s': 125.0, 'hw_delay_s': 0.012},
     )
     observed = {}
     raw = SimpleNamespace(info={'sfreq': 1000.0}, ch_names=['MEG'])
@@ -242,18 +242,18 @@ def test_trf_callback_and_helpers_keep_the_step_profile_after_scope_exit(
     def span_callback(data):
         observed['callback_profile'] = get_defaults()
         kwargs = {'fallback_drift_us_per_s': 0.0} if explicit_callback_drift else {}
-        return TRFSpanSpec.from_events(data, {1: 'sound.wav'}, 2, **kwargs)
+        return StimulusSpanSpec.from_events(data, {1: 'sound.wav'}, 2, **kwargs)
 
     def build_epochs(**kwargs):
         observed['build_profile'] = get_defaults()
         observed['build_kwargs'] = kwargs
         return epochs, {}
 
-    monkeypatch.setattr(trf_utils, 'find_audio_trials', find_trials)
-    monkeypatch.setattr(trf_utils, '_build_trf_epochs', build_epochs)
+    monkeypatch.setattr(stimulus_utils, 'find_audio_trials', find_trials)
+    monkeypatch.setattr(stimulus_utils, '_build_stimulus_epochs', build_epochs)
     with use_defaults(profile):
         kwargs = {'fallback_drift_us_per_s': 75.0} if explicit_step_drift else {}
-        step = EpochTRF(span_callback, tmp_path, **kwargs)
+        step = EpochStimuls(span_callback, tmp_path, **kwargs)
 
     active = get_defaults()
     result = step.run(raw, {})
@@ -262,7 +262,7 @@ def test_trf_callback_and_helpers_keep_the_step_profile_after_scope_exit(
     callback_drift = 0.0 if explicit_callback_drift else step_drift
     assert result['data'] is epochs
     assert observed['callback_profile'].name == profile.name
-    assert observed['callback_profile'].trf.fallback_drift_us_per_s == step_drift
+    assert observed['callback_profile'].stimuli.fallback_drift_us_per_s == step_drift
     assert observed['trial_profile'] is observed['callback_profile']
     if not explicit_step_drift:
         assert observed['callback_profile'] is profile
@@ -294,7 +294,7 @@ def test_standalone_alignment_resolves_current_defaults_and_preserves_zero(monke
     wav_file = tmp_path / 'sound.wav'
     wav_file.touch()
     monkeypatch.setattr(alignment_utils.librosa, 'get_duration', lambda **kwargs: 2.0)
-    profile = Defaults.generic().with_overrides(trf={'fallback_drift_us_per_s': 125.0})
+    profile = Defaults.generic().with_overrides(stimuli={'fallback_drift_us_per_s': 125.0})
 
     with use_defaults(profile):
         inferred = alignment_utils.assume_raw_wav_alignment(wav_file, 1000.0)
@@ -336,7 +336,7 @@ def test_set_defaults_combines_named_profile_and_user_settings():
     assert Filter().lowpass == 80.0
     assert ICA().train is False
     assert ICA().resample_freq is None
-    assert profile.trf.hw_delay_s == 0.0165
+    assert profile.stimuli.hw_delay_s == 0.0165
     assert Filter(lowpass=None).lowpass is None
 
 
@@ -471,3 +471,57 @@ def test_profiles_include_new_main_parameters():
         assert EEGRANSAC().random_state == 12
         assert ForwardModel('subject', '.').redo_bem is True
         assert Resample(100).window == ('kaiser', 5.0)
+
+
+@pytest.mark.parametrize('section', ['stimuli', 'trf'])
+def test_stimulus_defaults_aliases_normalize_exports_and_copy_settings(section):
+    original = Defaults.salzburg()
+    profile = original.with_overrides(**{section: {
+        'feature': ['envelope', 'rectify'], 'alignment_kwargs': {'max_lag_s': 0.5}, 'resample_sfreq': 125,
+    }})
+    assert profile.stimuli == profile.trf
+    assert profile.section('stimuli') == profile.section('trf')
+    assert profile.to_dict()['stimuli']['resample_sfreq'] == 125
+    assert 'trf' not in profile.to_dict()
+    assert original.stimuli.resample_sfreq is None
+    legacy_copy = profile.trf
+    legacy_copy.feature.append('flux')
+    legacy_copy.alignment_kwargs['max_lag_s'] = 10
+    assert profile.stimuli.feature == ['envelope', 'rectify']
+    assert profile.stimuli.alignment_kwargs['max_lag_s'] == 0.5
+    with use_defaults(profile):
+        step = EpochStimuls(dict, '.')
+    assert step.resample_sfreq == 125
+    assert step.feature == ['envelope', 'rectify']
+    assert pickle.loads(pickle.dumps(profile)).to_dict() == profile.to_dict()
+
+
+def test_conflicting_stimulus_defaults_aliases_are_rejected_without_changing_context():
+    profile = get_defaults()
+    overrides = {'stimuli': {'resample_sfreq': 125}, 'trf': {'resample_sfreq': 250}}
+    with pytest.raises(ValueError, match='not both'):
+        profile.with_overrides(**overrides)
+    with pytest.raises(ValueError, match='not both'):
+        set_defaults(**overrides)
+    with pytest.raises(ValueError, match='not both'):
+        with use_defaults(**overrides):
+            pytest.fail('Conflicting aliases must be rejected before activating a profile.')
+    assert get_defaults() is profile
+
+
+@pytest.mark.parametrize('section', ['stimuli', 'trf'])
+def test_shortcuts_and_function_defaults_resolve_stimulus_aliases(section):
+    from inspect import signature
+    from almkanal.defaults import function_defaults
+
+    @function_defaults(section)
+    def configured(hw_delay_s=0):
+        return hw_delay_s
+
+    assert str(signature(configured)) == '(hw_delay_s=DEFAULT(stimuli.hw_delay_s))'
+    selected = set_defaults('salzburg', **{section: {'hw_delay_s': 0.012}})
+    assert selected.stimuli.hw_delay_s == configured() == 0.012
+    assert configured(0) == 0
+    with use_defaults('generic', **{section: {'hw_delay_s': 0.01}}):
+        assert configured() == 0.01
+    assert configured() == 0.012
