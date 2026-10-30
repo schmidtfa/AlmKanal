@@ -541,7 +541,8 @@ Used by `EpochTRF`, TRF epoch helpers, and fallback drift in trial helpers.
 
 | Option | Type | General default |
 | --- | --- | --- |
-| `feature` | <code>str</code> | `'envelope'` |
+| `feature` | <code>str &#124; Sequence[str]</code> | `'envelope'` |
+| `resample_sfreq` | <code>float &#124; None</code> | `None` |
 | `audio_cutoff_hz` | <code>float</code> | `80.0` |
 | `hw_delay_s` | <code>float</code> | `0.0` |
 | `epoch_len_s` | <code>float</code> | `5.0` |
@@ -641,7 +642,8 @@ Used by `prepare_audio`.
 
 | Option | Type | General default |
 | --- | --- | --- |
-| `feature` | <code>str</code> | `'envelope'` |
+| `feature` | <code>str &#124; Sequence[str]</code> | `'envelope'` |
+| `resample_sfreq` | <code>float &#124; None</code> | `None` |
 | `target_fs` | <code>float</code> | `100.0` |
 | `cutoff_hz` | <code>float</code> | `80.0` |
 | `n_mels` | <code>int</code> | `32` |

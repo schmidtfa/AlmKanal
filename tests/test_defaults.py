@@ -229,8 +229,8 @@ def test_trf_callback_and_helpers_keep_the_step_profile_after_scope_exit(
         trf={'fallback_drift_us_per_s': 125.0, 'hw_delay_s': 0.012},
     )
     observed = {}
-    raw = SimpleNamespace(info={'sfreq': 1000.0})
-    epochs = object()
+    raw = SimpleNamespace(info={'sfreq': 1000.0}, ch_names=['MEG'])
+    epochs = SimpleNamespace(info={'sfreq': 1000.0}, ch_names=['MEG', 'envelope'])
 
     def find_trials(data, onset_trigger_to_wav, end_triggers=None, **kwargs):
         observed['trial_profile'] = get_defaults()

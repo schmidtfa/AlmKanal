@@ -27,7 +27,8 @@ pipeline = AlmKanal([
         gen_span_spec=make_spans,
         base_audio_path=AUDIO_DIR,
         audio_channels=["AUDIO"],  # Your actual recorded-audio channel.
-        feature="envelope",
+        feature=["envelope", "pitch_voicing"],
+        resample_sfreq=200.0,
         epoch_len_s=5.0,
         hw_delay_s=0.0,  # Only when the reference represents sound at the ears.
         on_alignment_error="raise",
@@ -63,3 +64,45 @@ Review the QC output and recorded metadata for offset, drift, residual error, co
 Quality warnings can be emitted even when an alignment is applied. `on_alignment_error="raise"` stops actual failures; it is not an automatic rejection rule for every questionable fit. Use study-specific acceptance criteria and keep them with the analysis.
 
 Preserve trigger and recorded-audio channels until they have been used, and avoid preprocessing away the bandwidth needed for alignment.
+
+## Choose the sampling frequency and audio features
+
+`resample_sfreq` sets the output sampling frequency in Hz. With `None`, the
+input sampling frequency is retained. Trial spans and trigger samples always
+refer to the original recording. Alignment and the sample-rounded physical-delay
+correction run at that original rate. Each continuous trial segment is then
+resampled before audio features are computed at the output rate and appended.
+This preserves the available recorded-audio bandwidth for alignment and avoids
+resampling already appended features. An earlier resampling step reduces the
+bandwidth available to alignment.
+
+Segment resampling uses MNE's FFT method with a boxcar frequency-domain window,
+automatic padding, and `reflect_limited` edge padding. MNE applies anti-aliasing
+internally. Annotations are preserved when `preserve_annotations=True`; epochs
+overlapping bad annotations are rejected. Reports record the original and output
+sampling frequencies, resampling method, and processing order.
+
+`feature` accepts either one feature name or a nonempty sequence of distinct
+feature names. Channels are appended in the requested feature order as `misc`
+channels. Single-channel features use the requested feature name. Multichannel
+features use that name followed by component or band identifiers:
+
+| Feature | Appended channels |
+| --- | --- |
+| `envelope` | `envelope` (RMS amplitude) |
+| `rectify` | `rectify_pos_rect`, `rectify_neg_rect` |
+| `mel` | `mel_1_<frequency>Hz`, … |
+| `flux` | `flux` (onset strength) |
+| `mel_onsets` | `mel_onsets_1_<frequency>Hz`, … |
+| `pitch` | `pitch` (fundamental frequency in Hz) |
+| `pitch_voicing` | `pitch_voicing_log2_f0_centered`, `pitch_voicing_voicing` |
+
+Mel band indices start at one and frequency labels are rounded band centers.
+Feature names must not repeat, and appended channel names must not overlap
+recording channels. `audio_cutoff_hz` controls the feature low-pass filter;
+feature extraction details are described by `prepare_audio`. Features share the
+output sampling grid; only the common recording/feature duration contributes
+epochs, and incomplete trailing epochs are discarded.
+
+The standalone `build_trf_epochs` helper accepts the same `feature` and
+`resample_sfreq` parameters with an existing `TRFSpanSpec`.

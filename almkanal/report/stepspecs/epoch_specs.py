@@ -45,11 +45,14 @@ def epochs_spec() -> StepSpec:
 
 def _summarize_trf(infos: list[dict[str, Any]]) -> dict[str, Any]:
     """Pool all successful trials, using saved moments rather than truncated lists."""
+    resampling = [info['resample_info'] for info in infos if info.get('resample_info')]
     inference_counts: dict[str, int] = {}
     for info in infos:
         for rate, count in info.get('alignment_info', {}).get('end_inference_drift_counts', {}).items():
             inference_counts[rate] = inference_counts.get(rate, 0) + count
     results: dict[str, Any] = {
+        'resampling_original_sfreqs': sorted({item['original_sfreq'] for item in resampling}),
+        'n_recordings_resampled': len(resampling),
         'n_trials_end_inferred': sum(inference_counts.values()),
         'end_inference_drift_counts': dict(sorted(inference_counts.items(), key=lambda item: float(item[0]))),
     }
@@ -90,6 +93,8 @@ def epochs_trf_spec() -> StepSpec:
         settings_fn=keys_selector(
             'epoch_len_s',
             'feature',
+            'feature_channels',
+            'resample_sfreq',
             'audio_cutoff_hz',
             'hw_delay_s',
             'applied_hw_delay_s',

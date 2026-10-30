@@ -78,7 +78,7 @@ def test_assumed_drift_resamples_meg_before_delay(no_audio_trial, rate, delay):
     peak = np.argmax(epochs.get_data(picks=['MEG 002']).ravel())
     assert peak == pytest.approx(round((18.5 - applied_delay) * 1000), abs=1)
     feature = prepare_audio(str(wav), target_fs=1000)[0][0, :20000]
-    np.testing.assert_array_equal(epochs.get_data(picks=['env_rms']).ravel(), feature)
+    np.testing.assert_array_equal(epochs.get_data(picks=['envelope']).ravel(), feature)
     np.testing.assert_array_equal(raw.get_data(), original)
     slope = 1 + rate / 1e6
     np.testing.assert_allclose(epochs.metadata['t_on'], 0.5 + slope * (np.arange(20) + applied_delay))

@@ -67,7 +67,7 @@ class TRFAssumedDriftPipe(Job):
                     # argument once to override both defaults, e.g. to 500.0.
                     fallback_drift_us_per_s=fallback_drift_us_per_s,
                     # Omit alignment_kwargs entirely in this mode.
-                    feature=feature,  # Use 'envelope' or 'flux', not 'env_rms'.
+                    feature=feature,  # Feature names also identify the appended channels.
                     # Advance neural data by the playback-to-ear delay AFTER
                     # drift correction; the WAV feature channels stay unchanged.
                     # Use 0 if the reference already represents ear arrival.

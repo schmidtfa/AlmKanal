@@ -200,7 +200,7 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         assert '#### Realignment' not in methods
         assert 'Trial endpoints' not in methods
         assert 'physical-delay correction' not in methods
-        assert 'WAV-derived' not in methods
+        assert 'WAV-derived features (envelope)' in methods
         assert 'Data were epoched in 1.0s long epochs.' in ica_section
         assert resample_sentence in ica_section
     else:
@@ -221,3 +221,51 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
             assert 'zero offset' in realignment
             assert 'normalized cross-correlation' not in methods
             assert 'mean ± population SD' not in methods
+
+
+@pytest.mark.parametrize('realign', [False, True])
+def test_resampling_and_multiple_features_methods_report(tmp_path, realign):
+    infos = []
+    for rate in (500.0, 1000.0):
+        info = make_info([1.0])
+        info.update({
+            'realign_audio': realign,
+            'feature': ['envelope', 'rectify'],
+            'feature_channels': ['envelope', 'rectify_pos_rect', 'rectify_neg_rect'],
+            'resample_sfreq': 125.0,
+            'original_sfreq': rate,
+            'sfreq': 125.0,
+            'resample_info': {
+                'sfreq': 125.0, 'original_sfreq': rate, 'applied_to': 'continuous trial segments',
+                'method': 'fft', 'window': 'boxcar', 'npad': 'auto', 'pad': 'reflect_limited',
+            },
+        })
+        infos.append(write_pipeline_json(tmp_path / f'{rate}.json', info))
+    context = build_context_from_files(infos)
+    assert context.steps[0].results['resampling_original_sfreqs'] == [500, 1000]
+    text = preprocessing_report(infos, tmp_path / 'methods.md').read_text()
+    assert 'from 500.0, 1000.0 Hz to 125.0 Hz' in text
+    assert 'FFT-based resampling with a boxcar frequency-domain window' in text
+    assert 'preceded audio-feature extraction and appending' in text
+    assert 'WAV-derived features (envelope, rectify)' in text
+    assert 'rectify_pos_rect' in text
+
+
+def test_report_rejects_different_resampling_targets(tmp_path):
+    first = make_info([1.0])
+    first['resample_sfreq'] = 125
+    second = deepcopy(first)
+    second['resample_sfreq'] = 200
+    files = [write_pipeline_json(tmp_path / 'a.json', first), write_pipeline_json(tmp_path / 'b.json', second)]
+    with pytest.raises(ValueError, match='Settings mismatch'):
+        build_context_from_files(files)
+
+
+
+def test_many_feature_channels_report_after_json_truncation(tmp_path):
+    info = make_info([1.0])
+    info.update(feature=['mel', 'mel_onsets'], feature_channels=[f'band_{i}' for i in range(64)])
+    path = write_pipeline_json(tmp_path / 'mel.json', info)
+    text = preprocessing_report([path], tmp_path / 'methods.md').read_text()
+    assert '64 audio feature channels were appended.' in text
+    assert 'Feature channels: length' not in text

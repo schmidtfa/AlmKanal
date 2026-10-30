@@ -181,7 +181,8 @@ class SourceReconstructionDefaults:
 
 @frozen
 class EpochTRFDefaults:
-    feature: str = 'envelope'
+    feature: str | Sequence[str] = 'envelope'
+    resample_sfreq: float | None = None
     audio_cutoff_hz: float = 80.0
     hw_delay_s: float = 0.0
     epoch_len_s: float = 5.0

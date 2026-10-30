@@ -66,7 +66,7 @@ class TRFInferredEndsPipe(Job):
                         'min_corr': 0.3,
                         'max_lag_s': 1.0,
                     },
-                    feature=feature,  # Use 'envelope' or 'flux', not 'env_rms'.
+                    feature=feature,  # Feature names also identify the appended channels.
                     # Applied to neural data after measured clock correction.
                     hw_delay_s=hw_delay_s,
                     epoch_len_s=epoch_len_s,

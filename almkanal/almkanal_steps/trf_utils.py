@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import attrs
+import librosa
 import mne
 import numpy as np
 import pandas as pd
@@ -238,7 +239,8 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     spec: TRFSpanSpec,
     base_audio_path: str | Path,
     *,
-    feature: str = 'envelope',
+    feature: str | Sequence[str] = 'envelope',
+    resample_sfreq: float | None = None,
     audio_cutoff_hz: float = 80.0,
     hw_delay_s: float = 0.0,
     epoch_len_s: float = 5.0,
@@ -253,6 +255,14 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
 ) -> tuple[mne.Epochs, dict[str, Any]]:
     if not isinstance(raw, mne.io.BaseRaw):
         raise TypeError('EpochTRF requires continuous mne.io.BaseRaw input.')
+    features = [feature] if isinstance(feature, str) else list(feature)
+    supported = {'envelope', 'rectify', 'mel', 'flux', 'mel_onsets', 'pitch', 'pitch_voicing'}
+    if not features or any(not isinstance(name, str) or name not in supported for name in features):
+        raise ValueError('feature must contain one or more supported audio feature names.')
+    if len(set(features)) != len(features):
+        raise ValueError('feature must not contain repeated features.')
+    if resample_sfreq is not None and (not np.isfinite(resample_sfreq) or resample_sfreq <= 0):
+        raise ValueError('resample_sfreq must be finite and positive, or None.')
     if not np.isfinite(hw_delay_s) or not np.isfinite(epoch_len_s) or epoch_len_s <= 0:
         raise ValueError('hw_delay_s must be finite and epoch_len_s must be finite and positive.')
     if audio_channels is not None and (isinstance(audio_channels, str) or not audio_channels):
@@ -273,6 +283,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
             stacklevel=3,
         )
     sfreq = float(raw.info['sfreq'])
+    output_sfreq = sfreq if resample_sfreq is None else float(resample_sfreq)
     first = int(raw.first_samp)
     delay_samples = int(round(hw_delay_s * sfreq))
     applied_delay_s = delay_samples / sfreq
@@ -328,45 +339,63 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
             record['n_epochs'] = 0
             trial_records.append(record)
 
-        audio_data, _t, audio_names, fs_aud = prepare_audio(
-            audio_path=str(wav),
-            feature=feature,
-            target_fs=sfreq,
-            cutoff_hz=audio_cutoff_hz,
-        )
+        audio_start_s = 0.0
         if alignment is not None:
-            desired_n = min(audio_data.shape[1], seg.n_times)
             slope = alignment['clock_slope']
             t_seg_on = (int(on_samp) - first) / sfreq + alignment['offset_s'] + slope * applied_delay_s
         else:
             if int(on_samp) < first:
                 continue
-            n_audio = audio_data.shape[1]
+            n_audio = int(round(librosa.get_duration(path=str(wav)) * sfreq))
             if off_samp is not None:
                 n_audio = min(n_audio, int(off_samp) - int(on_samp))
             start = int(on_samp) - first + delay_samples
-            # If the physical correction extends beyond the recording, retain
-            # only the matching audio/recording overlap.
             audio_start = max(0, -start)
             desired_n = min(n_audio - audio_start, raw.n_times - max(0, start))
             if desired_n <= 0:
                 continue
             start = max(0, start)
-            audio_data = audio_data[:, audio_start : audio_start + desired_n]
+            audio_start_s = audio_start / sfreq
             seg = raw.copy().crop(tmin=start / sfreq, tmax=(start + desired_n - 1) / sfreq)
             if not preserve_annotations:
                 seg.set_annotations(mne.Annotations([], [], []))
             t_seg_on = start / sfreq
             slope = 1.0
 
-        n_epoch_samples = int(round(epoch_len_s * sfreq))
+        # Align and apply physical delays on the original grid, then resample
+        # only recording channels before extracting features on the output grid.
+        if resample_sfreq is not None and output_sfreq != sfreq:
+            seg.load_data().resample(
+                output_sfreq, method='fft', window='boxcar', npad='auto', pad='reflect_limited', verbose=verbose
+            )
+        feature_arrays = []
+        audio_names = []
+        for name in features:
+            values, _, names, _ = prepare_audio(
+                audio_path=str(wav), feature=name, target_fs=output_sfreq, cutoff_hz=audio_cutoff_hz
+            )
+            if len(names) == 1:
+                names = [name]
+            elif name in {'mel', 'mel_onsets'}:
+                names = [f'{name}_{i + 1}_{channel.removeprefix("mel_")}' for i, channel in enumerate(names)]
+            else:
+                names = [f'{name}_{channel}' for channel in names]
+            audio_names.extend(names)
+            audio_start_out = int(round(audio_start_s * output_sfreq))
+            feature_arrays.append(values[:, audio_start_out:])
+        if len(set(audio_names)) != len(audio_names) or set(audio_names).intersection(seg.ch_names):
+            raise ValueError('Audio feature channel names must be unique and must not overlap recording channel names.')
+        desired_n = min(seg.n_times, *(values.shape[1] for values in feature_arrays))
+        audio_data = np.concatenate([values[:, :desired_n] for values in feature_arrays], axis=0)
+
+        n_epoch_samples = int(round(epoch_len_s * output_sfreq))
         if n_epoch_samples < 1:
             raise ValueError('epoch_len_s must span at least one sample.')
         if desired_n < n_epoch_samples:
             continue
         audio_data = audio_data[:, :desired_n]
-        seg.crop(tmin=0, tmax=(desired_n - 1) / sfreq).load_data()
-        info_aud = mne.create_info(audio_names, float(fs_aud), ['misc'] * len(audio_names))
+        seg.crop(tmin=0, tmax=(desired_n - 1) / output_sfreq).load_data()
+        info_aud = mne.create_info(audio_names, output_sfreq, ['misc'] * len(audio_names))
         seg.add_channels([mne.io.RawArray(audio_data, info_aud, verbose=verbose)], force_update_info=True)
 
         label_code = len(label_to_code) + 1
@@ -384,13 +413,13 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
         label_to_code[label] = label_code
         # Derive times from the retained events; annotation rejection may leave
         # gaps, so arange(len(ep)) would mislabel later epochs.
-        local_on_s = (ep.events[:, 0] - seg.first_samp) / sfreq
+        local_on_s = (ep.events[:, 0] - seg.first_samp) / output_sfreq
         meta = {
             'label': [label] * len(ep),
             'segment_on_s': [t_seg_on] * len(ep),
-            'segment_off_s': [t_seg_on + slope * (desired_n - 1) / sfreq] * len(ep),
+            'segment_off_s': [t_seg_on + slope * (desired_n - 1) / output_sfreq] * len(ep),
             't_on': t_seg_on + slope * local_on_s,
-            't_off': t_seg_on + slope * np.minimum(local_on_s + epoch_len_s, (desired_n - 1) / sfreq),
+            't_off': t_seg_on + slope * np.minimum(local_on_s + epoch_len_s, (desired_n - 1) / output_sfreq),
             'epoch_index_in_segment': ep.selection,
         }
         if alignment is not None:
@@ -441,7 +470,8 @@ def build_trf_epochs(
     spec: TRFSpanSpec,
     base_audio_path: str | Path,
     *,
-    feature: str = 'envelope',
+    feature: str | Sequence[str] = 'envelope',
+    resample_sfreq: float | None = None,
     audio_cutoff_hz: float = 80.0,
     hw_delay_s: float = 0.0,
     epoch_len_s: float = 5.0,
@@ -467,8 +497,18 @@ def build_trf_epochs(
         Trial spans, WAV paths, and optional per-trial metadata.
     base_audio_path : str | pathlib.Path
         Directory used to resolve relative WAV paths in ``spec``.
-    feature : str, default='envelope'
-        WAV feature: ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
+    resample_sfreq : float | None, default=None
+        Output sampling frequency in Hz. Resample continuous trial segments after
+        alignment and physical-delay correction, before extracting and appending
+        features. None retains the input rate. Uses FFT resampling with a boxcar
+        window, automatic padding, and reflect_limited edge padding; MNE applies
+        anti-aliasing internally. Trial spans always refer to input samples.
+    feature : str | sequence of str, default='envelope'
+        One or more distinct WAV features, appended in the requested order.
+        Single-channel features use the requested name; multichannel features
+        use that name as a prefix followed by component or band identifiers.
+        Names must not overlap existing recording channels. Available features:
+        ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
         ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See ``prepare_audio``.
     audio_cutoff_hz : float, default=80.0
         Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.
@@ -529,6 +569,7 @@ def build_trf_epochs(
         spec,
         base_audio_path,
         feature=feature,
+        resample_sfreq=resample_sfreq,
         audio_cutoff_hz=audio_cutoff_hz,
         hw_delay_s=hw_delay_s,
         epoch_len_s=epoch_len_s,
@@ -560,8 +601,18 @@ class EpochTRF(AlmKanalStep):
         WAV paths, and optional metadata for the input recording.
     base_audio_path : str | pathlib.Path
         Directory used to resolve relative WAV paths in the generated span spec.
-    feature : str, default='envelope'
-        WAV feature: ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
+    resample_sfreq : float | None, default=None
+        Output sampling frequency in Hz. Resample continuous trial segments after
+        alignment and physical-delay correction, before extracting and appending
+        features. None retains the input rate. Uses FFT resampling with a boxcar
+        window, automatic padding, and reflect_limited edge padding; MNE applies
+        anti-aliasing internally. Trial spans always refer to input samples.
+    feature : str | sequence of str, default='envelope'
+        One or more distinct WAV features, appended in the requested order.
+        Single-channel features use the requested name; multichannel features
+        use that name as a prefix followed by component or band identifiers.
+        Names must not overlap existing recording channels. Available features:
+        ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
         ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See ``prepare_audio``.
     audio_cutoff_hz : float, default=80.0
         Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.
@@ -626,7 +677,8 @@ class EpochTRF(AlmKanalStep):
 
     gen_span_spec: Callable
     base_audio_path: str | Path
-    feature: str = default_field('trf', 'feature')
+    feature: str | Sequence[str] = default_field('trf', 'feature')
+    resample_sfreq: float | None = default_field('trf', 'resample_sfreq', kw_only=True)
     audio_cutoff_hz: float = default_field('trf', 'audio_cutoff_hz')
     hw_delay_s: float = default_field('trf', 'hw_delay_s')
     epoch_len_s: float = default_field('trf', 'epoch_len_s')
@@ -672,6 +724,7 @@ class EpochTRF(AlmKanalStep):
             spec=spec,
             base_audio_path=self.base_audio_path,
             feature=self.feature,
+            resample_sfreq=self.resample_sfreq,
             audio_cutoff_hz=self.audio_cutoff_hz,
             hw_delay_s=self.hw_delay_s,
             epoch_len_s=self.epoch_len_s,
@@ -693,7 +746,22 @@ class EpochTRF(AlmKanalStep):
             'TRF_info': {
                 'spans_by_label': spec.spans_by_label,
                 'wav_by_label': {label: str(path) for label, path in spec.wav_by_label.items()},
-                'feature': self.feature,
+                'feature': [self.feature] if isinstance(self.feature, str) else list(self.feature),
+                'feature_channels': epochs.ch_names[len(data.ch_names) :],
+                'resample_sfreq': self.resample_sfreq,
+                'original_sfreq': sfreq,
+                'sfreq': float(epochs.info['sfreq']),
+                'resample_info': None
+                if self.resample_sfreq is None or self.resample_sfreq == sfreq
+                else {
+                    'sfreq': float(epochs.info['sfreq']),
+                    'original_sfreq': sfreq,
+                    'applied_to': 'continuous trial segments',
+                    'method': 'fft',
+                    'window': 'boxcar',
+                    'npad': 'auto',
+                    'pad': 'reflect_limited',
+                },
                 'audio_cutoff_hz': self.audio_cutoff_hz,
                 'hw_delay_s': self.hw_delay_s,
                 'applied_hw_delay_s': round(self.hw_delay_s * sfreq) / sfreq,
@@ -730,6 +798,21 @@ class EpochTRF(AlmKanalStep):
         """
         report.add_epochs(data, title='Epoched (TRF)')
         trf_info = info.get_step_info('EpochTRF', required=True)['TRF_info']
+        if trf_info.get('feature_channels'):
+            report.add_html(
+                pd.DataFrame({'Feature channel': trf_info['feature_channels']}).to_html(index=False, escape=True),
+                title='TRF audio features',
+            )
+        resampling = trf_info.get('resample_info')
+        if resampling:
+            report.add_html(
+                f'<p>Continuous trial segments were resampled from {resampling["original_sfreq"]:g} Hz '
+                f'to {resampling["sfreq"]:g} Hz using FFT-based resampling with a boxcar '
+                'frequency-domain window, automatic padding, and reflect_limited edge padding. '
+                'Resampling followed any alignment and physical-delay correction and preceded '
+                'audio-feature extraction and appending.</p>',
+                title='TRF resampling',
+            )
         if trf_info['realign_audio']:
             alignment = trf_info['alignment_info']
             columns = {

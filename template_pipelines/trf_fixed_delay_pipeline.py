@@ -56,7 +56,7 @@ class TRFFixedDelayPipe(Job):
                     audio_channels=None,
                     realign_without_audio=False,
                     # Omit alignment_kwargs; no recorded audio is used.
-                    feature=feature,  # Use 'envelope' or 'flux', not 'env_rms'.
+                    feature=feature,  # Feature names also identify the appended channels.
                     # Positive values advance neural data relative to the WAV
                     # features to compensate the 16.5 ms playback-to-ear delay.
                     hw_delay_s=hw_delay_s,

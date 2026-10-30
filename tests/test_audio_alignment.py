@@ -178,7 +178,7 @@ def test_epoch_trf_realigns_audio_and_records_diagnostics(
 
     assert len(epochs) == 8
     assert epochs.get_data().shape[-1] == 500
-    assert 'env_rms' in epochs.ch_names
+    assert 'envelope' in epochs.ch_names
     assert alignment['n_trials_aligned'] == 1
     assert alignment['n_trials_failed'] == 0
     assert alignment['n_trials_end_inferred'] == int(missing_end)

@@ -32,7 +32,8 @@ class TRFPipe(Job):
         hw_delay_s: float = 0.0165,
         epoch_len_s: float = 5.0,
         audio_channels: tuple[str, ...] = ('AUDIO001',),
-        feature: str = 'envelope',
+        feature: str | list[str] = 'envelope',
+        resample_sfreq: float | None = None,
     ) -> None:
         full_path = Path(data_path) / f'{subject_id}_raw.fif'
         raw = mne.io.read_raw(full_path, preload=True)
@@ -76,8 +77,10 @@ class TRFPipe(Job):
                         # At +499 us/s, 20 minutes adds about 0.6 s of lag.
                         'max_lag_s': 1.0,
                     },
-                    # 'envelope' produces 'env_rms'; 'flux' produces 'flux'.
+                    # Single-channel features use the requested feature name.
                     feature=feature,
+                    # Align at the input rate, then resample before extracting features.
+                    resample_sfreq=resample_sfreq,
                     # Realign first, then apply the physical delay. The default
                     # +0.0165 advances MEG to compensate the 16.5 ms air-tube
                     # delay; the subsequently added WAV feature is not shifted.
@@ -86,7 +89,7 @@ class TRFPipe(Job):
                     on_alignment_error='raise',
                 ),
                 # Keep sufficient audio bandwidth until EpochTRF has run.
-                # Add filtering and downsampling afterward as needed.
+                # Use resample_sfreq above to compute features at a lower output rate.
             ],
         )
         epochs, report = ak.run(raw)
