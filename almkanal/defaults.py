@@ -26,6 +26,11 @@ P = ParamSpec('P')
 R = TypeVar('R')
 
 
+def _canonical_section(name: str) -> str:
+    """Resolve the historical stimulus-defaults section name."""
+    return 'stimuli' if name == 'trf' else name
+
+
 def _matches_type(value: Any, annotation: Any) -> bool:  # noqa: C901, PLR0911
     """Validate profile types without imposing scientific parameter ranges."""
     if annotation is Any:
@@ -55,7 +60,7 @@ def _matches_type(value: Any, annotation: Any) -> bool:  # noqa: C901, PLR0911
     return isinstance(value, annotation)
 
 
-@frozen
+@frozen(getstate_setstate=False)
 class Defaults:
     """A named defaults profile. ``Defaults()`` is the general profile.
 
@@ -78,6 +83,22 @@ class Defaults:
         if not isinstance(self.version, str) or not self.version.strip():
             raise ValueError('Profile version must be a non-empty string.')
 
+    def __getstate__(self) -> dict[str, Any]:
+        return {attribute.name: getattr(self, attribute.name) for attribute in fields(type(self))}
+
+    def __setstate__(self, state: dict[str, Any] | tuple[Any, ...]) -> None:
+        """Load saved profiles, migrating the historical trf section."""
+        if isinstance(state, tuple):
+            state = dict(zip((attribute.name for attribute in fields(type(self))), state, strict=False))
+        for attribute in fields(type(self)):
+            if attribute.name in state:
+                value = state[attribute.name]
+                if attribute.name == '_sections':
+                    value = dict(value)
+                    if 'trf' in value:
+                        value.setdefault('stimuli', value.pop('trf'))
+                object.__setattr__(self, attribute.name, value)
+
     @classmethod
     def generic(cls) -> Defaults:
         """General defaults: no train removal, assumed audio delay, or drift."""
@@ -89,7 +110,7 @@ class Defaults:
         return cls().with_overrides(
             name='salzburg',
             ica={'train': True},
-            trf={
+            stimuli={
                 'hw_delay_s': 0.0165,
                 'fallback_drift_us_per_s': 499.0,
                 'audio_channels': ('MISC007', 'MISC008'),
@@ -110,23 +131,24 @@ class Defaults:
         """Salzburg defaults for TRF Analysis."""
         return cls.salzburg().with_overrides(
             name='salzburg_trf',
-            filter={'highpass': 0.5,
-                    'lowpass': 40},
+            filter={'highpass': 0.5, 'lowpass': 40},
         )
 
     @classmethod
     def salzburg_rest(cls) -> Defaults:
         """Salzburg defaults for Resting State Analysis."""
         return cls.salzburg().with_overrides(
-            name='salzburg_trf',
-            filter={'highpass': 0.1,
-                    'lowpass': None},
+            name='salzburg_rest',
+            filter={'highpass': 0.1, 'lowpass': None},
         )
 
     def with_overrides(
         self, *, name: str | None = None, version: str | None = None, **sections: Mapping[str, Any]
     ) -> Defaults:
         """Return an independent profile with selected parameters replaced."""
+        if 'trf' in sections and 'stimuli' in sections:
+            raise ValueError('Use either stimuli or its legacy alias trf in one call, not both.')
+        sections = {_canonical_section(section): changes for section, changes in sections.items()}
         unknown = sections.keys() - self._sections.keys()
         if unknown:
             raise ValueError(f'Unknown defaults sections: {sorted(unknown)}')
@@ -151,6 +173,7 @@ class Defaults:
 
     def section(self, name: str) -> dict[str, Any]:
         """Return a detached dictionary of one section's effective defaults."""
+        name = _canonical_section(name)
         if name not in self._sections:
             raise ValueError(f'Unknown defaults section: {name}')
         return deepcopy(asdict(self._sections[name], recurse=False))
@@ -160,7 +183,7 @@ class Defaults:
         return {'name': self.name, 'version': self.version, **{key: self.section(key) for key in self._sections}}
 
     def _value(self, section: str, key: str) -> Any:
-        return deepcopy(getattr(self._sections[section], key))
+        return deepcopy(getattr(self._sections[_canonical_section(section)], key))
 
     @property
     def filter(self) -> schema.FilterDefaults:
@@ -211,8 +234,13 @@ class Defaults:
         return deepcopy(self._sections['source_reconstruction'])
 
     @property
-    def trf(self) -> schema.EpochTRFDefaults:
-        return deepcopy(self._sections['trf'])
+    def stimuli(self) -> schema.EpochStimulsDefaults:
+        return deepcopy(self._sections['stimuli'])
+
+    @property
+    def trf(self) -> schema.EpochStimulsDefaults:
+        """Compatibility alias for stimulus defaults."""
+        return self.stimuli
 
     @property
     def pipeline(self) -> schema.PipelineDefaults:
@@ -321,6 +349,7 @@ def use_defaults(
 
 def default_field(section: str, key: str, **kwargs: Any) -> Any:
     """Create an attrs field that snapshots an omitted argument's default."""
+    section = _canonical_section(section)
     return field(factory=lambda: get_defaults()._value(section, key), metadata={'defaults': (section, key)}, **kwargs)
 
 
@@ -342,6 +371,7 @@ def function_defaults(
     including positional arguments. Signatures expose DEFAULT(section.option)
     to make the dynamic defaults visible in help and introspection.
     """
+    section = _canonical_section(section)
 
     def decorate(function: Callable[P, R]) -> Callable[P, R]:
         sig = signature(function)
@@ -351,7 +381,7 @@ def function_defaults(
             for name, parameter in sig.parameters.items()
             if name in keys and parameter.default is not Parameter.empty
         }
-        mapping.update(aliases or {})
+        mapping.update({name: (_canonical_section(section), key) for name, (section, key) in (aliases or {}).items()})
         for name in mapping:
             if name not in sig.parameters or sig.parameters[name].default is Parameter.empty:
                 raise ValueError(f'Cannot configure required or unknown argument: {function.__name__}.{name}')

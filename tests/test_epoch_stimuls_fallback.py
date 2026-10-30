@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from almkanal import AlmKanal, Defaults, EpochTRF, TRFSpanSpec, preprocessing_report, use_defaults
-from almkanal.almkanal_steps import trf_utils
+from almkanal import AlmKanal, Defaults, EpochStimuls, StimulusSpanSpec, preprocessing_report, use_defaults
+from almkanal.almkanal_steps import stimulus_utils
 from almkanal.report.methods_context import build_context_from_files
 from almkanal.stim_utils.alignment_utils import assume_raw_wav_alignment
 from almkanal.stim_utils.audio_utils import prepare_audio
@@ -29,7 +29,7 @@ def no_audio_trial(tmp_path, monkeypatch):
     def unexpected(*args, **kwargs):
         pytest.fail('No recorded audio is available for cross-correlation.')
 
-    monkeypatch.setattr(trf_utils, 'estimate_raw_wav_alignment', unexpected)
+    monkeypatch.setattr(stimulus_utils, 'estimate_raw_wav_alignment', unexpected)
 
     def make_trial(rate=499.0, repeated=False):
         slope = 1.0 + rate / 1e6
@@ -49,8 +49,8 @@ def no_audio_trial(tmp_path, monkeypatch):
             second_on = first_on + raw.n_times
             raw = mne.concatenate_raws([raw.copy(), raw.copy()], verbose=False)
             spans['repeat'] = (second_on, None)
-        spec = TRFSpanSpec(spans, wav_by_label={label: wav for label in spans})
-        step = EpochTRF(
+        spec = StimulusSpanSpec(spans, wav_by_label={label: wav for label in spans})
+        step = EpochStimuls(
             lambda raw: spec, tmp_path, realign_without_audio=True,
             audio_channels=None, fallback_drift_us_per_s=rate, epoch_len_s=1, verbose=False,
         )
@@ -78,7 +78,7 @@ def test_assumed_drift_resamples_meg_before_delay(no_audio_trial, rate, delay):
     peak = np.argmax(epochs.get_data(picks=['MEG 002']).ravel())
     assert peak == pytest.approx(round((18.5 - applied_delay) * 1000), abs=1)
     feature = prepare_audio(str(wav), target_fs=1000)[0][0, :20000]
-    np.testing.assert_array_equal(epochs.get_data(picks=['env_rms']).ravel(), feature)
+    np.testing.assert_array_equal(epochs.get_data(picks=['envelope']).ravel(), feature)
     np.testing.assert_array_equal(raw.get_data(), original)
     slope = 1 + rate / 1e6
     np.testing.assert_allclose(epochs.metadata['t_on'], 0.5 + slope * (np.arange(20) + applied_delay))
@@ -103,11 +103,11 @@ def test_public_builder_profile_rate_and_repeated_trials(no_audio_trial, profile
     make_trial, wav = no_audio_trial
     raw, spec, step = make_trial(rate=rate, repeated=True)
     with use_defaults(profile):
-        epochs = trf_utils.build_trf_epochs(
+        epochs = stimulus_utils.build_stimulus_epochs(
             raw, spec, wav.parent, realign_without_audio=True,
             audio_channels=None, hw_delay_s=0, epoch_len_s=1, verbose=False,
         )
-        assert EpochTRF(lambda raw: spec, wav.parent).fallback_drift_us_per_s == rate
+        assert EpochStimuls(lambda raw: spec, wav.parent).fallback_drift_us_per_s == rate
     assert len(epochs) == 40
     assert epochs.metadata['drift_us_per_s'].eq(rate).all()
     np.testing.assert_array_equal(epochs.get_data()[:20], epochs.get_data()[20:])
@@ -185,7 +185,7 @@ def test_fallback_reports_and_json_identify_assumptions(no_audio_trial, tmp_path
         spec.spans_by_label['first'] = (1734, 21744)
     pipeline = AlmKanal(steps=[step])
     epochs, report = pipeline.run(raw)
-    assert 'TRF audio realignment' in report.get_contents()[0]
+    assert 'Stimulus audio realignment' in report.get_contents()[0]
     html_path = tmp_path / 'report.html'
     report.save(html_path, open_browser=False, overwrite=True)
     html = html_path.read_text()

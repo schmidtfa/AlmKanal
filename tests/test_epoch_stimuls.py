@@ -11,8 +11,8 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from almkanal import Defaults, EpochTRF, TRFSpanSpec, use_defaults
-from almkanal.almkanal_steps import trf_utils
+from almkanal import Defaults, EpochStimuls, StimulusSpanSpec, use_defaults
+from almkanal.almkanal_steps import stimulus_utils
 from almkanal.stim_utils.audio_utils import prepare_audio
 from almkanal.info import AlmKanalInfo
 
@@ -49,9 +49,9 @@ def timing_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, An
             raise FileNotFoundError(wav_file)
         return alignment.copy()
 
-    monkeypatch.setattr(trf_utils, 'estimate_raw_wav_alignment', estimate)
+    monkeypatch.setattr(stimulus_utils, 'estimate_raw_wav_alignment', estimate)
     return {
-        'raw': raw, 'spec': TRFSpanSpec({'stimulus': (1634, 4134)}),
+        'raw': raw, 'spec': StimulusSpanSpec({'stimulus': (1634, 4134)}),
         'path': tmp_path, 'wav': wav, 'alignment': alignment,
     }
 
@@ -62,7 +62,7 @@ def test_physical_delay_is_applied_after_clock_correction(timing_data, delay) ->
     before = raw.get_data().copy()
     warning = pytest.warns(UserWarning, match='Negative hw_delay_s delays') if delay < 0 else nullcontext()
     with warning:
-        epochs = trf_utils.build_trf_epochs(
+        epochs = stimulus_utils.build_stimulus_epochs(
             raw, timing_data['spec'], timing_data['path'], audio_channels=['recorded'],
             hw_delay_s=delay, epoch_len_s=1.0, verbose=False,
         )
@@ -71,7 +71,7 @@ def test_physical_delay_is_applied_after_clock_correction(timing_data, delay) ->
     expected = np.arange(2000).reshape(4, 500) / 500 + delay
     np.testing.assert_allclose(neural[:, 100:-100], expected[:, 100:-100], atol=0.004)
     audio, _, _, _ = prepare_audio(str(timing_data['wav']), target_fs=500)
-    np.testing.assert_allclose(epochs.get_data(picks=['env_rms'])[:, 0], audio[0, :2000].reshape(4, 500))
+    np.testing.assert_allclose(epochs.get_data(picks=['envelope'])[:, 0], audio[0, :2000].reshape(4, 500))
     np.testing.assert_array_equal(raw.get_data(), before)
     np.testing.assert_allclose(epochs.metadata['wav_t_on'], [0, 1, 2, 3])
     np.testing.assert_allclose(epochs.metadata['t_on'], 0.8 + 0.04 + 1.2 * (np.arange(4) + delay))
@@ -80,7 +80,7 @@ def test_physical_delay_is_applied_after_clock_correction(timing_data, delay) ->
 def test_annotations_and_epoch_metadata_survive_rejection(timing_data) -> None:
     raw = timing_data['raw']
     raw.set_annotations(mne.Annotations([0.8 + 0.04 + 1.2 * 1.5], [0.12], ['BAD movement']))
-    epochs = trf_utils.build_trf_epochs(
+    epochs = stimulus_utils.build_stimulus_epochs(
         raw, timing_data['spec'], timing_data['path'], audio_channels=['recorded'],
         hw_delay_s=0.2, epoch_len_s=1.0, verbose=False,
     )
@@ -92,13 +92,13 @@ def test_annotations_and_epoch_metadata_survive_rejection(timing_data) -> None:
 
 def test_repeated_wav_trials_keep_their_own_times(timing_data, monkeypatch) -> None:
     raw = mne.concatenate_raws([timing_data['raw'].copy(), timing_data['raw'].copy()], verbose=False)
-    spec = TRFSpanSpec(
+    spec = StimulusSpanSpec(
         {'first': (1634, 4134), 'repeat': (5134, 7634)},
         wav_by_label={'first': 'stimulus.wav', 'repeat': 'stimulus.wav'},
     )
-    monkeypatch.setattr(trf_utils, 'estimate_raw_wav_alignment', lambda *args, **kwargs: timing_data['alignment'])
+    monkeypatch.setattr(stimulus_utils, 'estimate_raw_wav_alignment', lambda *args, **kwargs: timing_data['alignment'])
     with pytest.warns(UserWarning, match='Negative hw_delay_s delays'):
-        epochs = trf_utils.build_trf_epochs(
+        epochs = stimulus_utils.build_stimulus_epochs(
             raw, spec, timing_data['path'], audio_channels=['recorded'],
             hw_delay_s=-0.2, epoch_len_s=1, verbose=False,
         )
@@ -110,15 +110,15 @@ def test_repeated_wav_trials_keep_their_own_times(timing_data, monkeypatch) -> N
 
 
 def test_alignment_can_use_wav_duration_without_end_sample(timing_data) -> None:
-    epochs = trf_utils.build_trf_epochs(
-        timing_data['raw'], TRFSpanSpec({'stimulus': (1634, None)}), timing_data['path'],
+    epochs = stimulus_utils.build_stimulus_epochs(
+        timing_data['raw'], StimulusSpanSpec({'stimulus': (1634, None)}), timing_data['path'],
         audio_channels=['recorded'], hw_delay_s=0.2, epoch_len_s=1, verbose=False,
     )
     assert len(epochs) == 4
 
 
 def test_recorded_audio_takes_precedence_over_assumed_drift(timing_data) -> None:
-    step = EpochTRF(
+    step = EpochStimuls(
         lambda raw: timing_data['spec'], timing_data['path'],
         audio_channels=['recorded'], realign_without_audio=True,
         epoch_len_s=1, hw_delay_s=0, verbose=False,
@@ -129,7 +129,7 @@ def test_recorded_audio_takes_precedence_over_assumed_drift(timing_data) -> None
     assert result['data'].metadata['clock_slope'].eq(1.2).all()
     # An audio-estimation error must still fail instead of silently
     # substituting the assumed rate.
-    step.gen_span_spec = lambda raw: TRFSpanSpec(
+    step.gen_span_spec = lambda raw: StimulusSpanSpec(
         {'missing': (1634, 4134)}, wav_by_label={'missing': 'missing.wav'},
     )
     with pytest.raises(RuntimeError, match='Audio alignment failed'):
@@ -140,8 +140,8 @@ def test_alignment_disabled_retains_fixed_delay_processing(timing_data, monkeypa
     def unexpected(*args, **kwargs):
         pytest.fail('Disabled realignment must not estimate alignment.')
 
-    monkeypatch.setattr(trf_utils, 'estimate_raw_wav_alignment', unexpected)
-    epochs = trf_utils.build_trf_epochs(
+    monkeypatch.setattr(stimulus_utils, 'estimate_raw_wav_alignment', unexpected)
+    epochs = stimulus_utils.build_stimulus_epochs(
         timing_data['raw'], timing_data['spec'], timing_data['path'],
         hw_delay_s=0.0165, epoch_len_s=1.0, verbose=False,
     )
@@ -151,11 +151,11 @@ def test_alignment_disabled_retains_fixed_delay_processing(timing_data, monkeypa
 
 
 def test_failed_alignment_can_raise_or_skip(timing_data) -> None:
-    spec = TRFSpanSpec(
+    spec = StimulusSpanSpec(
         {'missing': (1634, 4134), 'stimulus': (1634, 4134)},
         wav_by_label={'missing': 'missing.wav'},
     )
-    step = EpochTRF(
+    step = EpochStimuls(
         lambda raw: spec, timing_data['path'], audio_channels=['recorded'],
         hw_delay_s=0, epoch_len_s=1, verbose=False,
     )
@@ -176,7 +176,7 @@ def test_insufficient_physical_delay_margin_is_an_error(timing_data) -> None:
     with pytest.warns(UserWarning, match='Negative hw_delay_s delays'), pytest.raises(
         RuntimeError, match='Audio alignment failed'
     ) as exc:
-        trf_utils.build_trf_epochs(
+        stimulus_utils.build_stimulus_epochs(
             timing_data['raw'], timing_data['spec'], timing_data['path'],
             audio_channels=['recorded'], hw_delay_s=-1.0, epoch_len_s=1, verbose=False,
         )
@@ -193,7 +193,7 @@ def test_insufficient_physical_delay_margin_is_an_error(timing_data) -> None:
 ])
 def test_invalid_configuration(timing_data, kwargs, message) -> None:
     with pytest.raises(ValueError, match=message):
-        trf_utils.build_trf_epochs(timing_data['raw'], timing_data['spec'], timing_data['path'], **kwargs)
+        stimulus_utils.build_stimulus_epochs(timing_data['raw'], timing_data['spec'], timing_data['path'], **kwargs)
 
 
 @pytest.fixture(params=[1.0015, 1.2], ids=['1500ppm', '20percent'])
@@ -221,16 +221,16 @@ def meg_pulse_data(timing_data, monkeypatch, request) -> dict[str, Any]:
     amplitude = 0.1 + np.exp(-((wav_times - 1.5) / 0.04) ** 2) + 0.5 * np.exp(-((wav_times - 2.7) / 0.1) ** 2)
     audio = amplitude * np.sin(2 * np.pi * (300 * wav_times + 150 * wav_times**2))
     wavfile.write(timing_data['wav'], 8000, audio.astype(np.float32))
-    monkeypatch.setattr(trf_utils, 'estimate_raw_wav_alignment', lambda *args, **kwargs: alignment.copy())
-    return {**timing_data, 'raw': raw, 'spec': TRFSpanSpec({'stimulus': (2834, 12834)}), 'alignment': alignment}
+    monkeypatch.setattr(stimulus_utils, 'estimate_raw_wav_alignment', lambda *args, **kwargs: alignment.copy())
+    return {**timing_data, 'raw': raw, 'spec': StimulusSpanSpec({'stimulus': (2834, 12834)}), 'alignment': alignment}
 
 
-@pytest.mark.parametrize('feature, channel', [('envelope', 'env_rms'), ('flux', 'flux')])
+@pytest.mark.parametrize('feature, channel', [('envelope', 'envelope'), ('flux', 'flux')])
 @pytest.mark.parametrize('realign', [True, False])
 def test_salzburg_delay_advances_only_meg_and_negative_delay_warns(meg_pulse_data, feature, channel, realign) -> None:
     raw = meg_pulse_data['raw']
     with use_defaults(Defaults.salzburg()):
-        step = EpochTRF(
+        step = EpochStimuls(
             gen_span_spec=lambda raw: meg_pulse_data['spec'],
             base_audio_path=meg_pulse_data['path'],
             feature=feature,
@@ -267,3 +267,143 @@ def test_salzburg_delay_advances_only_meg_and_negative_delay_warns(meg_pulse_dat
     if realign:
         assert peaks[1] - 3000 == pytest.approx(200, abs=tolerance)  # Preserve 100 ms neural latency.
     assert advanced['TRF_info']['applied_hw_delay_s'] == 0.0165
+
+
+@pytest.mark.parametrize('mode', ['audio', 'assumed', 'none'])
+@pytest.mark.parametrize('target', [125.0, 160.0, 1000.0])
+def test_resampling_precedes_multiple_features(timing_data, monkeypatch, mode, target):
+    raw = timing_data['raw']
+    before = raw.get_data().copy()
+    calls = []
+    original_prepare = stimulus_utils.prepare_audio
+    original_align = stimulus_utils._aligned_segment
+
+    def align(recording, *args, **kwargs):
+        assert recording.info['sfreq'] == 500
+        calls.append('align')
+        return original_align(recording, *args, **kwargs)
+
+    def prepare(*args, **kwargs):
+        assert kwargs['target_fs'] == target
+        calls.append(kwargs['feature'])
+        return original_prepare(*args, **kwargs)
+
+    monkeypatch.setattr(stimulus_utils, '_aligned_segment', align)
+    monkeypatch.setattr(stimulus_utils, 'prepare_audio', prepare)
+    step = EpochStimuls(
+        lambda raw: timing_data['spec'], timing_data['path'],
+        audio_channels=['recorded'] if mode == 'audio' else None,
+        realign_without_audio=mode == 'assumed', fallback_drift_us_per_s=0,
+        feature=['envelope', 'rectify'], resample_sfreq=target,
+        epoch_len_s=1, hw_delay_s=0.0165, verbose=False,
+    )
+    result = step.run(raw, AlmKanalInfo())
+    epochs = result['data']
+    assert calls == ([] if mode == 'none' else ['align']) + ['envelope', 'rectify']
+    assert epochs.info['sfreq'] == target
+    assert len(epochs) == 4
+    assert epochs.ch_names[-3:] == ['envelope', 'rectify_pos_rect', 'rectify_neg_rect']
+    assert epochs.get_channel_types()[-3:] == ['misc'] * 3
+    for feature, channels in [('envelope', ['envelope']), ('rectify', epochs.ch_names[-2:])]:
+        expected = original_prepare(str(timing_data['wav']), feature=feature, target_fs=target)[0]
+        actual = epochs.get_data(picks=channels).transpose(1, 0, 2).reshape(len(channels), -1)
+        np.testing.assert_array_equal(actual, expected[:, :int(4 * target)])
+    neural = epochs.get_data(picks=['EEG 001']).ravel()
+    local_times = np.arange(len(neural)) / target
+    expected_neural = local_times + 0.016 if mode == 'audio' else (local_times + 0.816 - 0.84) / 1.2
+    # Avoid FFT edge ringing at segment boundaries.
+    edge = int(target / 2)
+    np.testing.assert_allclose(neural[edge:-edge], expected_neural[edge:-edge], atol=0.01)
+    np.testing.assert_array_equal(raw.get_data(), before)
+    assert raw.info['sfreq'] == 500
+    slope = 1.2 if mode == 'audio' else 1.0
+    onset = 0.84 + slope * 0.016 if mode == 'audio' else 0.816
+    np.testing.assert_allclose(epochs.metadata['t_on'], onset + slope * np.arange(4))
+    info = result['TRF_info']
+    assert info['original_sfreq'] == 500
+    assert info['sfreq'] == target
+    assert info['resample_info']['method'] == 'fft'
+    assert info['feature_channels'] == epochs.ch_names[-3:]
+    assert info['applied_hw_delay_s'] == 0.016
+
+
+@pytest.mark.parametrize('target', [125, 160])
+def test_resampling_preserves_annotation_rejection_and_timing(timing_data, target):
+    raw = timing_data['raw']
+    raw.set_annotations(mne.Annotations([0.84 + 1.2 * 1.5], [0.12], ['BAD movement']))
+    epochs = stimulus_utils.build_stimulus_epochs(
+        raw, timing_data['spec'], timing_data['path'], audio_channels=['recorded'],
+        resample_sfreq=target, epoch_len_s=1, hw_delay_s=0, verbose=False,
+    )
+    assert epochs.metadata['epoch_index_in_segment'].tolist() == [0, 2, 3]
+    np.testing.assert_allclose(epochs.metadata['wav_t_on'], [0, 2, 3])
+    np.testing.assert_allclose(epochs.metadata['t_on'], 0.84 + 1.2 * np.array([0, 2, 3]))
+
+
+@pytest.mark.parametrize('kwargs, message', [
+    ({'resample_sfreq': 0}, 'resample_sfreq'),
+    ({'resample_sfreq': -100}, 'resample_sfreq'),
+    ({'resample_sfreq': np.nan}, 'resample_sfreq'),
+    ({'resample_sfreq': np.inf}, 'resample_sfreq'),
+    ({'feature': []}, 'feature'),
+    ({'feature': ['envelope', 'envelope']}, 'repeated'),
+    ({'feature': ['envelope', 'unknown']}, 'supported'),
+])
+def test_invalid_resampling_and_features(timing_data, kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        stimulus_utils.build_stimulus_epochs(timing_data['raw'], timing_data['spec'], timing_data['path'], **kwargs)
+
+
+def test_feature_names_do_not_overlap_recording(timing_data):
+    raw = timing_data['raw'].copy().rename_channels({'recorded': 'envelope'})
+    with pytest.raises(ValueError, match='must not overlap'):
+        stimulus_utils.build_stimulus_epochs(raw, timing_data['spec'], timing_data['path'], epoch_len_s=1)
+
+
+def test_mel_and_mel_onsets_have_distinct_names(timing_data):
+    epochs = stimulus_utils.build_stimulus_epochs(
+        timing_data['raw'], timing_data['spec'], timing_data['path'],
+        feature=['mel', 'mel_onsets'], resample_sfreq=125, epoch_len_s=1, verbose=False,
+    )
+    names = epochs.ch_names[2:]
+    assert len(names) == len(set(names)) == 64
+    assert all(name.startswith('mel_') for name in names[:32])
+    assert all(name.startswith('mel_onsets_') for name in names[32:])
+
+
+def test_resampling_defaults_and_noop(timing_data):
+    profile = Defaults.generic().with_overrides(stimuli={'resample_sfreq': 500, 'feature': ['envelope', 'rectify']})
+    with use_defaults(profile):
+        step = EpochStimuls(lambda raw: timing_data['spec'], timing_data['path'], epoch_len_s=1, verbose=False)
+    result = step.run(timing_data['raw'], AlmKanalInfo())
+    assert result['data'].info['sfreq'] == 500
+    assert result['TRF_info']['resample_info'] is None
+    assert result['TRF_info']['feature'] == ['envelope', 'rectify']
+
+
+@pytest.mark.parametrize('realign', [True, False])
+def test_qc_reports_resampling(timing_data, realign):
+    from almkanal.info import StepInfo
+
+    step = EpochStimuls(
+        lambda raw: timing_data['spec'], timing_data['path'], resample_sfreq=125,
+        audio_channels=['recorded'] if realign else None, epoch_len_s=1, verbose=False,
+    )
+    result = step.run(timing_data['raw'], AlmKanalInfo())
+    info = AlmKanalInfo()
+    info.add(StepInfo(step='EpochStimuls', info={'TRF_info': result['TRF_info']}))
+
+    class Report:
+        def __init__(self):
+            self.html = {}
+        def add_epochs(self, data, title):
+            assert data.info['sfreq'] == 125
+        def add_html(self, html, title):
+            self.html[title] = html
+
+    report = Report()
+    step.reports(result['data'], report, info)
+    assert '500 Hz to 125 Hz' in report.html['Stimulus resampling']
+    assert 'FFT-based' in report.html['Stimulus resampling']
+    assert 'envelope' in report.html['Stimulus audio features']
+    assert ('Stimulus audio realignment' in report.html) == realign

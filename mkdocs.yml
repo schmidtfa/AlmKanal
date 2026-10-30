@@ -62,7 +62,7 @@ nav:
           - Artifact correction and physiology: reference/preprocessing/artifacts.md
           - Events and epoching: reference/preprocessing/epoching.md
           - VPixx eye-tracking: reference/preprocessing/eye-tracking.md
-          - TRF and WAV alignment: reference/preprocessing/trf.md
+          - Stimulus epoching and WAV alignment: reference/preprocessing/trf.md
           - Spatial filtering: reference/preprocessing/spatial-filtering.md
           - Source reconstruction: reference/preprocessing/source-reconstruction.md
       - Reporting API: api-reporting.md

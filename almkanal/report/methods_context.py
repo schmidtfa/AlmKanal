@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from almkanal._step_names import canonical_step_name
 from almkanal.report.stepspecs.registry import StepSpec, get_registry, load_stepspec_package
 
 
@@ -85,17 +86,17 @@ def build_context_from_files(
     # 2) compose registry
     specs = get_registry()
     if extra_specs:
-        specs.update(extra_specs)
+        specs.update({canonical_step_name(name): spec for name, spec in extra_specs.items()})
 
     # 3) load JSONs & enforce same ordered processing history
     loaded = load_jsons(files)
     first_path, first_data = loaded[0]
 
     first_history = first_data['processing_history']
-    ordered_steps = [entry['step'] for entry in first_history]
+    ordered_steps = [canonical_step_name(entry['step']) for entry in first_history]
 
     for p, data in loaded[1:]:
-        steps_here = [entry['step'] for entry in data['processing_history']]
+        steps_here = [canonical_step_name(entry['step']) for entry in data['processing_history']]
 
         if steps_here != ordered_steps:
             raise ValueError(
