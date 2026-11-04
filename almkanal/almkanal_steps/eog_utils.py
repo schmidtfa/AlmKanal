@@ -24,7 +24,7 @@ class EOGCleaner(AlmKanalStep):
     check_and_correct_eog_channel_assignment: bool = True
     flat_threshold_v: float = 1e-8
     max_amplitude_v: float | None = None
-    max_bad_fraction: float = 0.3
+    max_bad_fraction: float = 0.5
     l_freq: float | None = 0.1
     h_freq: float | None = 40.0
 

@@ -519,22 +519,33 @@ def clean_eog(
         eog.filter(l_freq=l_freq, h_freq=h_freq, picks=['vertical', 'horizontal'], skip_by_annotation=('bad', 'edge'))
 
     return {
-        'data': eog,
-        'eog_info': {
-            'channel_assignment': assignment_info,
-            'vertical_polarity': polarity_info,
-            'blink_events': blink_info,
-            'quality': {
-                'excluded_fraction': excluded_fraction,
-                'interpolated_fraction': float(interpolated_mask.mean()),
-                'unfilled_blink_fraction': float(unfilled_mask.mean()),
-                'max_bad_fraction': max_bad_fraction,
-                'flat_threshold_v': flat_threshold_v,
-                'max_amplitude_v': max_amplitude_v,
-            },
-            'filter': {'l_freq': l_freq, 'h_freq': h_freq, 'skip': ['bad', 'edge']},
-            'sampling_rate': sfreq,
-            'first_samp': int(eog.first_samp),
-            'peak_time_reference': 'first available sample of this recording',
+    'data': eog,
+    'eog_info': {
+        'channel_assignment': {
+            'mapping': assignment_info['mapping'],
         },
-    }
+        'vertical_polarity': {
+            'checked': polarity_info['checked'],
+            'polarity': polarity_info.get('polarity'),
+            'n_positive_blinks': polarity_info.get('n_positive_blinks'),
+            'n_negative_blinks': polarity_info.get('n_negative_blinks'),
+        },
+        'blink_events': {
+            'checked': blink_info['checked'],
+            'n_blinks': blink_info.get('n_blinks'),
+        },
+        'quality': {
+            'excluded_fraction': excluded_fraction,
+            'interpolated_fraction': float(interpolated_mask.mean()),
+            'unfilled_blink_fraction': float(unfilled_mask.mean()),
+            'max_bad_fraction': max_bad_fraction,
+            'flat_threshold_v': flat_threshold_v,
+            'max_amplitude_v': max_amplitude_v,
+        },
+        'filter': {
+            'l_freq': l_freq,
+            'h_freq': h_freq,
+        },
+        'sampling_rate': sfreq,
+    },
+}
