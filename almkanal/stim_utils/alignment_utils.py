@@ -407,7 +407,7 @@ def estimate_raw_wav_alignment(  # noqa: C901, PLR0912, PLR0915
         capped below each signal's Nyquist frequency.
     envelope_lowpass : float, default=30.0
         Envelope low-pass cutoff in Hz; must be below both input and sync Nyquist
-        frequencies. Independent of EpochStimuls's WAV feature cutoff.
+        frequencies. Independent of StimulusEpochs's WAV feature cutoff.
     window_s : float, default=10.0
         Duration in seconds of each window used to estimate a lag.
     step_s : float, default=5.0

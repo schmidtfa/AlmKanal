@@ -2,8 +2,6 @@ from typing import Literal, overload
 
 from attrs import define, field
 
-from almkanal._step_names import canonical_step_name
-
 
 @define
 class StepInfo:
@@ -20,8 +18,7 @@ class AlmKanalInfo:
         self.processing_history.append(step_info)
 
     def get_steps(self, step: str) -> list[StepInfo]:
-        name = canonical_step_name(step)
-        return [step_info for step_info in self.processing_history if canonical_step_name(step_info.step) == name]
+        return [step_info for step_info in self.processing_history if step_info.step == step]
 
     def get_step(
         self,

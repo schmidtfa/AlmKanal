@@ -234,11 +234,11 @@ class Defaults:
         return deepcopy(self._sections['source_reconstruction'])
 
     @property
-    def stimuli(self) -> schema.EpochStimulsDefaults:
+    def stimuli(self) -> schema.StimulusEpochsDefaults:
         return deepcopy(self._sections['stimuli'])
 
     @property
-    def trf(self) -> schema.EpochStimulsDefaults:
+    def trf(self) -> schema.StimulusEpochsDefaults:
         """Compatibility alias for stimulus defaults."""
         return self.stimuli
 

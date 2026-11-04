@@ -9,7 +9,7 @@ import pytest
 from almkanal import (
     ICA,
     Defaults,
-    EpochStimuls,
+    StimulusEpochs,
     Events,
     Filter,
     Maxwell,
@@ -45,10 +45,10 @@ def test_generic_and_salzburg_profiles_have_distinct_hardware_assumptions():
         assert salzburg.stimuli.hw_delay_s == 0.0165
         assert salzburg.stimuli.fallback_drift_us_per_s == 499.0
         assert salzburg.stimuli.audio_channels == ('MISC007', 'MISC008')
-        step = EpochStimuls(lambda raw: StimulusSpanSpec({}), '.')
+        step = StimulusEpochs(lambda raw: StimulusSpanSpec({}), '.')
         assert step.audio_channels == ('MISC007', 'MISC008')
-        assert EpochStimuls(step.gen_span_spec, '.', audio_channels=None).audio_channels is None
-        assert EpochStimuls(step.gen_span_spec, '.', audio_channels=['recorded']).audio_channels == ['recorded']
+        assert StimulusEpochs(step.gen_span_spec, '.', audio_channels=None).audio_channels is None
+        assert StimulusEpochs(step.gen_span_spec, '.', audio_channels=['recorded']).audio_channels == ['recorded']
         assert salzburg.vpixx.screen_distance == 0.82
         assert salzburg.vpixx.screen_size == (0.61, 0.34)
         assert salzburg.vpixx.screen_resolution == (1920, 1080)
@@ -253,7 +253,7 @@ def test_stimulus_callback_and_helpers_keep_the_step_profile_after_scope_exit(
     monkeypatch.setattr(stimulus_utils, '_build_stimulus_epochs', build_epochs)
     with use_defaults(profile):
         kwargs = {'fallback_drift_us_per_s': 75.0} if explicit_step_drift else {}
-        step = EpochStimuls(span_callback, tmp_path, **kwargs)
+        step = StimulusEpochs(span_callback, tmp_path, **kwargs)
 
     active = get_defaults()
     result = step.run(raw, {})
@@ -490,7 +490,7 @@ def test_stimulus_defaults_aliases_normalize_exports_and_copy_settings(section):
     assert profile.stimuli.feature == ['envelope', 'rectify']
     assert profile.stimuli.alignment_kwargs['max_lag_s'] == 0.5
     with use_defaults(profile):
-        step = EpochStimuls(dict, '.')
+        step = StimulusEpochs(dict, '.')
     assert step.resample_sfreq == 125
     assert step.feature == ['envelope', 'rectify']
     assert pickle.loads(pickle.dumps(profile)).to_dict() == profile.to_dict()

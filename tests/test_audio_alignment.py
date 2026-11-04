@@ -9,7 +9,7 @@ import pytest
 from scipy.io import wavfile
 from scipy.signal import butter, hilbert, sosfiltfilt
 
-from almkanal import AlmKanal, EpochStimuls, StimulusSpanSpec, preprocessing_report
+from almkanal import AlmKanal, StimulusEpochs, StimulusSpanSpec, preprocessing_report
 from almkanal.stim_utils.alignment_utils import (
     apply_raw_wav_alignment,
     estimate_raw_wav_alignment,
@@ -156,7 +156,7 @@ def test_epoch_stimuls_realigns_audio_and_records_diagnostics(
     missing_end: bool,
 ) -> None:
     wav_path = synthetic_audio_alignment['wav_path']
-    step = EpochStimuls(
+    step = StimulusEpochs(
         gen_span_spec=lambda raw: StimulusSpanSpec.from_events(
             raw, {11: wav_path.name}, 99, stim_channel='stim',
             infer_missing_ends=missing_end, base_audio_path=wav_path.parent,
@@ -173,7 +173,7 @@ def test_epoch_stimuls_realigns_audio_and_records_diagnostics(
     original = raw.get_data().copy()
     pipeline = AlmKanal(steps=[step])
     epochs, report = pipeline.run(raw)
-    trf_info = pipeline.info.get_step_info('EpochStimuls', required=True)['TRF_info']
+    trf_info = pipeline.info.get_step_info('StimulusEpochs', required=True)['TRF_info']
     alignment = trf_info['alignment_info']
 
     assert len(epochs) == 8

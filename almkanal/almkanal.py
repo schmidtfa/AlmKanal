@@ -5,7 +5,6 @@ from copy import deepcopy
 import mne
 from attrs import define, field
 
-from almkanal._step_names import canonical_step_name
 from almkanal.data_utils.info_generator import build_json
 from almkanal.defaults import Defaults, default_field, get_defaults
 from almkanal.info import AlmKanalInfo, StepInfo
@@ -37,11 +36,10 @@ class AlmKanalStep:
                 post.append(cur_step)
 
         # For each dependency in must_be_before, check only if it is present somewhere.
-        for dependency in self.must_be_before or ():
-            dep_name = canonical_step_name(dependency)
+        for dep_name in self.must_be_before or ():
             # If any step in the entire pipeline is of type dep_name:
-            if any(canonical_step_name(step.__class__.__name__) == dep_name for step in steps) and not any(
-                canonical_step_name(step.__class__.__name__) == dep_name for step in post
+            if any(step.__class__.__name__ == dep_name for step in steps) and not any(
+                step.__class__.__name__ == dep_name for step in post
             ):
                 # Then at least one such step must be in the post list.
                 raise ValueError(
@@ -52,10 +50,9 @@ class AlmKanalStep:
                 )
 
         # For each dependency in must_be_later, check only if it is present somewhere.
-        for dependency in self.must_be_after or ():
-            dep_name = canonical_step_name(dependency)
-            if any(canonical_step_name(step.__class__.__name__) == dep_name for step in steps) and not any(
-                canonical_step_name(step.__class__.__name__) == dep_name for step in pre
+        for dep_name in self.must_be_after or ():
+            if any(step.__class__.__name__ == dep_name for step in steps) and not any(
+                step.__class__.__name__ == dep_name for step in pre
             ):
                 # Then at least one such step must be in the pre list.
                 raise ValueError(

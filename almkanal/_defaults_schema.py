@@ -180,7 +180,7 @@ class SourceReconstructionDefaults:
 
 
 @frozen
-class EpochStimulsDefaults:
+class StimulusEpochsDefaults:
     feature: str | Sequence[str] = 'envelope'
     resample_sfreq: float | None = None
     audio_cutoff_hz: float = 80.0
@@ -193,10 +193,6 @@ class EpochStimulsDefaults:
     verbose: bool = True
     realign_without_audio: bool = False
     fallback_drift_us_per_s: float = 0.0
-
-
-# Preserve the historical pickle/import path for defaults sections.
-EpochTRFDefaults = EpochStimulsDefaults
 
 
 @frozen
@@ -286,7 +282,7 @@ SECTION_TYPES = {
     'forward_model': ForwardModelDefaults,
     'spatial_filter': SpatialFilterDefaults,
     'source_reconstruction': SourceReconstructionDefaults,
-    'stimuli': EpochStimulsDefaults,
+    'stimuli': StimulusEpochsDefaults,
     'pipeline': PipelineDefaults,
     'vpixx': VPixxDefaults,
     'ica_eog': ICAEOGDefaults,

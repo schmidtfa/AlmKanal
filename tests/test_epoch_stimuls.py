@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from almkanal import Defaults, EpochStimuls, StimulusSpanSpec, use_defaults
+from almkanal import Defaults, StimulusEpochs, StimulusSpanSpec, use_defaults
 from almkanal.almkanal_steps import stimulus_utils
 from almkanal.stim_utils.audio_utils import prepare_audio
 from almkanal.info import AlmKanalInfo
@@ -118,7 +118,7 @@ def test_alignment_can_use_wav_duration_without_end_sample(timing_data) -> None:
 
 
 def test_recorded_audio_takes_precedence_over_assumed_drift(timing_data) -> None:
-    step = EpochStimuls(
+    step = StimulusEpochs(
         lambda raw: timing_data['spec'], timing_data['path'],
         audio_channels=['recorded'], realign_without_audio=True,
         epoch_len_s=1, hw_delay_s=0, verbose=False,
@@ -155,7 +155,7 @@ def test_failed_alignment_can_raise_or_skip(timing_data) -> None:
         {'missing': (1634, 4134), 'stimulus': (1634, 4134)},
         wav_by_label={'missing': 'missing.wav'},
     )
-    step = EpochStimuls(
+    step = StimulusEpochs(
         lambda raw: spec, timing_data['path'], audio_channels=['recorded'],
         hw_delay_s=0, epoch_len_s=1, verbose=False,
     )
@@ -230,7 +230,7 @@ def meg_pulse_data(timing_data, monkeypatch, request) -> dict[str, Any]:
 def test_salzburg_delay_advances_only_meg_and_negative_delay_warns(meg_pulse_data, feature, channel, realign) -> None:
     raw = meg_pulse_data['raw']
     with use_defaults(Defaults.salzburg()):
-        step = EpochStimuls(
+        step = StimulusEpochs(
             gen_span_spec=lambda raw: meg_pulse_data['spec'],
             base_audio_path=meg_pulse_data['path'],
             feature=feature,
@@ -290,7 +290,7 @@ def test_resampling_precedes_multiple_features(timing_data, monkeypatch, mode, t
 
     monkeypatch.setattr(stimulus_utils, '_aligned_segment', align)
     monkeypatch.setattr(stimulus_utils, 'prepare_audio', prepare)
-    step = EpochStimuls(
+    step = StimulusEpochs(
         lambda raw: timing_data['spec'], timing_data['path'],
         audio_channels=['recorded'] if mode == 'audio' else None,
         realign_without_audio=mode == 'assumed', fallback_drift_us_per_s=0,
@@ -374,7 +374,7 @@ def test_mel_and_mel_onsets_have_distinct_names(timing_data):
 def test_resampling_defaults_and_noop(timing_data):
     profile = Defaults.generic().with_overrides(stimuli={'resample_sfreq': 500, 'feature': ['envelope', 'rectify']})
     with use_defaults(profile):
-        step = EpochStimuls(lambda raw: timing_data['spec'], timing_data['path'], epoch_len_s=1, verbose=False)
+        step = StimulusEpochs(lambda raw: timing_data['spec'], timing_data['path'], epoch_len_s=1, verbose=False)
     result = step.run(timing_data['raw'], AlmKanalInfo())
     assert result['data'].info['sfreq'] == 500
     assert result['TRF_info']['resample_info'] is None
@@ -385,13 +385,13 @@ def test_resampling_defaults_and_noop(timing_data):
 def test_qc_reports_resampling(timing_data, realign):
     from almkanal.info import StepInfo
 
-    step = EpochStimuls(
+    step = StimulusEpochs(
         lambda raw: timing_data['spec'], timing_data['path'], resample_sfreq=125,
         audio_channels=['recorded'] if realign else None, epoch_len_s=1, verbose=False,
     )
     result = step.run(timing_data['raw'], AlmKanalInfo())
     info = AlmKanalInfo()
-    info.add(StepInfo(step='EpochStimuls', info={'TRF_info': result['TRF_info']}))
+    info.add(StepInfo(step='StimulusEpochs', info={'TRF_info': result['TRF_info']}))
 
     class Report:
         def __init__(self):

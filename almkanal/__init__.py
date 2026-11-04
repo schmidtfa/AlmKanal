@@ -13,8 +13,7 @@ from almkanal.almkanal_steps.ica_utils import ICA
 from almkanal.almkanal_steps.spatial_filter_utils import SpatialFilter
 from almkanal.almkanal_steps.src_recon_utils import SourceReconstruction
 from almkanal.almkanal_steps.stimulus_utils import (
-    EpochStimuls,
-    EpochTRF,
+    StimulusEpochs,
     StimulusSpanSpec,
     TRFSpanSpec,
     build_stimulus_epochs,
@@ -42,8 +41,7 @@ __all__ = [
     'PhysioCleaner',
     'Events',
     'Epochs',
-    'EpochStimuls',
-    'EpochTRF',
+    'StimulusEpochs',
     'StimulusSpanSpec',
     'TRFSpanSpec',
     'build_stimulus_epochs',

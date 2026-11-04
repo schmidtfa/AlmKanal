@@ -558,11 +558,11 @@ def build_stimulus_epochs(
 
     The Salzburg profile uses ``hw_delay_s=0.0165``, ``audio_channels``
     ``('MISC007', 'MISC008')``, and ``fallback_drift_us_per_s=499.0``.
-    See :class:`EpochStimuls` for delay conventions and assumed-drift behavior.
+    See :class:`StimulusEpochs` for delay conventions and assumed-drift behavior.
 
     See Also
     --------
-    EpochStimuls : Pipeline step with alignment diagnostics and reporting.
+    StimulusEpochs : Pipeline step with alignment diagnostics and reporting.
     estimate_raw_wav_alignment : Alignment options and search-range guidance.
     prepare_audio : Available WAV features and their output channels.
     """
@@ -588,7 +588,7 @@ def build_stimulus_epochs(
 
 
 @define
-class EpochStimuls(AlmKanalStep):
+class StimulusEpochs(AlmKanalStep):
     """Create fixed-length epochs within stimulus trials and attach WAV features.
 
     Optionally correct the recording clock, apply a fixed neural timing shift,
@@ -801,7 +801,7 @@ class EpochStimuls(AlmKanalStep):
             Pipeline history containing this step's ``TRF_info`` entry.
         """
         report.add_epochs(data, title='Epoched stimuli')
-        stimulus_info = info.get_step_info('EpochStimuls', required=True)['TRF_info']
+        stimulus_info = info.get_step_info('StimulusEpochs', required=True)['TRF_info']
         if stimulus_info.get('feature_channels'):
             report.add_html(
                 pd.DataFrame({'Feature channel': stimulus_info['feature_channels']}).to_html(index=False, escape=True),
@@ -858,9 +858,6 @@ class EpochStimuls(AlmKanalStep):
                 html += pd.DataFrame(alignment['failures']).to_html(index=False, escape=True)
             report.add_html(html, title='Stimulus audio realignment')
 
-
-# Compatibility import for existing pipelines and serialized steps.
-EpochTRF = EpochStimuls
 
 # Historical public names remain loadable by existing scripts and pickles.
 TRFSpanSpec = StimulusSpanSpec

@@ -87,8 +87,7 @@ def _summarize_stimuli(infos: list[dict[str, Any]]) -> dict[str, Any]:
     return results
 
 
-@register_step('EpochTRF')
-@register_step('EpochStimuls')
+@register_step('StimulusEpochs')
 def epochs_stimuls_spec() -> StepSpec:
     return StepSpec(
         settings_fn=keys_selector(
