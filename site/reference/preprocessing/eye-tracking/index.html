@@ -479,6 +479,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../defaults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Defaults and lab profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../validation/" class="md-nav__link">
         
   
@@ -1289,7 +1316,7 @@
   <span class="md-ellipsis">
     
   
-  TRF and WAV alignment
+  Stimulus epoching and WAV alignment
 
     
   </span>
@@ -1605,7 +1632,12 @@
 
 
 
-        <p>This class implements the eye cleaning tools by the ocular tracking gang in AlmKanal</p>
+        <p>Load, clean, and align VPixx eye tracking with continuous M/EEG data.</p>
+<p>Omitted options use the active <code>vpixx</code> defaults at construction. The
+general profile requires screen geometry when converting gaze to radians;
+select the Salzburg profile or supply measured geometry for another setup.
+Screen dimensions and viewing distance are in metres. <code>eye_path</code> is
+required and must contain one path per recording when processing blocks.</p>
 
 
 

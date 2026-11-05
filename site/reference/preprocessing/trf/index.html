@@ -27,7 +27,7 @@
     
     
       
-        <title>TRF and WAV alignment - AlmKanal</title>
+        <title>Stimulus epoching and WAV alignment - AlmKanal</title>
       
     
     
@@ -117,7 +117,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              TRF and WAV alignment
+              Stimulus epoching and WAV alignment
             
           </span>
         </div>
@@ -460,6 +460,33 @@
     
   
   Working with your data
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../defaults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Defaults and lab profiles
 
     
   </span>
@@ -1240,7 +1267,7 @@
   <span class="md-ellipsis">
     
   
-  TRF and WAV alignment
+  Stimulus epoching and WAV alignment
 
     
   </span>
@@ -1257,7 +1284,7 @@
   <span class="md-ellipsis">
     
   
-  TRF and WAV alignment
+  Stimulus epoching and WAV alignment
 
     
   </span>
@@ -1283,30 +1310,58 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#almkanal.almkanal_steps.trf_utils.EpochTRF" class="md-nav__link">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusEpochs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        EpochTRF
+        StimulusEpochs
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StimulusEpochs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusEpochs.reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reports
       </span>
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#almkanal.almkanal_steps.trf_utils.TRFSpanSpec" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusEpochs.run" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        TRFSpanSpec
+        run
       </span>
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="TRFSpanSpec">
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        StimulusSpanSpec
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StimulusSpanSpec">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#almkanal.almkanal_steps.trf_utils.TRFSpanSpec.from_events" class="md-nav__link">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec.from_events" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         from_events
@@ -1316,8 +1371,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec.labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        labels
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.build_stimulus_epochs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        build_stimulus_epochs
+      </span>
+    </span>
+  </a>
   
 </li>
       
@@ -1582,30 +1659,58 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#almkanal.almkanal_steps.trf_utils.EpochTRF" class="md-nav__link">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusEpochs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        EpochTRF
+        StimulusEpochs
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StimulusEpochs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusEpochs.reports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        reports
       </span>
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#almkanal.almkanal_steps.trf_utils.TRFSpanSpec" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusEpochs.run" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        TRFSpanSpec
+        run
       </span>
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="TRFSpanSpec">
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        StimulusSpanSpec
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="StimulusSpanSpec">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#almkanal.almkanal_steps.trf_utils.TRFSpanSpec.from_events" class="md-nav__link">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec.from_events" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         from_events
@@ -1615,8 +1720,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec.labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        labels
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#almkanal.almkanal_steps.stimulus_utils.build_stimulus_epochs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        build_stimulus_epochs
+      </span>
+    </span>
+  </a>
   
 </li>
       
@@ -1640,16 +1767,23 @@
   
 
 
-<h1 id="trf-epoching-and-wav-alignment">TRF epoching and WAV alignment</h1>
-<p><code>EpochTRF</code> prepares epochs with WAV-derived stimulus features. <code>TRFSpanSpec</code> describes the trial spans and audio files used for this workflow.</p>
+<h1 id="stimulus-epoching-and-wav-alignment">Stimulus epoching and WAV alignment</h1>
+<p><code>StimulusEpochs</code> divides each stimulus trial into non-overlapping, fixed-length
+epochs and appends one or more WAV-derived stimulus features. The resulting
+epochs can be used for TRFs and other analyses.
+Use <code>feature="envelope"</code> for a single feature or
+<code>feature=["envelope", "mel_onsets"]</code> to append several features.
+<code>resample_sfreq=200.0</code> resamples trial segments after alignment and physical-delay
+correction, before computing features at 200 Hz; <code>None</code> retains the input rate.</p>
+<p><code>StimulusSpanSpec</code> describes the trial spans and audio files used for this workflow.</p>
 
 
 <div class="doc doc-object doc-class">
 
 
 
-<h2 id="almkanal.almkanal_steps.trf_utils.EpochTRF" class="doc doc-heading">
-            <code>almkanal.almkanal_steps.trf_utils.EpochTRF</code>
+<h2 id="almkanal.almkanal_steps.stimulus_utils.StimulusEpochs" class="doc doc-heading">
+            <code>almkanal.almkanal_steps.stimulus_utils.StimulusEpochs</code>
 
 
 </h2>
@@ -1661,14 +1795,11 @@
 
 
 
-        <p>Create TRF epochs and attach stimulus features from WAV files.</p>
-<p><code>EpochTRF</code> extracts trial spans from a continuous recording, loads the
-corresponding WAV files, computes stimulus features, and returns fixed-length
-epochs containing both the neural data and the WAV-derived feature channels.</p>
-<p>Neural data can optionally be realigned to the stimulus clock using either
-recorded audio or an assumed clock drift when no recorded audio is available.
-A fixed physical-delay correction can subsequently be applied to the neural
-data.</p>
+        <p>Create fixed-length epochs within stimulus trials and attach WAV features.</p>
+<p>Optionally correct the recording clock, apply a fixed neural timing shift,
+then split trials into non-overlapping epochs with WAV features as <code>misc</code>
+channels. Defaults below describe the general profile; omitted settings use
+the active profile captured when the step is constructed.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -1687,13 +1818,12 @@ data.</p>
                 <code>gen_span_spec</code>
             </td>
             <td>
-                  <code><span title="collections.abc.Callable">Callable</span></code>
+                  <code><span title="callable">callable</span></code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Function that receives the input :class:<code>mne.io.BaseRaw</code> object and
-returns a :class:<code>TRFSpanSpec</code> describing the trial spans and associated
-WAV files.</p>
+                <p>Callback <code>gen_span_spec(raw) -&gt; StimulusSpanSpec</code> supplying trial spans,
+WAV paths, and optional metadata for the input recording.</p>
               </div>
             </td>
             <td>
@@ -1709,8 +1839,7 @@ WAV files.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Base directory used to locate WAV files referenced by the generated
-:class:<code>TRFSpanSpec</code>.</p>
+                <p>Directory used to resolve relative WAV paths in the generated span spec.</p>
               </div>
             </td>
             <td>
@@ -1719,14 +1848,39 @@ WAV files.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
-                <code>feature</code>
+                <code>resample_sfreq</code>
             </td>
             <td>
-                  <code><span title="str">str</span></code>
+                  <code><span title="float">float</span> | None</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>WAV feature to compute and append to the neural data.</p>
+                <p>Output sampling frequency in Hz. Resample continuous trial segments after
+alignment and physical-delay correction, before extracting and appending
+features. None retains the input rate. Uses FFT resampling with a boxcar
+window, automatic padding, and reflect_limited edge padding; MNE applies
+anti-aliasing internally. Trial spans always refer to input samples.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>feature</code>
+            </td>
+            <td>
+                  <code>str | sequence of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One or more distinct WAV features, appended in the requested order.
+Single-channel features use the requested name; multichannel features
+use that name as a prefix followed by component or band identifiers.
+Names must not overlap existing recording channels. Available features:
+<code>'envelope'</code> (RMS), <code>'rectify'</code>, <code>'mel'</code>, <code>'flux'</code>,
+<code>'mel_onsets'</code>, <code>'pitch'</code>, or <code>'pitch_voicing'</code>. See <code>prepare_audio</code>.</p>
               </div>
             </td>
             <td>
@@ -1742,8 +1896,7 @@ WAV files.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Low-pass cutoff frequency, in Hz, used when constructing the audio
-feature.</p>
+                <p>Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.</p>
               </div>
             </td>
             <td>
@@ -1759,16 +1912,12 @@ feature.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Physical-delay correction, in seconds, applied to the neural data after
-clock realignment. Positive values advance neural events relative to the
-WAV feature channels. The default of 16.5 ms compensates the typical
-playback-to-ear delay when the recorded audio reference precedes sound
-arrival at the ears. Use zero when the reference already represents
-sound arrival at the ears. Negative values add lag and emit a warning.</p>
+                <p>Neural timing shift in seconds, applied after clock correction.
+Positive values advance neural events; negative values add lag and warn.</p>
               </div>
             </td>
             <td>
-                  <code>0.0165</code>
+                  <code>0.0</code>
             </td>
           </tr>
           <tr class="doc-section-item">
@@ -1780,7 +1929,8 @@ sound arrival at the ears. Negative values add lag and emit a warning.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Length of the generated epochs, in seconds.</p>
+                <p>Duration of each non-overlapping epoch in seconds. Must be positive;
+incomplete trailing epochs are discarded.</p>
               </div>
             </td>
             <td>
@@ -1796,10 +1946,8 @@ sound arrival at the ears. Negative values add lag and emit a warning.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Recorded audio channels used to estimate the temporal relationship
-between the recording and the WAV files. When provided, audio-based
-alignment takes precedence over assumed-drift alignment. When <code>None</code>,
-no clock realignment is performed unless <code>realign_without_audio=True</code>.</p>
+                <p>Recorded audio channel names for estimating offset and drift.
+<code>None</code> disables measured alignment; see <code>realign_without_audio</code>.</p>
               </div>
             </td>
             <td>
@@ -1815,9 +1963,8 @@ no clock realignment is performed unless <code>realign_without_audio=True</code>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Additional keyword arguments passed to
-:func:<code>estimate_raw_wav_alignment</code>. These override that function's
-defaults.</p>
+                <p>Overrides for <code>estimate_raw_wav_alignment</code>, e.g. <code>{'max_lag_s': 1.0}</code>.
+Requires <code>audio_channels</code>; <code>None</code> uses the captured alignment defaults.</p>
               </div>
             </td>
             <td>
@@ -1833,8 +1980,8 @@ defaults.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Whether annotations from the original recording are retained in the
-realigned data.</p>
+                <p>Keep annotations and reject epochs overlapping bad intervals.
+<code>False</code> removes annotations before epoching.</p>
               </div>
             </td>
             <td>
@@ -1850,9 +1997,8 @@ realigned data.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Behaviour when alignment of a trial fails. <code>'raise'</code> propagates the
-alignment error; <code>'skip'</code> records the failure and continues with the
-remaining trials.</p>
+                <p>Raise on alignment failure, or warn, record the failure, and skip the
+trial. Applies to measured and assumed alignment, not quality warnings.</p>
               </div>
             </td>
             <td>
@@ -1868,7 +2014,7 @@ remaining trials.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Whether to emit informational output during processing.</p>
+                <p>Emit processing messages. Quality warnings are shown regardless.</p>
               </div>
             </td>
             <td>
@@ -1884,9 +2030,8 @@ remaining trials.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If <code>True</code> and <code>audio_channels</code> is <code>None</code>, realign neural data using
-the original WAV duration and <code>fallback_drift_us_per_s</code> instead of
-estimating offset and drift from recorded audio.</p>
+                <p>Resample using assumed drift and WAV duration when <code>audio_channels</code>
+is <code>None</code>. Assumes WAV time zero at the trial onset.</p>
               </div>
             </td>
             <td>
@@ -1902,12 +2047,44 @@ estimating offset and drift from recorded audio.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Assumed clock drift, in microseconds per second, used when
-<code>realign_without_audio=True</code>. The default is +499 µs/s.</p>
+                <p>Assumed drift in microseconds per second for <code>realign_without_audio</code>
+and, by default, missing-end inference in <code>gen_span_spec</code>.</p>
               </div>
             </td>
             <td>
-                  <code>DEFAULT_FALLBACK_DRIFT_US_PER_S</code>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>must_be_before</code>
+            </td>
+            <td>
+                  <code>tuple of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Step class names that must follow this step if present in the pipeline.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>must_be_after</code>
+            </td>
+            <td>
+                  <code>tuple of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Step class names that must precede this step if present in the pipeline.</p>
+              </div>
+            </td>
+            <td>
+                  <code>()</code>
             </td>
           </tr>
       </tbody>
@@ -1916,100 +2093,34 @@ estimating offset and drift from recorded audio.</p>
 
 <details class="note" open>
   <summary>Notes</summary>
-  <p>Audio-based realignment estimates both onset offset and clock drift from the
-recorded audio. The channels specified by <code>audio_channels</code> must therefore
-be present and contain sufficient signal bandwidth for reliable alignment.</p>
-<p>When <code>realign_without_audio=True</code>, the mapping between WAV time and raw
-time is assumed to be</p>
-<p><code>t_raw = (1 + drift / 1e6) * t_wav</code>.</p>
-<p>WAV time zero is assumed to coincide with the trial onset. This mode cannot
-estimate an onset offset or verify the assumed drift. The original trial-end
-sample does not determine the drift; instead, the WAV duration determines
-the duration of the corrected trial.</p>
-<p>If recorded audio is supplied, failed audio-based fits follow
-<code>on_alignment_error</code> and do not fall back to the assumed-drift method.</p>
-<p>Clock realignment is performed before <code>hw_delay_s</code> is applied. The WAV
-feature channels themselves are not shifted. Physical delays are rounded to
-the nearest sample on the corrected sampling grid.</p>
-<p>Realignment retains sufficient recording margins to preserve the complete
-WAV duration. Insufficient recording coverage is treated as an alignment
-error.</p>
-<p>Audio alignment searches within <code>alignment_kwargs['max_lag_s']</code> around
-zero for each analysis window. The search range must accommodate both the
-initial offset and drift accumulated over the full stimulus duration. For
-example, a drift of +500 µs/s accumulates to 0.63 s over a 1260 s stimulus,
-so a 1 s search range can be more appropriate than the default 0.25 s.
-Missing-end inference does not expand this range automatically.</p>
-<p>Potentially unreliable alignment fits emit :class:<code>RuntimeWarning</code> even when
-<code>verbose=False</code> but are still applied. <code>on_alignment_error</code> controls
-actual alignment failures, not quality warnings. The residual-RMS warning
-threshold can be configured with
-<code>alignment_kwargs['warn_residual_rms_ms']</code> and defaults to 10 ms.</p>
-<p>The processing metadata returned by :meth:<code>run</code> is stored under
-<code>'TRF_info'</code> and includes the effective alignment method, alignment
-settings, applied physical delay, per-trial diagnostics, and inferred trial
-endpoints.</p>
+  <ul>
+<li><strong>Recorded audio:</strong> takes precedence over assumed drift and needs sufficient
+  signal bandwidth. Failed fits follow <code>on_alignment_error</code> without falling
+  back to assumed drift. For long stimuli, increase
+  <code>alignment_kwargs['max_lag_s']</code> to cover offset plus accumulated drift;
+  see <code>estimate_raw_wav_alignment</code> for search limits and quality warnings.</li>
+<li><strong>Assumed drift:</strong> uses <code>t_raw = (1 + drift / 1e6) * t_wav</code> relative to
+  trial onset. Positive drift lengthens raw time. The WAV determines trial
+  duration; the end trigger does not determine drift. No offset is measured.</li>
+<li><strong>Physical delay:</strong> applied after clock correction, rounded to a sample.
+  WAV features stay unchanged. Use zero if the audio reference already
+  represents sound arrival at the ears. Alignment needs raw coverage for the
+  full WAV plus delay margins; insufficient coverage is an alignment error.</li>
+<li><strong>Salzburg defaults:</strong> <code>hw_delay_s=0.0165</code> compensates the 16.5 ms air-tube
+  delay when the reference precedes the tubes. The profile also sets
+  <code>audio_channels=('MISC007', 'MISC008')</code> and
+  <code>fallback_drift_us_per_s=499.0</code>. Pass <code>audio_channels=None</code> explicitly
+  to use assumed drift with this profile.</li>
+</ul>
 </details>
 
 <details class="see-also" open>
   <summary>See Also</summary>
-  <p>estimate_raw_wav_alignment
-    Estimate clock offset and drift from recorded and reference audio.
-TRFSpanSpec
-    Description of trial spans and their associated WAV files.</p>
+  <p>StimulusSpanSpec : Trial spans, WAV paths, and optional metadata.
+build_stimulus_epochs : Standalone epoch builder using an existing span spec.
+estimate_raw_wav_alignment : Alignment options and fit diagnostics.
+prepare_audio : Available WAV features and their output channels.</p>
 </details>
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-class">
-
-
-
-<h2 id="almkanal.almkanal_steps.trf_utils.TRFSpanSpec" class="doc doc-heading">
-            <code>almkanal.almkanal_steps.trf_utils.TRFSpanSpec</code>
-
-
-</h2>
-
-
-    <div class="doc doc-contents first">
-
-
-
-        <p>Minimal spec for TRF epoch building.
-- spans_by_label: REQUIRED raw-sample spans
-- metadata_by_label: OPTIONAL per-label metadata to merge into epoch metadata
-                     values may be scalars (broadcast to all epochs of that label)
-                     or sequences of length n_epochs for that label
-- wav_by_label: OPTIONAL WAV paths, relative to base_audio_path or absolute.
-               Distinct trial labels may reference the same WAV.</p>
-
 
 
 
@@ -2034,29 +2145,168 @@ TRFSpanSpec
 <div class="doc doc-object doc-function">
 
 
-<h3 id="almkanal.almkanal_steps.trf_utils.TRFSpanSpec.from_events" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">from_events</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">onset_trigger_to_wav</span><span class="p">,</span> <span class="n">end_triggers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">stim_channel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">infer_missing_ends</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">base_audio_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fallback_drift_us_per_s</span><span class="o">=</span><span class="n">DEFAULT_FALLBACK_DRIFT_US_PER_S</span><span class="p">)</span></code>
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
-  </span>
+<h3 id="almkanal.almkanal_steps.stimulus_utils.StimulusEpochs.reports" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">reports</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">report</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span></code>
 
 </h3>
 
 
     <div class="doc doc-contents ">
 
-        <p>Build ordered, uniquely labelled trials, including repeated WAVs.</p>
-<p>Set infer_missing_ends=True to replace missing end triggers with WAV
-duration * (1 + fallback_drift_us_per_s / 1e6), on the raw clock.
-The default prior is +499 us/s; this only defines the span. EpochTRF
-estimates actual offset and drift when audio_channels are supplied.
-Without recorded audio, enable realign_without_audio on EpochTRF to
-also resample the neural data, using the same fallback_drift_us_per_s.
-Pass base_audio_path for relative WAV paths, and end_triggers=None
-when no end-trigger codes exist. Actual end triggers take precedence.
-End-inference provenance is retained in epoch metadata and reports;
-the Raw trigger channel is not modified.</p>
+        <p>Add stimulus epochs and any alignment diagnostics to the report.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="mne.BaseEpochs">BaseEpochs</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Epochs produced by this step.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>report</code>
+            </td>
+            <td>
+                  <code><span title="mne.Report">Report</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Report to update in place.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>info</code>
+            </td>
+            <td>
+                  <code><span title="almkanal.info.AlmKanalInfo">AlmKanalInfo</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pipeline history containing this step's <code>TRF_info</code> entry.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="almkanal.almkanal_steps.stimulus_utils.StimulusEpochs.run" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">info</span><span class="p">)</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Build stimulus epochs and collect processing diagnostics.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>data</code>
+            </td>
+            <td>
+                  <code><span title="mne.io.BaseRaw">BaseRaw</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Continuous recording passed to <code>gen_span_spec</code> and then epoched.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>info</code>
+            </td>
+            <td>
+                  <code><span title="almkanal.info.AlmKanalInfo">AlmKanalInfo</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Pipeline processing history; not used by this step.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>result</code></td>            <td>
+                  <code><span title="dict">dict</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>data</code> contains the epochs; <code>TRF_info</code> contains settings, spans,
+alignment diagnostics, and inferred endpoints. <code>defaults</code> records
+the captured profile and effective step parameters.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -2069,7 +2319,687 @@ the Raw trigger channel is not modified.</p>
 
     </div>
 
-</div><p><code>TRFSpanSpec</code> is a supporting data class, not an <code>AlmKanalStep</code>. See the <a href="../../../audio-alignment/">WAV-alignment guide</a> for workflow details.</p>
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec" class="doc doc-heading">
+            <code>almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec</code>
+
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>Describe trial spans, WAV files, and metadata for stimulus epoching.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>spans_by_label</code>
+            </td>
+            <td>
+                  <code>dict of str to tuple of (int, int | None)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Trial label to <code>(onset, end)</code> samples, including <code>raw.first_samp</code>.
+An end of <code>None</code> leaves the available raw/WAV duration as the limit.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>metadata_by_label</code>
+            </td>
+            <td>
+                  <code>dict of str to mapping</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Extra epoch metadata per trial. Scalars are repeated; sequences with
+one value per retained epoch are assigned elementwise. Defaults to empty.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wav_by_label</code>
+            </td>
+            <td>
+                  <code>mapping of str to str | pathlib.Path</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>WAV paths, absolute or relative to <code>base_audio_path</code>. Missing entries
+use the trial label with a <code>.wav</code> suffix. Defaults to empty.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Trials are processed in insertion order. Use distinct labels for repeated
+presentations of the same WAV, or construct them with :meth:<code>from_events</code>.
+<code>build_stimulus_epochs</code> can override the implicit WAV suffix via <code>wav_ext</code>.</p>
+</details>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec.from_events" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">from_events</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">onset_trigger_to_wav</span><span class="p">,</span> <span class="n">end_triggers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">stim_channel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">infer_missing_ends</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">base_audio_path</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">fallback_drift_us_per_s</span><span class="o">=</span><span class="n">DEFAULT_FALLBACK_DRIFT_US_PER_S</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Build uniquely labelled stimulus trials from onset and end triggers.</p>
+<p>Defaults below describe the general profile; omitted settings use the
+active defaults profile.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw</code>
+            </td>
+            <td>
+                  <code><span title="mne.io.BaseRaw">BaseRaw</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Continuous recording containing the stimulus triggers.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>onset_trigger_to_wav</code>
+            </td>
+            <td>
+                  <code>mapping of int to str | pathlib.Path</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Onset trigger codes mapped to WAV paths. Repeated codes create
+separate trials referencing the same WAV.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>end_triggers</code>
+            </td>
+            <td>
+                  <code>int | sequence of int | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Codes that end a trial. <code>None</code> requires <code>infer_missing_ends=True</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>stim_channel</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Trigger channel name. <code>None</code> requires exactly one stim channel.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>infer_missing_ends</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Estimate missing endpoints from WAV duration and assumed drift.
+Recorded end triggers take precedence.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>base_audio_path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>WAV directory, required for relative paths when inferring ends.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fallback_drift_us_per_s</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Assumed drift in microseconds per second for end inference.
+Positive values lengthen the span; Salzburg defaults to +499.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>spec</code></td>            <td>
+                  <code><a class="autorefs autorefs-internal" title="almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec" href="./#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec">StimulusSpanSpec</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Trials in trigger order, labelled <code>trial_000</code>, <code>trial_001</code>, etc.,
+with WAV paths, trigger codes, and any end-inference metadata.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>End inference uses <code>WAV duration * (1 + drift / 1e6)</code> and leaves the
+trigger channel unchanged. It only defines spans: to also resample
+neural data without recorded audio, set <code>realign_without_audio=True</code>
+on :class:<code>EpochStimuls</code> and use the same <code>fallback_drift_us_per_s</code>.
+With recorded audio, EpochStimuls estimates the offset and drift instead.</p>
+</details>
+
+<details class="see-also" open>
+  <summary>See Also</summary>
+  <p>find_audio_trials : Trigger pairing and missing-end handling.</p>
+</details>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec.labels" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">labels</span><span class="p">()</span></code>
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Return trial labels in insertion order.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><p><code>StimulusSpanSpec</code> is a supporting data class, not an <code>AlmKanalStep</code>. See the <a href="../../../audio-alignment/">WAV-alignment guide</a> for workflow details.</p>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="almkanal.almkanal_steps.stimulus_utils.build_stimulus_epochs" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">almkanal</span><span class="o">.</span><span class="n">almkanal_steps</span><span class="o">.</span><span class="n">stimulus_utils</span><span class="o">.</span><span class="n">build_stimulus_epochs</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">base_audio_path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">feature</span><span class="o">=</span><span class="s1">'envelope'</span><span class="p">,</span> <span class="n">resample_sfreq</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">audio_cutoff_hz</span><span class="o">=</span><span class="mf">80.0</span><span class="p">,</span> <span class="n">hw_delay_s</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">epoch_len_s</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">wav_ext</span><span class="o">=</span><span class="s1">'.wav'</span><span class="p">,</span> <span class="n">audio_channels</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">realign_without_audio</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">fallback_drift_us_per_s</span><span class="o">=</span><span class="n">DEFAULT_FALLBACK_DRIFT_US_PER_S</span><span class="p">,</span> <span class="n">alignment_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preserve_annotations</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">on_alignment_error</span><span class="o">=</span><span class="s1">'raise'</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></code>
+
+</h2>
+
+
+    <div class="doc doc-contents first">
+
+        <p>Build fixed-length stimulus epochs with stimulus features from WAV files.</p>
+<p>Defaults below describe the general profile; omitted configurable settings
+use the active defaults profile.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                <code>raw</code>
+            </td>
+            <td>
+                  <code><span title="mne.io.BaseRaw">BaseRaw</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Continuous recording to epoch. The input is not modified.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>spec</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec" href="./#almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec">StimulusSpanSpec</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Trial spans, WAV paths, and optional per-trial metadata.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>base_audio_path</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span> | <span title="pathlib.Path">Path</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Directory used to resolve relative WAV paths in <code>spec</code>.</p>
+              </div>
+            </td>
+            <td>
+                <em>required</em>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>resample_sfreq</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Output sampling frequency in Hz. Resample continuous trial segments after
+alignment and physical-delay correction, before extracting and appending
+features. None retains the input rate. Uses FFT resampling with a boxcar
+window, automatic padding, and reflect_limited edge padding; MNE applies
+anti-aliasing internally. Trial spans always refer to input samples.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>feature</code>
+            </td>
+            <td>
+                  <code>str | sequence of str</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>One or more distinct WAV features, appended in the requested order.
+Single-channel features use the requested name; multichannel features
+use that name as a prefix followed by component or band identifiers.
+Names must not overlap existing recording channels. Available features:
+<code>'envelope'</code> (RMS), <code>'rectify'</code>, <code>'mel'</code>, <code>'flux'</code>,
+<code>'mel_onsets'</code>, <code>'pitch'</code>, or <code>'pitch_voicing'</code>. See <code>prepare_audio</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;envelope&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>audio_cutoff_hz</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.</p>
+              </div>
+            </td>
+            <td>
+                  <code>80.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>hw_delay_s</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Neural timing shift in seconds, applied after clock correction.
+Positive values advance neural events; negative values add lag and warn.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>epoch_len_s</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Duration of each non-overlapping epoch in seconds. Must be positive;
+incomplete trailing epochs are discarded.</p>
+              </div>
+            </td>
+            <td>
+                  <code>5.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>wav_ext</code>
+            </td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Suffix used to turn labels without a <code>wav_by_label</code> entry into paths.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;.wav&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>audio_channels</code>
+            </td>
+            <td>
+                  <code>sequence of str | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Recorded audio channel names for estimating offset and drift.
+<code>None</code> disables measured alignment; see <code>realign_without_audio</code>.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>realign_without_audio</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Resample using assumed drift and WAV duration when <code>audio_channels</code>
+is <code>None</code>. Assumes WAV time zero at the trial onset.</p>
+              </div>
+            </td>
+            <td>
+                  <code>False</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>fallback_drift_us_per_s</code>
+            </td>
+            <td>
+                  <code><span title="float">float</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Assumed drift in microseconds per second for <code>realign_without_audio</code>.
+Positive values mean the recording clock spans more time than the WAV.</p>
+              </div>
+            </td>
+            <td>
+                  <code>0.0</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>alignment_kwargs</code>
+            </td>
+            <td>
+                  <code><span title="mapping">mapping</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Overrides for <code>estimate_raw_wav_alignment</code>, e.g. <code>{'max_lag_s': 1.0}</code>.
+Requires <code>audio_channels</code>; <code>None</code> uses the active alignment defaults.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>preserve_annotations</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Keep annotations and reject epochs overlapping bad intervals.
+<code>False</code> removes annotations before epoching.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>on_alignment_error</code>
+            </td>
+            <td>
+                  <code>(&#39;raise&#39;, &#39;skip&#39;)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Raise on alignment failure, or warn and skip the affected trial.
+Applies to measured and assumed alignment, not fit-quality warnings.</p>
+              </div>
+            </td>
+            <td>
+                  <code>&#39;raise&#39;</code>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>verbose</code>
+            </td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Emit processing messages. Quality warnings are shown regardless.</p>
+              </div>
+            </td>
+            <td>
+                  <code>True</code>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+<th>Name</th>          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+<td><code>epochs</code></td>            <td>
+                  <code><span title="mne.Epochs">Epochs</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Concatenated epochs with the input channels, WAV features as <code>misc</code>
+channels, and trial/timing metadata. Raises if no epochs survive.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<details class="note" open>
+  <summary>Notes</summary>
+  <p>Recorded audio takes precedence over assumed drift, including when a fit
+fails. Clock correction precedes the sample-rounded <code>hw_delay_s</code> shift;
+WAV features are not shifted. Alignment requires recording coverage for
+the full WAV duration plus any physical-delay margins.</p>
+<p>The Salzburg profile uses <code>hw_delay_s=0.0165</code>, <code>audio_channels</code>
+<code>('MISC007', 'MISC008')</code>, and <code>fallback_drift_us_per_s=499.0</code>.
+See :class:<code>StimulusEpochs</code> for delay conventions and assumed-drift behavior.</p>
+</details>
+
+<details class="see-also" open>
+  <summary>See Also</summary>
+  <p>StimulusEpochs : Pipeline step with alignment diagnostics and reporting.
+estimate_raw_wav_alignment : Alignment options and search-range guidance.
+prepare_audio : Available WAV features and their output channels.</p>
+</details>
+
+    </div>
+
+</div>
 
 
 

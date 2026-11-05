@@ -8,21 +8,15 @@ hide:
 <div class="grid ak-hero" markdown>
 <div markdown>
 
-Built on MNE-Python &nbsp; &middot; &nbsp; Open source
-{ .ak-eyebrow }
-
 # Alm<span>Kanal</span>
 
 Flexible, modular and extendable preprocessing pipelines for M/EEG data
 { .ak-tagline }
 
-Build the pipeline you need. See every step. Then turn what you ran into your Methods section.
+Build and run preprocessing pipelines, keep track of the settings, and generate a Methods draft from your processing history.
 
 [Get started &rarr;](quickstart.md){ .md-button .md-button--primary }
 [Create your own step](custom-steps.md){ .md-button }
-
-Your data. Your steps. No fuss.
-{ .ak-note }
 
 </div>
 <div class="ak-demo" markdown>
@@ -75,7 +69,7 @@ From code to Methods
 
     1. Widmann, A., Schröger, E., & Maess, B. (2015). Digital filter design for electrophysiological data: A practical approach. Journal of Neuroscience Methods, 250, 34–46. doi:10.1016/j.jneumeth.2014.08.002
 
-    2. Keil, A., Debener, S., Gratton, G., Junghöfer, M., Kappenman, E. S., Luck, S. J., Luu, P., Miller, G. A., & Yee, C. M. (2014). Committee report: Publication guidelines and recommendations for studies using EEG and MEG. Psychophysiology, 51(1), 1–21. https://doi.org/10.1111/psyp.12147
+    2. Keil, A., Debener, S., Gratton, G., Junghöfer, M., Kappenman, E. S., Luck, S. J., Luu, P., Miller, G. A., & Yee, C. M. (2014). Committee report: Publication guidelines and recommendations for studies using EEG and MEG. Psychophysiology, 51(1), 1–21. [https://doi.org/10.1111/psyp.12147](https://doi.org/10.1111/psyp.12147)
 
     > **Disclaimer**
     >
@@ -83,76 +77,74 @@ From code to Methods
 
     </div>
 
-    [How Methods reporting works &rarr;](methods.md)
-
 </div>
 </div>
 
 <div class="grid ak-flow" markdown>
 
-**01 &nbsp; Compose**<br>Reusable Python steps
+**01 &nbsp; Define**<br>Choose and configure steps
 
-**02 &nbsp; Check**<br>Declared ordering rules
+**02 &nbsp; Validate**<br>Check step-order constraints
 
-**03 &nbsp; Run**<br>Process and inspect
+**03 &nbsp; Run**<br>Process data and review reports
 
-**04 &nbsp; Document**<br>Generate Methods text
+**04 &nbsp; Document**<br>Save settings and draft Methods
 
 </div>
 
-## Made for the way research evolves.
+## What you can do with AlmKanal
 
-Start small, adapt a step, or bring an existing analysis along.
+AlmKanal builds on MNE-Python by bringing commonly used preprocessing functions together in a modular pipeline framework. Feel free to use the existing steps, add your own, or start with data that have already been processed.
 
 <div class="grid cards" markdown>
 
--   **Pipelines you can read**
+-   **Pipelines in Python**
 
-    Steup your processing steps directly in Python, in the order they should run.
+    Define and configure processing steps directly in Python. The pipeline makes the order of operations explicit.
 
     [Build a pipeline &rarr;](pipelines.md)
 
--   **Steps you can extend**
+-   **Your own processing steps**
 
-    Add a custom Step without stepping away from the core framework.
+    Add a custom `AlmKanalStep` when you need an operation that is not covered by the built-in steps.
 
     [Create your own step &rarr;](custom-steps.md)
 
--   **Checks before you run**
+-   **Step-order checks**
 
-    Conflicts are catched by the ordering rules declared in the preprocessing steps.
+    Steps can declare which operations must come before or after them. AlmKanal checks those constraints before processing starts.
 
     [Understand validation &rarr;](validation.md)
 
--   **Methods from your pipeline**
+-   **A record of what ran**
 
-    Turn recorded preprocessing settings into a draft of your Methods section to review and edit.
+    Save the preprocessing settings used in a pipeline and generate an editable draft of the Methods section from that history.
 
     [Generate Methods text &rarr;](methods.md)
 
--   **Start with the data you have**
+-   **Use existing MNE data**
 
-    Use compatible steps on existing MNE Raw or Epochs objects, including previously processed recordings.
+    Apply compatible steps to MNE `Raw` or `Epochs` objects, including recordings that have already been preprocessed.
 
     [Work with existing data &rarr;](pipelines.md)
 
--   **Bring recordings together**
+-   **Audio and eye-tracking alignment**
 
-    Prepare synchronized M/EEG, VPixx eye-tracking, and WAV audio data for subsequent analyses.
+    Tools for working with M/EEG recordings alongside WAV audio stimuli and VPixx eye-tracking data.
 
     [Eye tracking &rarr;](eye-tracking.md) &nbsp; [Audio alignment &rarr;](audio-alignment.md)
 
 </div>
 
-## One small example. The whole workflow.
+## Try a complete example
 
-Try a pipeline on synthetic EEG, save its processing history, and generate a Methods draft.
+The [quick start](quickstart.md) runs a pipeline on synthetic EEG data, saves the processing history, and generates a Methods draft.
 
 [Open the quick start &rarr;](quickstart.md){ .md-button .md-button--primary }
 [Explore the examples](examples.md){ .md-button }
 
 ---
 
-The name is a nod to Salzburg's *Almkanal* &mdash; and to the hope of spending less time rewriting preprocessing boilerplate and more time outside in the sun. ☀️ 🍹 🏖️
+The name is a nod to Salzburg's *Almkanal* — and to the hope of spending less time rewriting preprocessing code and more time outside in the sun. ☀️ 🍹 🏖️
 
 </div>
