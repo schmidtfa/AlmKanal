@@ -133,6 +133,6 @@ The [quick start](quickstart.md) runs a pipeline on synthetic EEG data, saves th
 
 ---
 
-The name is a nod to Salzburg's *Almkanal* — and to the hope of spending less time rewriting preprocessing code and more time outside in the sun. ☀️ 🍹 🏖️
+The name is a nod to Salzburg's *Almkanal* — and to the hope of spending less time rewriting preprocessing boilerplate code and more time outside in the sun. ☀️ 🍹 🏖️
 
 </div>
