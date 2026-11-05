@@ -479,6 +479,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../defaults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Defaults and lab profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../validation/" class="md-nav__link">
         
   
@@ -1013,6 +1040,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#defaults-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Defaults API
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#further-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1346,7 +1384,7 @@
   <span class="md-ellipsis">
     
   
-  TRF and WAV alignment
+  Stimulus epoching and WAV alignment
 
     
   </span>
@@ -1668,6 +1706,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#defaults-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Defaults API
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#further-documentation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1724,6 +1773,16 @@
 </code></pre></div>
 <p>Subclass the base <code>AlmKanalStep</code> class and implement <code>run(data, info)</code> and <code>reports(data, report, info)</code>. The first returns a dictionary with a <code>"data"</code> entry plus metadata; the second receives the processed data and updated context and may add report content.</p>
 <p>Use <code>must_be_before</code>, <code>must_be_after</code>, and <code>allow_repeated</code> for supported construction-time checks. See <a href="../validation/">validation</a> for their exact scope.</p>
+<h2 id="defaults-api">Defaults API</h2>
+<p><code>set_defaults(profile="generic", **sections)</code> selects general defaults, the
+<code>"salzburg"</code> profile, or a <code>Defaults</code> object and applies optional section overrides.
+It returns the activated profile. Each call starts from the selected profile;
+pass <code>get_defaults()</code> to extend the active settings. <code>use_defaults()</code> accepts
+the same arguments within a temporary <code>with</code> block.</p>
+<p><code>Defaults.generic()</code> and <code>Defaults.salzburg()</code> construct reusable profiles;
+<code>profile.with_overrides(...)</code> returns a customized copy. <code>configure(profile)</code>
+activates an already-built profile. See <a href="../defaults/">Defaults and lab profiles</a>
+for available sections, capture timing, and examples.</p>
 <h2 id="further-documentation">Further documentation</h2>
 <p>For detailed documentation of individual classes and parameters, see the automatically generated API reference for AlmKanal, AlmKanalStep, and the preprocessing steps. The API reference is generated directly from the Python docstrings.</p>
 <p>For practical examples, see VPixx alignment, WAV alignment, and Methods reporting.</p>

@@ -479,6 +479,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../defaults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Defaults and lab profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../validation/" class="md-nav__link">
         
   
@@ -853,6 +880,28 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Inspect alignment diagnostics
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-sampling-frequency-and-audio-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose the sampling frequency and audio features
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#share-stimulus-processing-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Share stimulus-processing defaults
       </span>
     </span>
   </a>
@@ -1316,7 +1365,7 @@
   <span class="md-ellipsis">
     
   
-  TRF and WAV alignment
+  Stimulus epoching and WAV alignment
 
     
   </span>
@@ -1620,6 +1669,28 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#choose-the-sampling-frequency-and-audio-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose the sampling frequency and audio features
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#share-stimulus-processing-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Share stimulus-processing defaults
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1643,17 +1714,17 @@
   <h1>WAV alignment</h1>
 
 <h2 id="define-trials-and-their-wav-files">Define trials and their WAV files</h2>
-<p><code>TRFSpanSpec</code> describes raw-sample trial spans and their corresponding stimuli. <code>EpochTRF</code> uses a function that creates this specification from the input recording, prepares WAV features, and returns fixed-length epochs.</p>
+<p><code>StimulusSpanSpec</code> describes raw-sample trial spans and their corresponding stimuli. <code>EpochStimuls</code> uses a function that creates this specification from the input recording, prepares WAV features, and returns fixed-length epochs.</p>
 <p>The following is an acquisition-dependent example. It assumes known onset/end trigger codes and a recorded-audio channel. Replace those values with your experiment's mapping.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">mne</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">almkanal</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlmKanal</span><span class="p">,</span> <span class="n">EpochTRF</span><span class="p">,</span> <span class="n">TRFSpanSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">almkanal</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlmKanal</span><span class="p">,</span> <span class="n">EpochStimuls</span><span class="p">,</span> <span class="n">StimulusSpanSpec</span>
 
 <span class="n">AUDIO_DIR</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"stimuli"</span><span class="p">)</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">make_spans</span><span class="p">(</span><span class="n">raw</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">TRFSpanSpec</span><span class="o">.</span><span class="n">from_events</span><span class="p">(</span>
+    <span class="k">return</span> <span class="n">StimulusSpanSpec</span><span class="o">.</span><span class="n">from_events</span><span class="p">(</span>
         <span class="n">raw</span><span class="p">,</span>
         <span class="n">onset_trigger_to_wav</span><span class="o">=</span><span class="p">{</span><span class="mi">1</span><span class="p">:</span> <span class="s2">"story.wav"</span><span class="p">},</span>
         <span class="n">end_triggers</span><span class="o">=</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
@@ -1663,11 +1734,12 @@
 
 <span class="n">raw</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_raw_fif</span><span class="p">(</span><span class="s2">"your_recording_raw.fif"</span><span class="p">,</span> <span class="n">preload</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">pipeline</span> <span class="o">=</span> <span class="n">AlmKanal</span><span class="p">([</span>
-    <span class="n">EpochTRF</span><span class="p">(</span>
+    <span class="n">EpochStimuls</span><span class="p">(</span>
         <span class="n">gen_span_spec</span><span class="o">=</span><span class="n">make_spans</span><span class="p">,</span>
         <span class="n">base_audio_path</span><span class="o">=</span><span class="n">AUDIO_DIR</span><span class="p">,</span>
         <span class="n">audio_channels</span><span class="o">=</span><span class="p">[</span><span class="s2">"AUDIO"</span><span class="p">],</span>  <span class="c1"># Your actual recorded-audio channel.</span>
-        <span class="n">feature</span><span class="o">=</span><span class="s2">"envelope"</span><span class="p">,</span>
+        <span class="n">feature</span><span class="o">=</span><span class="p">[</span><span class="s2">"envelope"</span><span class="p">,</span> <span class="s2">"pitch_voicing"</span><span class="p">],</span>
+        <span class="n">resample_sfreq</span><span class="o">=</span><span class="mf">200.0</span><span class="p">,</span>
         <span class="n">epoch_len_s</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span>
         <span class="n">hw_delay_s</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>  <span class="c1"># Only when the reference represents sound at the ears.</span>
         <span class="n">on_alignment_error</span><span class="o">=</span><span class="s2">"raise"</span><span class="p">,</span>
@@ -1709,6 +1781,90 @@
 <p>Review the QC output and recorded metadata for offset, drift, residual error, correspondence strength, rejected or skipped trials, and retained epochs. Long stimuli can need a wider alignment search interval to accommodate accumulated clock drift.</p>
 <p>Quality warnings can be emitted even when an alignment is applied. <code>on_alignment_error="raise"</code> stops actual failures; it is not an automatic rejection rule for every questionable fit. Use study-specific acceptance criteria and keep them with the analysis.</p>
 <p>Preserve trigger and recorded-audio channels until they have been used, and avoid preprocessing away the bandwidth needed for alignment.</p>
+<h2 id="choose-the-sampling-frequency-and-audio-features">Choose the sampling frequency and audio features</h2>
+<p><code>resample_sfreq</code> sets the output sampling frequency in Hz. With <code>None</code>, the
+input sampling frequency is retained. Trial spans and trigger samples always
+refer to the original recording. Alignment and the sample-rounded physical-delay
+correction run at that original rate. Each continuous trial segment is then
+resampled before audio features are computed at the output rate and appended.
+This preserves the available recorded-audio bandwidth for alignment and avoids
+resampling already appended features. An earlier resampling step reduces the
+bandwidth available to alignment.</p>
+<p>Segment resampling uses MNE's FFT method with a boxcar frequency-domain window,
+automatic padding, and <code>reflect_limited</code> edge padding. MNE applies anti-aliasing
+internally. Annotations are preserved when <code>preserve_annotations=True</code>; epochs
+overlapping bad annotations are rejected. Reports record the original and output
+sampling frequencies, resampling method, and processing order.</p>
+<p><code>feature</code> accepts either one feature name or a nonempty sequence of distinct
+feature names. Channels are appended in the requested feature order as <code>misc</code>
+channels. Single-channel features use the requested feature name. Multichannel
+features use that name followed by component or band identifiers:</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Appended channels</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>envelope</code></td>
+<td><code>envelope</code> (RMS amplitude)</td>
+</tr>
+<tr>
+<td><code>rectify</code></td>
+<td><code>rectify_pos_rect</code>, <code>rectify_neg_rect</code></td>
+</tr>
+<tr>
+<td><code>mel</code></td>
+<td><code>mel_1_&lt;frequency&gt;Hz</code>, …</td>
+</tr>
+<tr>
+<td><code>flux</code></td>
+<td><code>flux</code> (onset strength)</td>
+</tr>
+<tr>
+<td><code>mel_onsets</code></td>
+<td><code>mel_onsets_1_&lt;frequency&gt;Hz</code>, …</td>
+</tr>
+<tr>
+<td><code>pitch</code></td>
+<td><code>pitch</code> (fundamental frequency in Hz)</td>
+</tr>
+<tr>
+<td><code>pitch_voicing</code></td>
+<td><code>pitch_voicing_log2_f0_centered</code>, <code>pitch_voicing_voicing</code></td>
+</tr>
+</tbody>
+</table>
+<p>Mel band indices start at one and frequency labels are rounded band centers.
+Feature names must not repeat, and appended channel names must not overlap
+recording channels. <code>audio_cutoff_hz</code> controls the feature low-pass filter;
+feature extraction details are described by <code>prepare_audio</code>. Features share the
+output sampling grid; only the common recording/feature duration contributes
+epochs, and incomplete trailing epochs are discarded.</p>
+<p>The standalone <code>build_stimulus_epochs</code> helper accepts the same <code>feature</code> and
+<code>resample_sfreq</code> parameters with an existing <code>StimulusSpanSpec</code>.</p>
+<h2 id="share-stimulus-processing-defaults">Share stimulus-processing defaults</h2>
+<p>Use the <code>stimuli</code> defaults section to configure shared settings for
+<code>EpochStimuls</code>, <code>build_stimulus_epochs</code>, trial-end inference, and assumed drift:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">almkanal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Defaults</span><span class="p">,</span> <span class="n">set_defaults</span>
+
+<span class="n">profile</span> <span class="o">=</span> <span class="n">Defaults</span><span class="o">.</span><span class="n">generic</span><span class="p">()</span><span class="o">.</span><span class="n">with_overrides</span><span class="p">(</span>
+    <span class="n">stimuli</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">"resample_sfreq"</span><span class="p">:</span> <span class="mf">200.0</span><span class="p">,</span>
+        <span class="s2">"feature"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"envelope"</span><span class="p">,</span> <span class="s2">"pitch_voicing"</span><span class="p">],</span>
+        <span class="s2">"epoch_len_s"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">,</span>
+    <span class="p">},</span>
+<span class="p">)</span>
+<span class="n">set_defaults</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span>
+
+<span class="c1"># Inspect a detached copy of the stimulus settings.</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="n">profile</span><span class="o">.</span><span class="n">stimuli</span>
+</code></pre></div>
+<p>Explicit step or helper arguments take precedence over profile settings. Each
+step captures its profile when constructed; changing the active defaults later
+does not change an existing step's configuration.</p>
 
 
 

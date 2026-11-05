@@ -479,6 +479,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../defaults/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Defaults and lab profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../validation/" class="md-nav__link">
         
   
@@ -1327,7 +1354,7 @@
   <span class="md-ellipsis">
     
   
-  TRF and WAV alignment
+  Stimulus epoching and WAV alignment
 
     
   </span>
@@ -1668,6 +1695,11 @@
 <p><code>VPixxCleaner</code> loads eye-tracking data, applies supported cleaning options, aligns it to a continuous recording using the configured trigger channels, and adds eye-tracking channels to the recording.</p>
 <p>You need a supported eye-tracking file for each raw recording, identifiable synchronization events, and the correct screen and calibration settings. The guide below is an API example, not a validated recipe for every VPixx export format or acquisition setup.</p>
 <h2 id="configure-the-step">Configure the step</h2>
+<p><code>VPixxCleaner</code> uses the active <code>vpixx</code> <a href="../defaults/">defaults profile</a>. The generic
+profile leaves screen geometry unset; supply it as below, or call
+<code>set_defaults("salzburg")</code> before creating the step to use the Salzburg setup.
+Screen dimensions and viewing distance are in metres. Pixel-only processing
+with <code>convert_to_radians=False</code> does not require screen geometry.</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">mne</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">almkanal</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlmKanal</span><span class="p">,</span> <span class="n">VPixxCleaner</span>
 
@@ -1691,6 +1723,17 @@
 <span class="n">pipeline</span><span class="o">.</span><span class="n">generate_json</span><span class="p">(</span><span class="s2">"eye_preprocessing.json"</span><span class="p">)</span>
 </code></pre></div>
 <p>Keep the synchronization channels available until alignment has completed. The example's channel names and dimensions must be replaced when your setup differs.</p>
+<p>To reuse settings across scripts and standalone helpers:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">almkanal</span><span class="w"> </span><span class="kn">import</span> <span class="n">set_defaults</span><span class="p">,</span> <span class="n">VPixxCleaner</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">almkanal.eye_utils.gaze_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_eyetracking_data</span>
+
+<span class="n">set_defaults</span><span class="p">(</span><span class="s2">"salzburg"</span><span class="p">,</span> <span class="n">vpixx</span><span class="o">=</span><span class="p">{</span><span class="s2">"blink_buffer_vpixx"</span><span class="p">:</span> <span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">)})</span>
+<span class="n">step</span> <span class="o">=</span> <span class="n">VPixxCleaner</span><span class="p">(</span><span class="s2">"eye.mat"</span><span class="p">)</span>
+<span class="n">eye</span> <span class="o">=</span> <span class="n">load_eyetracking_data</span><span class="p">(</span><span class="s2">"eye.mat"</span><span class="p">)</span>
+</code></pre></div>
+<p>The step captures settings at construction; the standalone loader reads the
+active profile at call time. Explicit arguments override profile values. The
+loader obtains its sampling rate from the MAT-file timestamps.</p>
 <h2 id="check-the-result">Check the result</h2>
 <p>Check event correspondences and timing across the recording, channel names and units, blink handling, and retained samples. The implementation checks equal sampling rates and sample counts before adding eye channels. Matching dimensions alone are not evidence of correct synchronization.</p>
 <h2 id="work-with-recording-blocks">Work with recording blocks</h2>

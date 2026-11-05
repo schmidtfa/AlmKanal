@@ -1,6 +1,6 @@
 # Stimulus epoching and WAV alignment
 
-`EpochStimuls` divides each stimulus trial into non-overlapping, fixed-length
+`StimulusEpochs` divides each stimulus trial into non-overlapping, fixed-length
 epochs and appends one or more WAV-derived stimulus features. The resulting
 epochs can be used for TRFs and other analyses.
 Use `feature="envelope"` for a single feature or
@@ -10,7 +10,7 @@ correction, before computing features at 200 Hz; `None` retains the input rate.
 
 `StimulusSpanSpec` describes the trial spans and audio files used for this workflow.
 
-::: almkanal.almkanal_steps.stimulus_utils.EpochStimuls
+::: almkanal.almkanal_steps.stimulus_utils.StimulusEpochs
 
 ::: almkanal.almkanal_steps.stimulus_utils.StimulusSpanSpec
 
