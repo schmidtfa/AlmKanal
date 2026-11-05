@@ -344,10 +344,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#made-for-the-way-research-evolves" class="md-nav__link">
+  <a href="#what-you-can-do-with-almkanal" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Made for the way research evolves.
+        What you can do with AlmKanal
       </span>
     </span>
   </a>
@@ -355,10 +355,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-small-example-the-whole-workflow" class="md-nav__link">
+  <a href="#try-a-complete-example" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        One small example. The whole workflow.
+        Try a complete example
       </span>
     </span>
   </a>
@@ -1690,10 +1690,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#made-for-the-way-research-evolves" class="md-nav__link">
+  <a href="#what-you-can-do-with-almkanal" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Made for the way research evolves.
+        What you can do with AlmKanal
       </span>
     </span>
   </a>
@@ -1701,10 +1701,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-small-example-the-whole-workflow" class="md-nav__link">
+  <a href="#try-a-complete-example" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        One small example. The whole workflow.
+        Try a complete example
       </span>
     </span>
   </a>
@@ -1734,13 +1734,11 @@
 <div class="ak-home">
 <div class="grid ak-hero">
 <div>
-<p class="ak-eyebrow">Built on MNE-Python &nbsp; &middot; &nbsp; Open source</p>
 <h1 id="almkanal">Alm<span>Kanal</span></h1>
 <p class="ak-tagline">Flexible, modular and extendable preprocessing pipelines for M/EEG data</p>
-<p>Build the pipeline you need. See every step. Then turn what you ran into your Methods section.</p>
+<p>Build and run preprocessing pipelines, keep track of the settings, and generate a Methods draft from your processing history.</p>
 <p><a class="md-button md-button--primary" href="quickstart/">Get started &rarr;</a>
 <a class="md-button" href="custom-steps/">Create your own step</a></p>
-<p class="ak-note">Your data. Your steps. No fuss.</p>
 </div>
 <div class="ak-demo">
 <p class="ak-eyebrow">From code to Methods</p>
@@ -1781,7 +1779,7 @@
 <p>Widmann, A., Schröger, E., &amp; Maess, B. (2015). Digital filter design for electrophysiological data: A practical approach. Journal of Neuroscience Methods, 250, 34–46. doi:10.1016/j.jneumeth.2014.08.002</p>
 </li>
 <li>
-<p>Keil, A., Debener, S., Gratton, G., Junghöfer, M., Kappenman, E. S., Luck, S. J., Luu, P., Miller, G. A., &amp; Yee, C. M. (2014). Committee report: Publication guidelines and recommendations for studies using EEG and MEG. Psychophysiology, 51(1), 1–21. https://doi.org/10.1111/psyp.12147</p>
+<p>Keil, A., Debener, S., Gratton, G., Junghöfer, M., Kappenman, E. S., Luck, S. J., Luu, P., Miller, G. A., &amp; Yee, C. M. (2014). Committee report: Publication guidelines and recommendations for studies using EEG and MEG. Psychophysiology, 51(1), 1–21. <a href="https://doi.org/10.1111/psyp.12147">https://doi.org/10.1111/psyp.12147</a></p>
 </li>
 </ol>
 <blockquote>
@@ -1792,58 +1790,56 @@
 </div>
 </div>
 </div>
-<div class="highlight"><pre><span></span><code>[How Methods reporting works &amp;rarr;](methods.md)
-</code></pre></div>
 </div>
 </div>
 <div class="grid ak-flow">
-<p><strong>01 &nbsp; Compose</strong><br>Reusable Python steps</p>
-<p><strong>02 &nbsp; Check</strong><br>Declared ordering rules</p>
-<p><strong>03 &nbsp; Run</strong><br>Process and inspect</p>
-<p><strong>04 &nbsp; Document</strong><br>Generate Methods text</p>
+<p><strong>01 &nbsp; Define</strong><br>Choose and configure steps</p>
+<p><strong>02 &nbsp; Validate</strong><br>Check step-order constraints</p>
+<p><strong>03 &nbsp; Run</strong><br>Process data and review reports</p>
+<p><strong>04 &nbsp; Document</strong><br>Save settings and draft Methods</p>
 </div>
-<h2 id="made-for-the-way-research-evolves">Made for the way research evolves.</h2>
-<p>Start small, adapt a step, or bring an existing analysis along.</p>
+<h2 id="what-you-can-do-with-almkanal">What you can do with AlmKanal</h2>
+<p>AlmKanal builds on MNE-Python by bringing commonly used preprocessing functions together in a modular pipeline framework. Feel free to use the existing steps, add your own, or start with data that have already been processed.</p>
 <div class="grid cards">
 <ul>
 <li>
-<p><strong>Pipelines you can read</strong></p>
-<p>Steup your processing steps directly in Python, in the order they should run.</p>
+<p><strong>Pipelines in Python</strong></p>
+<p>Define and configure processing steps directly in Python. The pipeline makes the order of operations explicit.</p>
 <p><a href="pipelines/">Build a pipeline &rarr;</a></p>
 </li>
 <li>
-<p><strong>Steps you can extend</strong></p>
-<p>Add a custom Step without stepping away from the core framework.</p>
+<p><strong>Your own processing steps</strong></p>
+<p>Add a custom <code>AlmKanalStep</code> when you need an operation that is not covered by the built-in steps.</p>
 <p><a href="custom-steps/">Create your own step &rarr;</a></p>
 </li>
 <li>
-<p><strong>Checks before you run</strong></p>
-<p>Conflicts are catched by the ordering rules declared in the preprocessing steps.</p>
+<p><strong>Step-order checks</strong></p>
+<p>Steps can declare which operations must come before or after them. AlmKanal checks those constraints before processing starts.</p>
 <p><a href="validation/">Understand validation &rarr;</a></p>
 </li>
 <li>
-<p><strong>Methods from your pipeline</strong></p>
-<p>Turn recorded preprocessing settings into a draft of your Methods section to review and edit.</p>
+<p><strong>A record of what ran</strong></p>
+<p>Save the preprocessing settings used in a pipeline and generate an editable draft of the Methods section from that history.</p>
 <p><a href="methods/">Generate Methods text &rarr;</a></p>
 </li>
 <li>
-<p><strong>Start with the data you have</strong></p>
-<p>Use compatible steps on existing MNE Raw or Epochs objects, including previously processed recordings.</p>
+<p><strong>Use existing MNE data</strong></p>
+<p>Apply compatible steps to MNE <code>Raw</code> or <code>Epochs</code> objects, including recordings that have already been preprocessed.</p>
 <p><a href="pipelines/">Work with existing data &rarr;</a></p>
 </li>
 <li>
-<p><strong>Bring recordings together</strong></p>
-<p>Prepare synchronized M/EEG, VPixx eye-tracking, and WAV audio data for subsequent analyses.</p>
+<p><strong>Audio and eye-tracking alignment</strong></p>
+<p>Tools for working with M/EEG recordings alongside WAV audio stimuli and VPixx eye-tracking data.</p>
 <p><a href="eye-tracking/">Eye tracking &rarr;</a> &nbsp; <a href="audio-alignment/">Audio alignment &rarr;</a></p>
 </li>
 </ul>
 </div>
-<h2 id="one-small-example-the-whole-workflow">One small example. The whole workflow.</h2>
-<p>Try a pipeline on synthetic EEG, save its processing history, and generate a Methods draft.</p>
+<h2 id="try-a-complete-example">Try a complete example</h2>
+<p>The <a href="quickstart/">quick start</a> runs a pipeline on synthetic EEG data, saves the processing history, and generates a Methods draft.</p>
 <p><a class="md-button md-button--primary" href="quickstart/">Open the quick start &rarr;</a>
 <a class="md-button" href="examples/">Explore the examples</a></p>
 <hr />
-<p>The name is a nod to Salzburg's <em>Almkanal</em> &mdash; and to the hope of spending less time rewriting preprocessing boilerplate and more time outside in the sun. ☀️ 🍹 🏖️</p>
+<p>The name is a nod to Salzburg's <em>Almkanal</em> — and to the hope of spending less time rewriting preprocessing code and more time outside in the sun. ☀️ 🍹 🏖️</p>
 </div>
 
   
