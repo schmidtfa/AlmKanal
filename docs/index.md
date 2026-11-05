@@ -80,18 +80,6 @@ From code to Methods
 </div>
 </div>
 
-<div class="grid ak-flow" markdown>
-
-**01 &nbsp; Define**<br>Choose and configure steps
-
-**02 &nbsp; Validate**<br>Check step-order constraints
-
-**03 &nbsp; Run**<br>Process data and review reports
-
-**04 &nbsp; Document**<br>Save settings and draft Methods
-
-</div>
-
 ## What you can do with AlmKanal
 
 AlmKanal builds on MNE-Python by bringing commonly used preprocessing functions together in a modular pipeline framework. Feel free to use the existing steps, add your own, or start with data that have already been processed.
