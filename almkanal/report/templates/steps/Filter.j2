@@ -1,0 +1,124 @@
+{# steps/Filter.j2 — filter reporting aligned with MNE and Widmann et al. (2015) #}
+
+{% set lf = s.settings.l_freq %}
+{% set hf = s.settings.h_freq %}
+{% set method = (s.settings.method | default('fir')) | lower %}
+{% set phase = s.settings.phase | default('zero') %}
+
+{% set win = s.settings.fir_window | default('hamming') %}
+{% set design = (s.settings.fir_design | default('firwin')) | lower %}
+{% set ltb = s.settings.l_trans_bandwidth | default(none) %}
+{% set htb = s.settings.h_trans_bandwidth | default(none) %}
+
+{% set filter_length_samples = s.settings.filter_length_samples | default(none) %}
+{% set filter_length_seconds = s.settings.filter_length_seconds | default(none) %}
+{% set filter_order = s.settings.filter_order | default(none) %}
+
+{% set iir = s.settings.iir_params | default({}, true) %}
+{% set iir_order = iir.order | default(none) %}
+{% set iir_ftype = (iir.ftype | default('butter')) | lower %}
+
+{% set applied_to = s.settings.applied_to | default(none) %}
+
+
+{# Determine filter kind #}
+{% if lf is not none and hf is not none %}
+    {% if lf < hf %}
+        {% set kind = 'band-pass' %}
+    {% elif lf > hf %}
+        {% set kind = 'band-stop' %}
+    {% else %}
+        {% set kind = 'filter' %}
+    {% endif %}
+{% elif lf is not none %}
+    {% set kind = 'high-pass' %}
+{% elif hf is not none %}
+    {% set kind = 'low-pass' %}
+{% else %}
+    {% set kind = 'filter' %}
+{% endif %}
+
+
+{# Human-readable IIR type #}
+{% if iir_ftype == 'butter' %}
+    {% set iir_name = 'Butterworth' %}
+{% else %}
+    {% set iir_name = iir_ftype %}
+{% endif %}
+
+
+{# FIR -6 dB cutoff frequencies.
+   MNE defines these at the midpoint of the transition band for
+   phase='zero' and fir_design='firwin'. #}
+{% set report_fir_cutoffs = method == 'fir' and phase == 'zero' and design == 'firwin' %}
+
+{% if report_fir_cutoffs %}
+    {% set cut_low = (
+        lf - (ltb / 2.0)
+        if lf is not none and ltb is number and kind in ['band-pass', 'high-pass']
+        else none
+    ) %}
+    {% set cut_high = (
+        hf + (htb / 2.0)
+        if hf is not none and htb is number and kind in ['band-pass', 'low-pass']
+        else none
+    ) %}
+{% else %}
+    {% set cut_low = none %}
+    {% set cut_high = none %}
+{% endif %}
+
+
+#### Offline filtering
+
+{% if kind == 'band-pass' %}
+A band-pass filter ({{ lf }}–{{ hf }} Hz)
+{% elif kind == 'band-stop' %}
+A band-stop filter ({{ hf }}–{{ lf }} Hz)
+{% elif kind == 'high-pass' %}
+A high-pass filter at {{ lf }} Hz
+{% elif kind == 'low-pass' %}
+A low-pass filter at {{ hf }} Hz
+{% endif %}
+was applied to the {% if applied_to %}{{ applied_to }} {% endif %}data.
+{% if method == 'fir' %}
+The finite impulse response (FIR) filter was designed using {{ design }} with a {{ win }} window.
+{% if phase == 'zero' %}
+A symmetric linear-phase filter with delay compensation was used, resulting in zero-phase, non-causal filtering.
+{% elif phase == 'zero-double' %}
+The filter was applied once forward and once backward, resulting in zero-phase, non-causal filtering.
+{% elif phase == 'minimum' %}
+A minimum-phase FIR filter was used.
+{% elif phase == 'minimum-half' %}
+A minimum-phase FIR filter with the legacy half-length implementation was used.
+{% endif %}
+{% if filter_length_samples is not none %}
+The realized filter length was {{ filter_length_samples }} samples{% if filter_length_seconds is not none %} ({{ filter_length_seconds | round(3) }} s){% endif %}{% if filter_order is not none %}, corresponding to FIR order {{ filter_order }}{% endif %}.
+{% endif %}
+{% if kind == 'band-pass' %}
+The lower and upper transition bandwidths were {{ ltb | round(3) }} Hz and {{ htb | round(3) }} Hz, respectively.
+{% elif kind == 'high-pass' %}
+The transition bandwidth was {{ ltb | round(3) }} Hz.
+{% elif kind == 'low-pass' %}
+The transition bandwidth was {{ htb | round(3) }} Hz.
+{% elif kind == 'band-stop' %}
+The two transition bandwidths were {{ ltb | round(3) }} Hz and {{ htb | round(3) }} Hz.
+{% endif %}
+{% if cut_low is not none and cut_high is not none %}
+The −6 dB cutoff frequencies were {{ cut_low | round(3) }} Hz and {{ cut_high | round(3) }} Hz, located at the midpoints of the lower and upper transition bands.
+{% elif cut_low is not none %}
+The −6 dB cutoff frequency was {{ cut_low | round(3) }} Hz, located at the midpoint of the transition band.
+{% elif cut_high is not none %}
+The −6 dB cutoff frequency was {{ cut_high | round(3) }} Hz, located at the midpoint of the transition band.
+{% endif %}
+{% elif method == 'iir' %}
+The infinite impulse response (IIR) filter was a {{ iir_name }} filter{% if iir_order is not none %} of order {{ iir_order }}{% endif %}.
+{% if phase in ['zero', 'zero-double'] %}
+The filter was applied forward and backward, resulting in zero-phase, non-causal filtering.
+{% elif phase == 'forward' %}
+The filter was applied once in the forward direction, resulting in causal filtering.
+{% endif %}
+{% endif %}
+Filter design and reporting was aimed to follow recommended practices for electrophysiological data
+({{ ref('Widmann2015', 'Widmann, A., Schröger, E., & Maess, B. (2015). Digital filter design for electrophysiological data: A practical approach. Journal of Neuroscience Methods, 250, 34–46. doi:10.1016/j.jneumeth.2014.08.002') }},
+{{ ref('Keil2014', 'Keil, A., Debener, S., Gratton, G., Junghöfer, M., Kappenman, E. S., Luck, S. J., Luu, P., Miller, G. A., & Yee, C. M. (2014). Committee report: Publication guidelines and recommendations for studies using EEG and MEG. Psychophysiology, 51(1), 1–21. https://doi.org/10.1111/psyp.12147') }}).
