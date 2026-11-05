@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from unittest.mock import Mock
-import matplotlib.pyplot as plt
+
 import mne
 import numpy as np
 import pytest
@@ -67,11 +67,7 @@ def test_forward_model_requires_saved_transform_when_not_redoing(
 ):
     fs_dir = tmp_path / 'freesurfer'
     fsaverage = make_subject(fs_dir / 'fsaverage')
-    (
-        fsaverage
-        / 'bem'
-        / 'fsaverage-ico-4-src.fif'
-    ).touch()
+    (fsaverage / 'bem' / 'fsaverage-ico-4-src.fif').touch()
 
     monkeypatch.setattr(
         mne.datasets,
@@ -109,11 +105,7 @@ def test_forward_model_reuses_saved_transform(
 ):
     fs_dir = tmp_path / 'freesurfer'
     fsaverage = make_subject(fs_dir / 'fsaverage')
-    (
-        fsaverage
-        / 'bem'
-        / 'fsaverage-ico-4-src.fif'
-    ).touch()
+    (fsaverage / 'bem' / 'fsaverage-ico-4-src.fif').touch()
 
     cache_id = 'recording_from_template'
     trans_dir = tmp_path / 'headmodels' / cache_id

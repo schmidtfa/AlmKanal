@@ -100,12 +100,7 @@ def test_plot_head_model_uses_bem_head_file(
     monkeypatch,
 ):
     subject_id = 'recording'
-    bem_path = (
-        tmp_path
-        / subject_id
-        / 'bem'
-        / f'{subject_id}-head.fif'
-    )
+    bem_path = tmp_path / subject_id / 'bem' / f'{subject_id}-head.fif'
     bem_path.parent.mkdir(parents=True)
     bem_path.touch()
 
@@ -132,9 +127,7 @@ def test_plot_head_model_uses_bem_head_file(
             'Sagittal View',
             '3D View',
         ]
-        assert fig._suptitle.get_text() == (
-            f'MEG - DIG Coregistration of {subject_id}'
-        )
+        assert fig._suptitle.get_text() == (f'MEG - DIG Coregistration of {subject_id}')
 
         read_bem.assert_called_once_with(bem_path)
         read_surface.assert_not_called()
@@ -150,12 +143,7 @@ def test_plot_head_model_falls_back_to_freesurfer_scalp_surface(
     monkeypatch,
 ):
     subject_id = 'recording'
-    scalp_path = (
-        tmp_path
-        / subject_id
-        / 'bem'
-        / 'outer_skin.surf'
-    )
+    scalp_path = tmp_path / subject_id / 'bem' / 'outer_skin.surf'
     scalp_path.parent.mkdir(parents=True)
     scalp_path.touch()
 

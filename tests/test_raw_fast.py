@@ -2,12 +2,11 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import mne
-import numpy as np
 import pytest
 
 from almkanal import (
-    AlmKanal,
     EEGRANSAC,
+    AlmKanal,
     Filter,
     ForwardModel,
     ReReference,
@@ -15,6 +14,7 @@ from almkanal import (
     SourceReconstruction,
     SpatialFilter,
 )
+
 from .settings import SOURCE_SURF, SOURCE_VOL
 
 
@@ -45,6 +45,7 @@ def _disable_reports(monkeypatch):
 
 def _mock_forward_step(monkeypatch, subjects_dir):
     """Provide ForwardModel metadata without running FreeSurfer/MNE anatomy work."""
+
     def fake_run(self, data, info):
         return {
             'data': data,
@@ -67,6 +68,9 @@ def _mock_source_application(monkeypatch):
     )
 
 
+@pytest.mark.filterwarnings(
+    'ignore:Resampling of the stim channels caused event information to become unreliable:RuntimeWarning'
+)
 def test_ransac(gen_mne_data_raw_eeg):
     raw, _ = gen_mne_data_raw_eeg
     raw = raw.copy().crop(tmax=10)
@@ -179,7 +183,11 @@ def test_ad_hoc_cov(gen_mne_data_raw, source, monkeypatch, tmp_path):
         ]
     )
 
-    ak.run(raw)
+    with pytest.warns(
+        UserWarning,
+        match='You have multiple sensor types',
+    ):
+        ak.run(raw)
 
     make_ad_hoc_cov.assert_called_once()
 

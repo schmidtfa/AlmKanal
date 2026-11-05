@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import mne
 import pytest
@@ -47,7 +47,7 @@ def mock_info():
             2024,
             1,
             11,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         )
     )
     return info
@@ -63,21 +63,14 @@ def test_get_nearest_empty_room(
     )
 
     for date_dir in os.listdir(setup_empty_room_dir):
-        print(
-            f'  {date_dir} -> '
-            f'{os.listdir(setup_empty_room_dir / date_dir)}'
-        )
+        print(f'  {date_dir} -> ' f'{os.listdir(setup_empty_room_dir / date_dir)}')
 
     result_path = get_nearest_empty_room(
         mock_info,
         str(setup_empty_room_dir),
     )
 
-    expected = (
-        setup_empty_room_dir
-        / '240110'
-        / 'empty_room_68.fif'
-    )
+    expected = setup_empty_room_dir / '240110' / 'empty_room_68.fif'
 
     assert result_path == expected
 

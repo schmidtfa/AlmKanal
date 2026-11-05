@@ -22,36 +22,42 @@ def test_kv_filter():
     env = make_env()
     kv = env.filters['kv']
 
-    assert kv(
-        {
-            'a': 1,
-            'b': None,
-            'c': 3,
-        }
-    ) == 'a=1; c=3'
+    assert (
+        kv(
+            {
+                'a': 1,
+                'b': None,
+                'c': 3,
+            }
+        )
+        == 'a=1; c=3'
+    )
 
-    assert kv(
-        {
-            'a': 1,
-            'b': 2,
-        },
-        omit={'b'},
-    ) == 'a=1'
+    assert (
+        kv(
+            {
+                'a': 1,
+                'b': 2,
+            },
+            omit={'b'},
+        )
+        == 'a=1'
+    )
 
-    assert kv(
-        {
-            'a': None,
-        }
-    ) == '—'
+    assert (
+        kv(
+            {
+                'a': None,
+            }
+        )
+        == '—'
+    )
 
 
 def test_custom_template_overrides_packaged_template(
     tmp_path,
 ):
-    template = (
-        tmp_path
-        / 'methods_master.j2'
-    )
+    template = tmp_path / 'methods_master.j2'
 
     template.write_text(
         'Subjects={{ n_subjects }}',
@@ -83,21 +89,14 @@ def test_missing_template_raises(
 def test_render_methods_to_file(
     tmp_path,
 ):
-    template = (
-        tmp_path
-        / 'methods_master.j2'
-    )
+    template = tmp_path / 'methods_master.j2'
 
     template.write_text(
         'N={{ n_subjects }}',
         encoding='utf-8',
     )
 
-    out = (
-        tmp_path
-        / 'nested'
-        / 'methods.md'
-    )
+    out = tmp_path / 'nested' / 'methods.md'
 
     result = render_methods_to_file(
         _ctx(),
@@ -106,6 +105,4 @@ def test_render_methods_to_file(
     )
 
     assert result == out
-    assert out.read_text(
-        encoding='utf-8'
-    ) == 'N=2'
+    assert out.read_text(encoding='utf-8') == 'N=2'

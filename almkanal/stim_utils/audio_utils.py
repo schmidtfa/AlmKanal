@@ -170,7 +170,7 @@ def prepare_audio(  # noqa PLR0915
     elif feature in ['pitch', 'pitch_voicing']:
         # Frame length for pYIN:
         # ~40 ms window, at least 2 hops long
-        frame_length = max(2 * hop, int(round(0.04 * sr)))
+        frame_length = max(2 * hop, int(round(0.05 * sr)))
 
         # Speech-like pitch range (change if needed)
         fmin = 50.0

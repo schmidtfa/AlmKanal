@@ -43,9 +43,7 @@ def synthetic_audio_alignment(tmp_path_factory: pytest.TempPathFactory) -> dict[
         rng.normal(size=len(wav_times)),
     )
     modulation /= np.max(np.abs(modulation))
-    wav = (0.55 + 0.4 * modulation) * (
-        np.sin(2 * np.pi * 110 * wav_times) + 0.35 * np.sin(2 * np.pi * 173 * wav_times)
-    )
+    wav = (0.55 + 0.4 * modulation) * (np.sin(2 * np.pi * 110 * wav_times) + 0.35 * np.sin(2 * np.pi * 173 * wav_times))
     wav = (wav / np.max(np.abs(wav))).astype(np.float32)
 
     trigger_time_s = 0.5
@@ -148,7 +146,9 @@ def test_estimation_and_application_correct_known_drift(synthetic_audio_alignmen
     wav_envelope = np.abs(hilbert(sosfiltfilt(bandpass, wav_at_raw_sfreq)))
     assert np.corrcoef(recorded_envelope, wav_envelope)[0, 1] > 0.75
 
-
+@pytest.mark.filterwarnings(
+    "ignore:Channel locations not available:RuntimeWarning"
+)
 @pytest.mark.parametrize('missing_end', [False, True])
 def test_epoch_stimuls_realigns_audio_and_records_diagnostics(
     synthetic_audio_alignment: dict[str, Any],
@@ -158,8 +158,12 @@ def test_epoch_stimuls_realigns_audio_and_records_diagnostics(
     wav_path = synthetic_audio_alignment['wav_path']
     step = StimulusEpochs(
         gen_span_spec=lambda raw: StimulusSpanSpec.from_events(
-            raw, {11: wav_path.name}, 99, stim_channel='stim',
-            infer_missing_ends=missing_end, base_audio_path=wav_path.parent,
+            raw,
+            {11: wav_path.name},
+            99,
+            stim_channel='stim',
+            infer_missing_ends=missing_end,
+            base_audio_path=wav_path.parent,
         ),
         base_audio_path=wav_path.parent,
         audio_channels=['MISC flat', 'audio'],
@@ -218,7 +222,10 @@ def test_span_spec_preserves_repeated_wavs_and_event_order() -> None:
     stim[[0, 10, 20]] = [11, 12, 11]
     stim[[8, 18, 28]] = 99
     raw = mne.io.RawArray(
-        stim[None], mne.create_info(['trigger'], 100.0, ['stim']), first_samp=100, verbose=False,
+        stim[None],
+        mne.create_info(['trigger'], 100.0, ['stim']),
+        first_samp=100,
+        verbose=False,
     )
     spec = StimulusSpanSpec.from_events(raw, {11: 'same.wav', 12: 'other.wav'}, 99)
     assert list(spec.spans_by_label.values()) == [(100, 108), (110, 118), (120, 128)]

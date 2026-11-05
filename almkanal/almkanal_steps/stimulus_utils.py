@@ -450,7 +450,11 @@ def _build_stimulus_epochs(  # noqa: C901, PLR0915, PLR0912
 
     if not epochs_list:
         raise RuntimeError('No epochs produced. Check spans/audio paths/durations and alignment failures.')
-    epochs_all = mne.concatenate_epochs(epochs_list, on_mismatch='warn', verbose=verbose)
+    for epochs in epochs_list:
+        epochs.set_annotations(
+            None
+        )  # explicitely drop annotations as they will be dropped implcitely anyway after this step
+    epochs_all = mne.concatenate_epochs(epochs_list, verbose=verbose)
     epochs_all.event_id = label_to_code
     alignment_info = {
         'trials': trial_records,

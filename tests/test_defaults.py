@@ -9,10 +9,10 @@ import pytest
 from almkanal import (
     ICA,
     Defaults,
-    StimulusEpochs,
     Events,
     Filter,
     Maxwell,
+    StimulusEpochs,
     StimulusSpanSpec,
     configure,
     get_defaults,
@@ -21,7 +21,6 @@ from almkanal import (
 )
 from almkanal.almkanal_steps import stimulus_utils
 from almkanal.stim_utils import alignment_utils
-from numpy.typing import ArrayLike
 
 
 @pytest.fixture(autouse=True)
@@ -402,8 +401,9 @@ def test_eye_hardware_must_be_configured_without_a_lab_profile():
 
 
 def test_standalone_maxwell_preserves_positional_overrides(monkeypatch):
-    from almkanal.almkanal_steps.channel_utils import run_maxwell
     import mne
+
+    from almkanal.almkanal_steps.channel_utils import run_maxwell
 
     observed = []
     monkeypatch.setattr(mne.preprocessing, 'find_bad_channels_maxwell', lambda *args, **kwargs: ([], []))
@@ -429,6 +429,7 @@ def test_pipeline_json_records_selected_profile_and_explicit_parameters(monkeypa
 
     import mne
     import numpy as np
+
     from almkanal import AlmKanal
 
     monkeypatch.setattr('almkanal.almkanal.mne.Report', Mock())
@@ -476,9 +477,15 @@ def test_profiles_include_new_main_parameters():
 @pytest.mark.parametrize('section', ['stimuli', 'trf'])
 def test_stimulus_defaults_aliases_normalize_exports_and_copy_settings(section):
     original = Defaults.salzburg()
-    profile = original.with_overrides(**{section: {
-        'feature': ['envelope', 'rectify'], 'alignment_kwargs': {'max_lag_s': 0.5}, 'resample_sfreq': 125,
-    }})
+    profile = original.with_overrides(
+        **{
+            section: {
+                'feature': ['envelope', 'rectify'],
+                'alignment_kwargs': {'max_lag_s': 0.5},
+                'resample_sfreq': 125,
+            }
+        }
+    )
     assert profile.stimuli == profile.trf
     assert profile.section('stimuli') == profile.section('trf')
     assert profile.to_dict()['stimuli']['resample_sfreq'] == 125
@@ -512,6 +519,7 @@ def test_conflicting_stimulus_defaults_aliases_are_rejected_without_changing_con
 @pytest.mark.parametrize('section', ['stimuli', 'trf'])
 def test_shortcuts_and_function_defaults_resolve_stimulus_aliases(section):
     from inspect import signature
+
     from almkanal.defaults import function_defaults
 
     @function_defaults(section)

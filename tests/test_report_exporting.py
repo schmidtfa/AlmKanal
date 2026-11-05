@@ -12,13 +12,9 @@ def mocked_rendering(
 ):
     ctx = object()
 
-    build = Mock(
-        return_value=ctx
-    )
+    build = Mock(return_value=ctx)
 
-    render = Mock(
-        return_value='# Methods\n'
-    )
+    render = Mock(return_value='# Methods\n')
 
     monkeypatch.setattr(
         exporting,
@@ -62,11 +58,7 @@ def test_preprocessing_report_pandoc_success(
     monkeypatch,
     mocked_rendering,
 ):
-    out = (
-        tmp_path
-        / 'results'
-        / 'methods.docx'
-    )
+    out = tmp_path / 'results' / 'methods.docx'
 
     calls = {}
 
@@ -80,19 +72,13 @@ def test_preprocessing_report_pandoc_success(
         calls['check'] = check
 
         # Pretend Pandoc generated the file.
-        output_file = args[
-            args.index('-o') + 1
-        ]
+        output_file = args[args.index('-o') + 1]
 
         from pathlib import Path
 
-        Path(output_file).write_bytes(
-            b'fake docx'
-        )
+        Path(output_file).write_bytes(b'fake docx')
 
-        return SimpleNamespace(
-            returncode=0
-        )
+        return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(
         exporting.subprocess,
@@ -132,16 +118,11 @@ def test_preprocessing_report_pandoc_success(
     assert [
         '-M',
         'title=My Methods',
-    ] in [
-        args[ix:ix + 2]
-        for ix in range(len(args) - 1)
-    ]
+    ] in [args[ix : ix + 2] for ix in range(len(args) - 1)]
 
     assert '--standalone' in args
 
-    assert calls['input'] == (
-        b'# Methods\n'
-    )
+    assert calls['input'] == (b'# Methods\n')
 
     assert calls['check'] is False
 
@@ -154,10 +135,7 @@ def test_preprocessing_report_pandoc_failure(
     monkeypatch.setattr(
         exporting.subprocess,
         'run',
-        lambda *args, **kwargs:
-            SimpleNamespace(
-                returncode=2
-            ),
+        lambda *args, **kwargs: SimpleNamespace(returncode=2),
     )
 
     with pytest.raises(

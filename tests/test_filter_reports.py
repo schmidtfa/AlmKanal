@@ -56,10 +56,6 @@ def test_epoch_reports_baseline_and_input_preservation(step, tmin, baseline_samp
 
 
 
-from unittest.mock import Mock
-
-import mne
-import numpy as np
 import pytest
 
 from almkanal.almkanal_steps.filter_utils import Filter, Resample
@@ -73,10 +69,7 @@ def raw_small():
         ch_types='eeg',
     )
 
-    values = (
-        np.random.default_rng(42).normal(size=(1, 2000))
-        * 1e-6
-    )
+    values = np.random.default_rng(42).normal(size=(1, 2000)) * 1e-6
 
     return mne.io.RawArray(
         values,
@@ -192,17 +185,17 @@ def test_epoch_reports_preserve_the_supplied_data(
     # A nonzero, changing signal makes an extra baseline
     # correction detectable.
     ramp = np.linspace(2e-6, 5e-6, 61)
-    values = np.stack(
-        [ramp, ramp + 1e-6]
-    )[:, None, :]
+    values = np.stack([ramp, ramp + 1e-6])[:, None, :]
 
     epochs = mne.EpochsArray(
         values,
         info,
-        events=np.array([
-            [0, 0, 1],
-            [100, 0, 2],
-        ]),
+        events=np.array(
+            [
+                [0, 0, 1],
+                [100, 0, 2],
+            ]
+        ),
         event_id={'a': 1, 'b': 2},
         tmin=tmin,
         baseline=baseline,
@@ -213,11 +206,7 @@ def test_epoch_reports_preserve_the_supplied_data(
     expected = epochs.copy().average(by_event_type=True)
 
     report = Mock(spec=mne.Report)
-    step = (
-        Filter()
-        if step_class is Filter
-        else Resample(sfreq=50)
-    )
+    step = Filter() if step_class is Filter else Resample(sfreq=50)
 
     step.reports(
         epochs,
@@ -261,11 +250,7 @@ def test_raw_reporting_is_unchanged(
     title,
 ):
     report = Mock(spec=mne.Report)
-    step = (
-        Filter()
-        if step_class is Filter
-        else Resample(sfreq=50)
-    )
+    step = Filter() if step_class is Filter else Resample(sfreq=50)
 
     step.reports(
         raw_small,

@@ -53,7 +53,6 @@ def test_spatial_filter_selection_extracts_cov_and_norm() -> None:
         'reduce_rank': False,
         'data_cov_source': 'continuous',
         'noise_cov_source': 'empty_room',
-
         # Provenance that should not enter report settings.
         'filters': object(),
         'data_cov': object(),
@@ -85,7 +84,6 @@ def test_source_reconstruction_selection_extracts_parcellation() -> None:
         'return_parc': True,
         'atlas': 'glasser',
         'effective_label_mode': 'pca_flip',
-
         # provenance only
         'subject_id': 'fsaverage',
         'subjects_dir': '/tmp/freesurfer',
