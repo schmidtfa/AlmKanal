@@ -10,7 +10,7 @@ The pages below document AlmKanal's public preprocessing steps directly from the
 | [Artifact and physiological signal processing](artifacts.md) | `ICA`, `PhysioCleaner` |
 | [Events and epoching](epoching.md) | `Events`, `Epochs` |
 | [VPixx eye-tracking alignment](eye-tracking.md) | `VPixxCleaner` |
-| [TRF epoching and WAV alignment](trf.md) | `EpochTRF`, `TRFSpanSpec` |
+| [Stimulus epoching and WAV alignment](trf.md) | `EpochStimuls`, `StimulusSpanSpec` |
 | [Spatial filtering](spatial-filtering.md) | `SpatialFilter` |
 | [Source modelling and reconstruction](source-reconstruction.md) | `ForwardModel`, `SourceReconstruction` |
 

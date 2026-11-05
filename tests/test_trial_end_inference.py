@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from scipy.io import wavfile
 
-from almkanal import TRFSpanSpec
+from almkanal import StimulusSpanSpec
 from almkanal.stim_utils.alignment_utils import find_audio_trials
 
 
@@ -28,7 +28,7 @@ def onset_only_trials(tmp_path):
 def test_infers_all_missing_ends_without_changing_events(onset_only_trials, end_triggers):
     raw, path = onset_only_trials
     original = raw.get_data().copy()
-    spec = TRFSpanSpec.from_events(
+    spec = StimulusSpanSpec.from_events(
         raw,
         {11: path.name},
         end_triggers,
@@ -53,7 +53,7 @@ def test_infers_all_missing_ends_without_changing_events(onset_only_trials, end_
 @pytest.mark.parametrize('drift, duration_samples', [(0.0, 8000), (499.0, 8004), (1000.0, 8008), (-1000.0, 7992)])
 def test_custom_signed_drift_and_absolute_wav_paths(onset_only_trials, drift, duration_samples):
     raw, path = onset_only_trials
-    spec = TRFSpanSpec.from_events(
+    spec = StimulusSpanSpec.from_events(
         raw,
         {11: path},
         infer_missing_ends=True,
@@ -67,7 +67,7 @@ def test_actual_end_triggers_take_precedence_in_mixed_trials(onset_only_trials, 
     raw, path = onset_only_trials
     offset = 10_000 if missing_first else 0
     raw._data[0, 8050 + offset] = 99
-    spec = TRFSpanSpec.from_events(
+    spec = StimulusSpanSpec.from_events(
         raw,
         {11: path},
         99,
@@ -129,7 +129,7 @@ def test_inference_does_not_extend_past_available_trial(onset_only_trials, bound
 def test_inference_at_exclusive_recording_boundary_is_crop_safe(onset_only_trials):
     raw, path = onset_only_trials
     raw.crop(tmax=7.999)
-    spec = TRFSpanSpec.from_events(raw, {11: path}, infer_missing_ends=True)
+    spec = StimulusSpanSpec.from_events(raw, {11: path}, infer_missing_ends=True)
     on, off = spec.spans_by_label['trial_000']
     assert (on, off) == (1234, 9233)
     trial = raw.copy().crop((on - raw.first_samp) / 1000, (off - raw.first_samp) / 1000)

@@ -180,8 +180,9 @@ class SourceReconstructionDefaults:
 
 
 @frozen
-class EpochTRFDefaults:
-    feature: str = 'envelope'
+class StimulusEpochsDefaults:
+    feature: str | Sequence[str] = 'envelope'
+    resample_sfreq: float | None = None
     audio_cutoff_hz: float = 80.0
     hw_delay_s: float = 0.0
     epoch_len_s: float = 5.0
@@ -281,7 +282,7 @@ SECTION_TYPES = {
     'forward_model': ForwardModelDefaults,
     'spatial_filter': SpatialFilterDefaults,
     'source_reconstruction': SourceReconstructionDefaults,
-    'trf': EpochTRFDefaults,
+    'stimuli': StimulusEpochsDefaults,
     'pipeline': PipelineDefaults,
     'vpixx': VPixxDefaults,
     'ica_eog': ICAEOGDefaults,

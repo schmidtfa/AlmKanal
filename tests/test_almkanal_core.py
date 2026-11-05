@@ -4,15 +4,14 @@ import mne
 import numpy as np
 import pytest
 
+import almkanal.almkanal as core
 from almkanal.almkanal import (
     AlmKanal,
     AlmKanalStep,
 )
-import almkanal.almkanal as core
 
 
 class DummyStep(AlmKanalStep):
-
     def run(
         self,
         data,
@@ -39,7 +38,6 @@ class TargetStep(DummyStep):
 
 
 class BadStep(AlmKanalStep):
-
     def run(
         self,
         data,
@@ -98,19 +96,16 @@ def epochs_small():
 def mock_report(
     monkeypatch,
 ):
-    report = Mock(
-        spec=mne.Report
-    )
+    report = Mock(spec=mne.Report)
 
     monkeypatch.setattr(
         core.mne,
         'Report',
-        Mock(
-            return_value=report
-        ),
+        Mock(return_value=report),
     )
 
     return report
+
 
 def test_dependency_must_be_before():
     step = DummyStep()

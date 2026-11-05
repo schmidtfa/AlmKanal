@@ -1,25 +1,20 @@
 import numpy as np
 import pytest
 from scipy.io import wavfile
-from almkanal.stim_utils.audio_utils import (
-    resample_poly_exact, prepare_audio
-)
+
+from almkanal.stim_utils.audio_utils import prepare_audio, resample_poly_exact
+
 
 @pytest.fixture
 def sine_wave():
     sfreq = 44_100
     duration = 1.0
 
-    times = np.arange(
-        int(sfreq * duration)
-    ) / sfreq
+    times = np.arange(int(sfreq * duration)) / sfreq
 
-    audio = np.sin(
-        2 * np.pi * 440 * times
-    )
+    audio = np.sin(2 * np.pi * 440 * times)
 
     return audio, sfreq
-
 
 
 def test_resample_poly_exact_smoke(
@@ -42,9 +37,7 @@ def test_resample_poly_exact_smoke(
         abs=1,
     )
 
-    assert np.all(
-        np.isfinite(resampled)
-    )
+    assert np.all(np.isfinite(resampled))
 
 
 @pytest.mark.parametrize(
@@ -67,23 +60,16 @@ def test_resample_poly_exact_preserves_duration(
         target_sfreq,
     )
 
-    input_duration = (
-        len(audio) / sfreq
-    )
+    input_duration = len(audio) / sfreq
 
-    output_duration = (
-        len(resampled)
-        / target_sfreq
-    )
+    output_duration = len(resampled) / target_sfreq
 
     assert output_duration == pytest.approx(
         input_duration,
         abs=1 / target_sfreq,
     )
 
-    assert np.all(
-        np.isfinite(resampled)
-    )
+    assert np.all(np.isfinite(resampled))
 
 
 def test_resample_poly_exact_not_empty(
@@ -99,9 +85,7 @@ def test_resample_poly_exact_not_empty(
 
     assert len(resampled) > 0
 
-    assert np.max(
-        np.abs(resampled)
-    ) > 0
+    assert np.max(np.abs(resampled)) > 0
 
 
 def test_resample_poly_exact_zero_signal():
@@ -127,10 +111,12 @@ def test_resample_poly_exact_multichannel():
 
     times = np.arange(sfreq) / sfreq
 
-    audio = np.vstack([
-        np.sin(2 * np.pi * 10 * times),
-        np.sin(2 * np.pi * 20 * times),
-    ])
+    audio = np.vstack(
+        [
+            np.sin(2 * np.pi * 10 * times),
+            np.sin(2 * np.pi * 20 * times),
+        ]
+    )
 
     resampled = resample_poly_exact(
         audio,
@@ -141,23 +127,17 @@ def test_resample_poly_exact_multichannel():
     assert resampled.shape[0] == 2
     assert resampled.shape[1] == 100
 
-    assert np.all(
-        np.isfinite(resampled)
-    )
+    assert np.all(np.isfinite(resampled))
 
 
 @pytest.fixture
 def prep_audio_smoke(tmp_path):
     sfreq = 44_100
-    duration = 1.0
+    duration = 4.0
 
-    times = np.arange(
-        int(sfreq * duration)
-    ) / sfreq
+    times = np.arange(int(sfreq * duration)) / sfreq
 
-    audio = 0.5 * np.sin(
-        2 * np.pi * 220 * times
-    )
+    audio = 0.5 * np.sin(2 * np.pi * 220 * times)
 
     audio_file = tmp_path / 'sine.wav'
 
@@ -168,6 +148,7 @@ def prep_audio_smoke(tmp_path):
     )
 
     return audio_file, sfreq
+
 
 @pytest.mark.parametrize(
     'feature',
@@ -180,8 +161,8 @@ def prep_audio_smoke(tmp_path):
         'pitch_voicing',
     ],
 )
-def test_prepare_audio_smoke(prep_audio_smoke,
-                             feature):
+
+def test_prepare_audio_smoke(prep_audio_smoke, feature):
     audio, sfreq = prep_audio_smoke
 
     result = prepare_audio(

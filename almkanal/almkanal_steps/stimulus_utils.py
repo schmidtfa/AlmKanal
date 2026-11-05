@@ -1,3 +1,5 @@
+"""Epoch stimulus trials with WAV alignment and audio features."""
+
 from __future__ import annotations
 
 import warnings
@@ -6,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import attrs
+import librosa
 import mne
 import numpy as np
 import pandas as pd
@@ -61,8 +64,8 @@ def _validate_meta(_inst: Any, _attr: attrs.Attribute[MetaMap], meta: MetaMap) -
 
 
 @define
-class TRFSpanSpec:
-    """Describe trial spans, WAV files, and metadata for TRF epoching.
+class StimulusSpanSpec:
+    """Describe trial spans, WAV files, and metadata for stimulus epoching.
 
     Parameters
     ----------
@@ -80,7 +83,7 @@ class TRFSpanSpec:
     -----
     Trials are processed in insertion order. Use distinct labels for repeated
     presentations of the same WAV, or construct them with :meth:`from_events`.
-    ``build_trf_epochs`` can override the implicit WAV suffix via ``wav_ext``.
+    ``build_stimulus_epochs`` can override the implicit WAV suffix via ``wav_ext``.
     """
 
     spans_by_label: Spans = field(validator=_validate_spans)
@@ -97,7 +100,7 @@ class TRFSpanSpec:
         'trials',
         aliases={
             'stim_channel': ('events', 'stim_channel'),
-            'fallback_drift_us_per_s': ('trf', 'fallback_drift_us_per_s'),
+            'fallback_drift_us_per_s': ('stimuli', 'fallback_drift_us_per_s'),
         },
     )
     def from_events(
@@ -110,8 +113,8 @@ class TRFSpanSpec:
         infer_missing_ends: bool = False,
         base_audio_path: str | Path | None = None,
         fallback_drift_us_per_s: float = DEFAULT_FALLBACK_DRIFT_US_PER_S,
-    ) -> TRFSpanSpec:
-        """Build uniquely labelled TRF trials from onset and end triggers.
+    ) -> StimulusSpanSpec:
+        """Build uniquely labelled stimulus trials from onset and end triggers.
 
         Defaults below describe the general profile; omitted settings use the
         active defaults profile.
@@ -138,7 +141,7 @@ class TRFSpanSpec:
 
         Returns
         -------
-        spec : TRFSpanSpec
+        spec : StimulusSpanSpec
             Trials in trigger order, labelled ``trial_000``, ``trial_001``, etc.,
             with WAV paths, trigger codes, and any end-inference metadata.
 
@@ -147,8 +150,8 @@ class TRFSpanSpec:
         End inference uses ``WAV duration * (1 + drift / 1e6)`` and leaves the
         trigger channel unchanged. It only defines spans: to also resample
         neural data without recorded audio, set ``realign_without_audio=True``
-        on :class:`EpochTRF` and use the same ``fallback_drift_us_per_s``.
-        With recorded audio, EpochTRF estimates the offset and drift instead.
+        on :class:`EpochStimuls` and use the same ``fallback_drift_us_per_s``.
+        With recorded audio, EpochStimuls estimates the offset and drift instead.
 
         See Also
         --------
@@ -233,12 +236,13 @@ def _aligned_segment(
     return aligned, alignment
 
 
-def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
+def _build_stimulus_epochs(  # noqa: C901, PLR0915, PLR0912
     raw: mne.io.BaseRaw,
-    spec: TRFSpanSpec,
+    spec: StimulusSpanSpec,
     base_audio_path: str | Path,
     *,
-    feature: str = 'envelope',
+    feature: str | Sequence[str] = 'envelope',
+    resample_sfreq: float | None = None,
     audio_cutoff_hz: float = 80.0,
     hw_delay_s: float = 0.0,
     epoch_len_s: float = 5.0,
@@ -252,7 +256,15 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     verbose: bool = True,
 ) -> tuple[mne.Epochs, dict[str, Any]]:
     if not isinstance(raw, mne.io.BaseRaw):
-        raise TypeError('EpochTRF requires continuous mne.io.BaseRaw input.')
+        raise TypeError('EpochStimuls requires continuous mne.io.BaseRaw input.')
+    features = [feature] if isinstance(feature, str) else list(feature)
+    supported = {'envelope', 'rectify', 'mel', 'flux', 'mel_onsets', 'pitch', 'pitch_voicing'}
+    if not features or any(not isinstance(name, str) or name not in supported for name in features):
+        raise ValueError('feature must contain one or more supported audio feature names.')
+    if len(set(features)) != len(features):
+        raise ValueError('feature must not contain repeated features.')
+    if resample_sfreq is not None and (not np.isfinite(resample_sfreq) or resample_sfreq <= 0):
+        raise ValueError('resample_sfreq must be finite and positive, or None.')
     if not np.isfinite(hw_delay_s) or not np.isfinite(epoch_len_s) or epoch_len_s <= 0:
         raise ValueError('hw_delay_s must be finite and epoch_len_s must be finite and positive.')
     if audio_channels is not None and (isinstance(audio_channels, str) or not audio_channels):
@@ -273,6 +285,7 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
             stacklevel=3,
         )
     sfreq = float(raw.info['sfreq'])
+    output_sfreq = sfreq if resample_sfreq is None else float(resample_sfreq)
     first = int(raw.first_samp)
     delay_samples = int(round(hw_delay_s * sfreq))
     applied_delay_s = delay_samples / sfreq
@@ -328,45 +341,63 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
             record['n_epochs'] = 0
             trial_records.append(record)
 
-        audio_data, _t, audio_names, fs_aud = prepare_audio(
-            audio_path=str(wav),
-            feature=feature,
-            target_fs=sfreq,
-            cutoff_hz=audio_cutoff_hz,
-        )
+        audio_start_s = 0.0
         if alignment is not None:
-            desired_n = min(audio_data.shape[1], seg.n_times)
             slope = alignment['clock_slope']
             t_seg_on = (int(on_samp) - first) / sfreq + alignment['offset_s'] + slope * applied_delay_s
         else:
             if int(on_samp) < first:
                 continue
-            n_audio = audio_data.shape[1]
+            n_audio = int(round(librosa.get_duration(path=str(wav)) * sfreq))
             if off_samp is not None:
                 n_audio = min(n_audio, int(off_samp) - int(on_samp))
             start = int(on_samp) - first + delay_samples
-            # If the physical correction extends beyond the recording, retain
-            # only the matching audio/recording overlap.
             audio_start = max(0, -start)
             desired_n = min(n_audio - audio_start, raw.n_times - max(0, start))
             if desired_n <= 0:
                 continue
             start = max(0, start)
-            audio_data = audio_data[:, audio_start : audio_start + desired_n]
+            audio_start_s = audio_start / sfreq
             seg = raw.copy().crop(tmin=start / sfreq, tmax=(start + desired_n - 1) / sfreq)
             if not preserve_annotations:
                 seg.set_annotations(mne.Annotations([], [], []))
             t_seg_on = start / sfreq
             slope = 1.0
 
-        n_epoch_samples = int(round(epoch_len_s * sfreq))
+        # Align and apply physical delays on the original grid, then resample
+        # only recording channels before extracting features on the output grid.
+        if resample_sfreq is not None and output_sfreq != sfreq:
+            seg.load_data().resample(
+                output_sfreq, method='fft', window='boxcar', npad='auto', pad='reflect_limited', verbose=verbose
+            )
+        feature_arrays = []
+        audio_names = []
+        for name in features:
+            values, _, names, _ = prepare_audio(
+                audio_path=str(wav), feature=name, target_fs=output_sfreq, cutoff_hz=audio_cutoff_hz
+            )
+            if len(names) == 1:
+                names = [name]
+            elif name in {'mel', 'mel_onsets'}:
+                names = [f'{name}_{i + 1}_{channel.removeprefix("mel_")}' for i, channel in enumerate(names)]
+            else:
+                names = [f'{name}_{channel}' for channel in names]
+            audio_names.extend(names)
+            audio_start_out = int(round(audio_start_s * output_sfreq))
+            feature_arrays.append(values[:, audio_start_out:])
+        if len(set(audio_names)) != len(audio_names) or set(audio_names).intersection(seg.ch_names):
+            raise ValueError('Audio feature channel names must be unique and must not overlap recording channel names.')
+        desired_n = min(seg.n_times, *(values.shape[1] for values in feature_arrays))
+        audio_data = np.concatenate([values[:, :desired_n] for values in feature_arrays], axis=0)
+
+        n_epoch_samples = int(round(epoch_len_s * output_sfreq))
         if n_epoch_samples < 1:
             raise ValueError('epoch_len_s must span at least one sample.')
         if desired_n < n_epoch_samples:
             continue
         audio_data = audio_data[:, :desired_n]
-        seg.crop(tmin=0, tmax=(desired_n - 1) / sfreq).load_data()
-        info_aud = mne.create_info(audio_names, float(fs_aud), ['misc'] * len(audio_names))
+        seg.crop(tmin=0, tmax=(desired_n - 1) / output_sfreq).load_data()
+        info_aud = mne.create_info(audio_names, output_sfreq, ['misc'] * len(audio_names))
         seg.add_channels([mne.io.RawArray(audio_data, info_aud, verbose=verbose)], force_update_info=True)
 
         label_code = len(label_to_code) + 1
@@ -384,13 +415,13 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
         label_to_code[label] = label_code
         # Derive times from the retained events; annotation rejection may leave
         # gaps, so arange(len(ep)) would mislabel later epochs.
-        local_on_s = (ep.events[:, 0] - seg.first_samp) / sfreq
+        local_on_s = (ep.events[:, 0] - seg.first_samp) / output_sfreq
         meta = {
             'label': [label] * len(ep),
             'segment_on_s': [t_seg_on] * len(ep),
-            'segment_off_s': [t_seg_on + slope * (desired_n - 1) / sfreq] * len(ep),
+            'segment_off_s': [t_seg_on + slope * (desired_n - 1) / output_sfreq] * len(ep),
             't_on': t_seg_on + slope * local_on_s,
-            't_off': t_seg_on + slope * np.minimum(local_on_s + epoch_len_s, (desired_n - 1) / sfreq),
+            't_off': t_seg_on + slope * np.minimum(local_on_s + epoch_len_s, (desired_n - 1) / output_sfreq),
             'epoch_index_in_segment': ep.selection,
         }
         if alignment is not None:
@@ -419,7 +450,11 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
 
     if not epochs_list:
         raise RuntimeError('No epochs produced. Check spans/audio paths/durations and alignment failures.')
-    epochs_all = mne.concatenate_epochs(epochs_list, on_mismatch='warn', verbose=verbose)
+    for epochs in epochs_list:
+        epochs.set_annotations(
+            None
+        )  # explicitely drop annotations as they will be dropped implcitely anyway after this step
+    epochs_all = mne.concatenate_epochs(epochs_list, verbose=verbose)
     epochs_all.event_id = label_to_code
     alignment_info = {
         'trials': trial_records,
@@ -435,13 +470,14 @@ def _build_trf_epochs(  # noqa: C901, PLR0915, PLR0912
     return epochs_all, alignment_info
 
 
-@function_defaults('trf')
-def build_trf_epochs(
+@function_defaults('stimuli')
+def build_stimulus_epochs(
     raw: mne.io.BaseRaw,
-    spec: TRFSpanSpec,
+    spec: StimulusSpanSpec,
     base_audio_path: str | Path,
     *,
-    feature: str = 'envelope',
+    feature: str | Sequence[str] = 'envelope',
+    resample_sfreq: float | None = None,
     audio_cutoff_hz: float = 80.0,
     hw_delay_s: float = 0.0,
     epoch_len_s: float = 5.0,
@@ -454,7 +490,7 @@ def build_trf_epochs(
     on_alignment_error: Literal['raise', 'skip'] = 'raise',
     verbose: bool = True,
 ) -> mne.Epochs:
-    """Build fixed-length TRF epochs with stimulus features from WAV files.
+    """Build fixed-length stimulus epochs with stimulus features from WAV files.
 
     Defaults below describe the general profile; omitted configurable settings
     use the active defaults profile.
@@ -463,12 +499,22 @@ def build_trf_epochs(
     ----------
     raw : mne.io.BaseRaw
         Continuous recording to epoch. The input is not modified.
-    spec : TRFSpanSpec
+    spec : StimulusSpanSpec
         Trial spans, WAV paths, and optional per-trial metadata.
     base_audio_path : str | pathlib.Path
         Directory used to resolve relative WAV paths in ``spec``.
-    feature : str, default='envelope'
-        WAV feature: ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
+    resample_sfreq : float | None, default=None
+        Output sampling frequency in Hz. Resample continuous trial segments after
+        alignment and physical-delay correction, before extracting and appending
+        features. None retains the input rate. Uses FFT resampling with a boxcar
+        window, automatic padding, and reflect_limited edge padding; MNE applies
+        anti-aliasing internally. Trial spans always refer to input samples.
+    feature : str | sequence of str, default='envelope'
+        One or more distinct WAV features, appended in the requested order.
+        Single-channel features use the requested name; multichannel features
+        use that name as a prefix followed by component or band identifiers.
+        Names must not overlap existing recording channels. Available features:
+        ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
         ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See ``prepare_audio``.
     audio_cutoff_hz : float, default=80.0
         Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.
@@ -516,19 +562,20 @@ def build_trf_epochs(
 
     The Salzburg profile uses ``hw_delay_s=0.0165``, ``audio_channels``
     ``('MISC007', 'MISC008')``, and ``fallback_drift_us_per_s=499.0``.
-    See :class:`EpochTRF` for delay conventions and assumed-drift behavior.
+    See :class:`StimulusEpochs` for delay conventions and assumed-drift behavior.
 
     See Also
     --------
-    EpochTRF : Pipeline step with alignment diagnostics and reporting.
+    StimulusEpochs : Pipeline step with alignment diagnostics and reporting.
     estimate_raw_wav_alignment : Alignment options and search-range guidance.
     prepare_audio : Available WAV features and their output channels.
     """
-    epochs, _ = _build_trf_epochs(
+    epochs, _ = _build_stimulus_epochs(
         raw,
         spec,
         base_audio_path,
         feature=feature,
+        resample_sfreq=resample_sfreq,
         audio_cutoff_hz=audio_cutoff_hz,
         hw_delay_s=hw_delay_s,
         epoch_len_s=epoch_len_s,
@@ -545,8 +592,8 @@ def build_trf_epochs(
 
 
 @define
-class EpochTRF(AlmKanalStep):
-    """Create TRF epochs and attach stimulus features from WAV files.
+class StimulusEpochs(AlmKanalStep):
+    """Create fixed-length epochs within stimulus trials and attach WAV features.
 
     Optionally correct the recording clock, apply a fixed neural timing shift,
     then split trials into non-overlapping epochs with WAV features as ``misc``
@@ -556,12 +603,22 @@ class EpochTRF(AlmKanalStep):
     Parameters
     ----------
     gen_span_spec : callable
-        Callback ``gen_span_spec(raw) -> TRFSpanSpec`` supplying trial spans,
+        Callback ``gen_span_spec(raw) -> StimulusSpanSpec`` supplying trial spans,
         WAV paths, and optional metadata for the input recording.
     base_audio_path : str | pathlib.Path
         Directory used to resolve relative WAV paths in the generated span spec.
-    feature : str, default='envelope'
-        WAV feature: ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
+    resample_sfreq : float | None, default=None
+        Output sampling frequency in Hz. Resample continuous trial segments after
+        alignment and physical-delay correction, before extracting and appending
+        features. None retains the input rate. Uses FFT resampling with a boxcar
+        window, automatic padding, and reflect_limited edge padding; MNE applies
+        anti-aliasing internally. Trial spans always refer to input samples.
+    feature : str | sequence of str, default='envelope'
+        One or more distinct WAV features, appended in the requested order.
+        Single-channel features use the requested name; multichannel features
+        use that name as a prefix followed by component or band identifiers.
+        Names must not overlap existing recording channels. Available features:
+        ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
         ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See ``prepare_audio``.
     audio_cutoff_hz : float, default=80.0
         Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.
@@ -618,26 +675,27 @@ class EpochTRF(AlmKanalStep):
 
     See Also
     --------
-    TRFSpanSpec : Trial spans, WAV paths, and optional metadata.
-    build_trf_epochs : Standalone epoch builder using an existing span spec.
+    StimulusSpanSpec : Trial spans, WAV paths, and optional metadata.
+    build_stimulus_epochs : Standalone epoch builder using an existing span spec.
     estimate_raw_wav_alignment : Alignment options and fit diagnostics.
     prepare_audio : Available WAV features and their output channels.
     """
 
     gen_span_spec: Callable
     base_audio_path: str | Path
-    feature: str = default_field('trf', 'feature')
-    audio_cutoff_hz: float = default_field('trf', 'audio_cutoff_hz')
-    hw_delay_s: float = default_field('trf', 'hw_delay_s')
-    epoch_len_s: float = default_field('trf', 'epoch_len_s')
-    audio_channels: Sequence[str] | None = default_field('trf', 'audio_channels')
-    alignment_kwargs: Mapping[str, Any] | None = default_field('trf', 'alignment_kwargs')
-    preserve_annotations: bool = default_field('trf', 'preserve_annotations')
-    on_alignment_error: Literal['raise', 'skip'] = default_field('trf', 'on_alignment_error')
-    verbose: bool = default_field('trf', 'verbose')
+    feature: str | Sequence[str] = default_field('stimuli', 'feature')
+    resample_sfreq: float | None = default_field('stimuli', 'resample_sfreq', kw_only=True)
+    audio_cutoff_hz: float = default_field('stimuli', 'audio_cutoff_hz')
+    hw_delay_s: float = default_field('stimuli', 'hw_delay_s')
+    epoch_len_s: float = default_field('stimuli', 'epoch_len_s')
+    audio_channels: Sequence[str] | None = default_field('stimuli', 'audio_channels')
+    alignment_kwargs: Mapping[str, Any] | None = default_field('stimuli', 'alignment_kwargs')
+    preserve_annotations: bool = default_field('stimuli', 'preserve_annotations')
+    on_alignment_error: Literal['raise', 'skip'] = default_field('stimuli', 'on_alignment_error')
+    verbose: bool = default_field('stimuli', 'verbose')
 
-    realign_without_audio: bool = default_field('trf', 'realign_without_audio', kw_only=True)
-    fallback_drift_us_per_s: float = default_field('trf', 'fallback_drift_us_per_s', kw_only=True)
+    realign_without_audio: bool = default_field('stimuli', 'realign_without_audio', kw_only=True)
+    fallback_drift_us_per_s: float = default_field('stimuli', 'fallback_drift_us_per_s', kw_only=True)
 
     must_be_before: tuple = ()
     must_be_after: tuple = ()
@@ -645,7 +703,7 @@ class EpochTRF(AlmKanalStep):
 
     @step_with_defaults
     def run(self, data: mne.io.BaseRaw, info: AlmKanalInfo) -> dict:
-        """Build TRF epochs and collect processing diagnostics.
+        """Build stimulus epochs and collect processing diagnostics.
 
         Parameters
         ----------
@@ -662,16 +720,19 @@ class EpochTRF(AlmKanalStep):
             the captured profile and effective step parameters.
         """
         span_profile = self._defaults_profile
-        if self.fallback_drift_us_per_s != span_profile.trf.fallback_drift_us_per_s:
-            span_profile = span_profile.with_overrides(trf={'fallback_drift_us_per_s': self.fallback_drift_us_per_s})
+        if self.fallback_drift_us_per_s != span_profile.stimuli.fallback_drift_us_per_s:
+            span_profile = span_profile.with_overrides(
+                stimuli={'fallback_drift_us_per_s': self.fallback_drift_us_per_s}
+            )
         with use_defaults(span_profile):
-            spec: TRFSpanSpec = self.gen_span_spec(data)
+            spec: StimulusSpanSpec = self.gen_span_spec(data)
         sfreq = float(data.info['sfreq'])
-        epochs, alignment_info = _build_trf_epochs(
+        epochs, alignment_info = _build_stimulus_epochs(
             raw=data,
             spec=spec,
             base_audio_path=self.base_audio_path,
             feature=self.feature,
+            resample_sfreq=self.resample_sfreq,
             audio_cutoff_hz=self.audio_cutoff_hz,
             hw_delay_s=self.hw_delay_s,
             epoch_len_s=self.epoch_len_s,
@@ -693,7 +754,22 @@ class EpochTRF(AlmKanalStep):
             'TRF_info': {
                 'spans_by_label': spec.spans_by_label,
                 'wav_by_label': {label: str(path) for label, path in spec.wav_by_label.items()},
-                'feature': self.feature,
+                'feature': [self.feature] if isinstance(self.feature, str) else list(self.feature),
+                'feature_channels': epochs.ch_names[len(data.ch_names) :],
+                'resample_sfreq': self.resample_sfreq,
+                'original_sfreq': sfreq,
+                'sfreq': float(epochs.info['sfreq']),
+                'resample_info': None
+                if self.resample_sfreq is None or self.resample_sfreq == sfreq
+                else {
+                    'sfreq': float(epochs.info['sfreq']),
+                    'original_sfreq': sfreq,
+                    'applied_to': 'continuous trial segments',
+                    'method': 'fft',
+                    'window': 'boxcar',
+                    'npad': 'auto',
+                    'pad': 'reflect_limited',
+                },
                 'audio_cutoff_hz': self.audio_cutoff_hz,
                 'hw_delay_s': self.hw_delay_s,
                 'applied_hw_delay_s': round(self.hw_delay_s * sfreq) / sfreq,
@@ -717,7 +793,7 @@ class EpochTRF(AlmKanalStep):
         }
 
     def reports(self, data: mne.BaseEpochs, report: mne.Report, info: AlmKanalInfo) -> None:
-        """Add TRF epochs and any alignment diagnostics to the report.
+        """Add stimulus epochs and any alignment diagnostics to the report.
 
         Parameters
         ----------
@@ -728,10 +804,25 @@ class EpochTRF(AlmKanalStep):
         info : AlmKanalInfo
             Pipeline history containing this step's ``TRF_info`` entry.
         """
-        report.add_epochs(data, title='Epoched (TRF)')
-        trf_info = info.get_step_info('EpochTRF', required=True)['TRF_info']
-        if trf_info['realign_audio']:
-            alignment = trf_info['alignment_info']
+        report.add_epochs(data, title='Epoched stimuli')
+        stimulus_info = info.get_step_info('StimulusEpochs', required=True)['TRF_info']
+        if stimulus_info.get('feature_channels'):
+            report.add_html(
+                pd.DataFrame({'Feature channel': stimulus_info['feature_channels']}).to_html(index=False, escape=True),
+                title='Stimulus audio features',
+            )
+        resampling = stimulus_info.get('resample_info')
+        if resampling:
+            report.add_html(
+                f'<p>Continuous trial segments were resampled from {resampling["original_sfreq"]:g} Hz '
+                f'to {resampling["sfreq"]:g} Hz using FFT-based resampling with a boxcar '
+                'frequency-domain window, automatic padding, and reflect_limited edge padding. '
+                'Resampling followed any alignment and physical-delay correction and preceded '
+                'audio-feature extraction and appending.</p>',
+                title='Stimulus resampling',
+            )
+        if stimulus_info['realign_audio']:
+            alignment = stimulus_info['alignment_info']
             columns = {
                 'label': 'Trial',
                 'alignment_method': 'Alignment method',
@@ -746,9 +837,9 @@ class EpochTRF(AlmKanalStep):
                 'n_epochs': 'Epochs',
             }
             table = pd.DataFrame(alignment['trials']).reindex(columns=list(columns)).rename(columns=columns)
-            if trf_info.get('alignment_method') == 'assumed_drift':
+            if stimulus_info.get('alignment_method') == 'assumed_drift':
                 method = (
-                    f'<p>Assumed drift correction: {trf_info["fallback_drift_us_per_s"]:g} µs/s. '
+                    f'<p>Assumed drift correction: {stimulus_info["fallback_drift_us_per_s"]:g} µs/s. '
                     'Neural data were resampled using the original WAV duration, assuming WAV time zero '
                     'at the trial onset (zero offset). No recorded audio was used; drift and offset '
                     'were not measured, and residual/correlation diagnostics are unavailable.</p>'
@@ -758,7 +849,7 @@ class EpochTRF(AlmKanalStep):
             html = (
                 f'<p>Aligned {alignment["n_trials_aligned"]} of {alignment["n_trials_found"]} trials; '
                 f'{alignment["n_trials_failed"]} failed. Physical-delay correction after realignment: '
-                f'{trf_info["applied_hw_delay_s"] * 1000:g} ms '
+                f'{stimulus_info["applied_hw_delay_s"] * 1000:g} ms '
                 f'(requested {self.hw_delay_s * 1000:g} ms). '
                 'WAV feature channels were left unchanged; positive values advance neural events '
                 'to compensate playback-to-ear delay, and negative values add lag.</p>'
@@ -769,4 +860,9 @@ class EpochTRF(AlmKanalStep):
             )
             if alignment['failures']:
                 html += pd.DataFrame(alignment['failures']).to_html(index=False, escape=True)
-            report.add_html(html, title='TRF audio realignment')
+            report.add_html(html, title='Stimulus audio realignment')
+
+
+# Historical public names remain loadable by existing scripts and pickles.
+TRFSpanSpec = StimulusSpanSpec
+build_trf_epochs = build_stimulus_epochs

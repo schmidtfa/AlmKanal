@@ -43,8 +43,19 @@
       {% do lines.append('The delay rounded to the sampling grid was ' ~ '%.3f'|format(s.settings.applied_hw_delay_s * 1000) ~ ' ms.') %}
     {% endif %}
   {% endif %}
-  {% if s.settings.feature is defined %}
-    {% do lines.append('WAV-derived ' ~ s.settings.feature ~ ' features were attached to the neural data.') %}
+{% endif %}
+{% if s.results.get('n_recordings_resampled', 0) %}
+  {% do lines.append('The continuous trial segments were resampled from ' ~ s.results.resampling_original_sfreqs|join(', ') ~ ' Hz to ' ~ s.settings.resample_sfreq ~ ' Hz using FFT-based resampling with a boxcar frequency-domain window, automatic padding, and reflect_limited edge padding. Resampling followed any realignment and physical-delay correction and preceded audio-feature extraction and appending.') %}
+{% endif %}
+{% if s.settings.feature is defined %}
+  {% set features = [s.settings.feature] if s.settings.feature is string else s.settings.feature %}
+  {% do lines.append('WAV-derived features (' ~ features|join(', ') ~ ') were computed at the output sampling frequency and attached as misc channels.') %}
+  {% if s.settings.feature_channels is defined %}
+    {% if s.settings.feature_channels is mapping %}
+      {% do lines.append(s.settings.feature_channels.length ~ ' audio feature channels were appended.') %}
+    {% else %}
+      {% do lines.append('Feature channels: ' ~ s.settings.feature_channels|join(', ') ~ '.') %}
+    {% endif %}
   {% endif %}
 {% endif %}
 {% do lines.append('Data were epoched in ' ~ s.settings.epoch_len_s ~ 's long epochs.') %}

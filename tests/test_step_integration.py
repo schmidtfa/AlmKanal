@@ -10,7 +10,7 @@ import almkanal as ak
 from almkanal.info import AlmKanalInfo
 from almkanal.report.methods_context import build_context_from_files
 from almkanal.report.rendering import render_methods
-import pandas as pd
+
 
 @pytest.fixture(autouse=True)
 def isolated_defaults():
@@ -40,7 +40,7 @@ def test_events_epochs_and_resampling_use_captured_settings(tmp_path, method):
         mne.create_info(['F3', 'F4', 'P3', 'P4', 'TRIGGER'], sfreq, ['eeg'] * 4 + ['stim']),
         first_samp=100,
     )
-    raw.set_montage('standard_1020')
+    raw.set_montage('colin27_1020')
 
     with ak.use_defaults(
         name='study-events',
@@ -147,7 +147,9 @@ def test_multiblock_maxwell_defaults_concatenation_and_methods(monkeypatch, tmp_
     assert ('Fine-calibration information was applied.' in text) is bool(compensation)
     assert ('Cross-talk compensation was applied.' in text) is bool(compensation)
 
-
+@pytest.mark.filterwarnings(
+    r"ignore:peak_width_limits min .* is < 2 bins:RuntimeWarning"
+)
 @pytest.mark.parametrize('fit_only', [False, True])
 def test_salzburg_train_ica_runs_on_synthetic_recording(fit_only):
     sfreq = 200

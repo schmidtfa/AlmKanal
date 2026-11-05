@@ -22,6 +22,7 @@ def salzburg_setup():
     with use_defaults('salzburg'):
         yield
 
+
 def make_synthetic_vpixx_mat(
     path: Path,
     *,
@@ -80,6 +81,15 @@ def make_synthetic_vpixx_mat(
     data[:, 8] = 0.0
     data[:, 9] = 0.0
 
+    # Simulate a 150 ms blink in both eyes at 1.5 seconds
+    blink_mask = (times >= 1.5) & (times < 1.65)
+
+    data[blink_mask, 8:10] = 1.0
+
+    # Simulate missing gaze and pupil data during the blink.
+    # VPixx uses 9999 to indicate missing samples.
+    data[blink_mask, 1:7] = 9999.0
+
     digital_output = np.zeros(n_samples)
 
     for time, code in zip(trigger_times, trigger_codes):
@@ -103,7 +113,7 @@ def make_synthetic_vpixx_mat(
     # 18 Right Eye Raw x
     # 19 Right Eye Raw y
 
-    savemat(path, {"data": data})
+    savemat(path, {'data': data})
 
 
 def make_synthetic_meg(
@@ -117,9 +127,9 @@ def make_synthetic_meg(
     n_samples = int(round(duration * sfreq))
 
     info = mne.create_info(
-        ch_names=["MEG001", "STI101"],
+        ch_names=['MEG001', 'STI101'],
         sfreq=sfreq,
-        ch_types=["mag", "stim"],
+        ch_types=['mag', 'stim'],
     )
 
     data = np.zeros((2, n_samples), dtype=float)
@@ -138,7 +148,7 @@ def make_synthetic_meg(
 
 def test_read_vpixx_mat(tmp_path):
     """Test reading a synthetic VPixx MAT file."""
-    path = tmp_path / "synthetic_eye.mat"
+    path = tmp_path / 'synthetic_eye.mat'
 
     make_synthetic_vpixx_mat(
         path,
@@ -156,7 +166,7 @@ def test_read_vpixx_mat(tmp_path):
 
 def test_load_eyetracking_data(tmp_path):
     """Test complete VPixx preprocessing."""
-    path = tmp_path / "synthetic_eye.mat"
+    path = tmp_path / 'synthetic_eye.mat'
 
     make_synthetic_vpixx_mat(
         path,
@@ -168,37 +178,36 @@ def test_load_eyetracking_data(tmp_path):
 
     assert isinstance(raw, mne.io.BaseRaw)
 
-    assert raw.info["sfreq"] == pytest.approx(2000.0)
+    assert raw.info['sfreq'] == pytest.approx(2000.0)
     assert raw.n_times == 10_000
 
     expected_channels = {
-        "eyetracker_x",
-        "eyetracker_y",
-        "pupil_diameter",
-        "blinks",
-        "velocity",
-        "velocity_x",
-        "velocity_y",
-        "Digital Output",
+        'eyetracker_x',
+        'eyetracker_y',
+        'pupil_diameter',
+        'blinks',
+        'velocity',
+        'velocity_x',
+        'velocity_y',
+        'Digital Output',
     }
 
     assert expected_channels.issubset(raw.ch_names)
 
-    assert raw.get_channel_types(picks=["Digital Output"]) == ["stim"]
+    assert raw.get_channel_types(picks=['Digital Output']) == ['stim']
 
     for channel in (
-        "eyetracker_x",
-        "eyetracker_y",
-        "pupil_diameter",
-        "velocity",
-        "velocity_x",
-        "velocity_y",
+        'eyetracker_x',
+        'eyetracker_y',
+        'pupil_diameter',
+        'velocity',
+        'velocity_x',
+        'velocity_y',
     ):
         data = raw.get_data(picks=[channel])
 
         assert data.shape == (1, raw.n_times)
         assert np.isfinite(data).all()
-
 
 
 def test_align_eye_to_meg(tmp_path):
@@ -207,7 +216,7 @@ def test_align_eye_to_meg(tmp_path):
     The eye tracker intentionally uses a different sampling frequency
     and starts 0.5 seconds later than the MEG recording.
     """
-    eye_path = tmp_path / "synthetic_eye.mat"
+    eye_path = tmp_path / 'synthetic_eye.mat'
 
     meg_sfreq = 1000.0
     eye_sfreq = 2000.0
@@ -240,8 +249,8 @@ def test_align_eye_to_meg(tmp_path):
         interpolate_blinks=False,
     )
 
-    assert meg.info["sfreq"] == pytest.approx(1000.0)
-    assert eye.info["sfreq"] == pytest.approx(2000.0)
+    assert meg.info['sfreq'] == pytest.approx(1000.0)
+    assert eye.info['sfreq'] == pytest.approx(2000.0)
 
     aligned_eye = align_eye_to_meg(
         meg,
@@ -249,9 +258,7 @@ def test_align_eye_to_meg(tmp_path):
     )
 
     # realign_raw() should have made the sampling frequencies compatible.
-    assert aligned_eye.info["sfreq"] == pytest.approx(
-        meg.info["sfreq"]
-    )
+    assert aligned_eye.info['sfreq'] == pytest.approx(meg.info['sfreq'])
 
     # The recordings should now have compatible sample counts.
     assert aligned_eye.n_times == meg.n_times
@@ -259,7 +266,7 @@ def test_align_eye_to_meg(tmp_path):
 
 def test_add_eye_tracking_data(tmp_path):
     """Test complete MEG + eye-tracking integration."""
-    eye_path = tmp_path / "synthetic_eye.mat"
+    eye_path = tmp_path / 'synthetic_eye.mat'
 
     meg = make_synthetic_meg(
         sfreq=1000.0,
@@ -267,7 +274,6 @@ def test_add_eye_tracking_data(tmp_path):
         trigger_times=(1.0, 2.0, 3.0),
         trigger_codes=(1, 2, 3),
     )
-
 
     make_synthetic_vpixx_mat(
         eye_path,
@@ -290,23 +296,23 @@ def test_add_eye_tracking_data(tmp_path):
         assert channel in result.ch_names
 
     expected_eye_channels = {
-        "eyetracker_x",
-        "eyetracker_y",
-        "pupil_diameter",
-        "blinks",
-        "velocity",
-        "velocity_x",
-        "velocity_y",
-        "Digital Output",
+        'eyetracker_x',
+        'eyetracker_y',
+        'pupil_diameter',
+        'blinks',
+        'velocity',
+        'velocity_x',
+        'velocity_y',
+        'Digital Output',
     }
 
     assert expected_eye_channels.issubset(result.ch_names)
 
     # Sampling frequencies should  match
-    assert result.info["sfreq"] == pytest.approx(1000.0)
+    assert result.info['sfreq'] == pytest.approx(1000.0)
 
     # add_channels() requires compatible sample counts
     assert result.n_times == meg.n_times
 
     # The resulting object contains more channels than the original MEG
-    assert result.info["nchan"] > len(original_meg_channels)
+    assert result.info['nchan'] > len(original_meg_channels)

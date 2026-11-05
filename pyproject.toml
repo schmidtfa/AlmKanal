@@ -142,6 +142,22 @@ quote-style = 'single'
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--ignore=almkanal/__version__.py"
+filterwarnings = [
+    # Deprecated Pyparsing APIs used by Matplotlib
+    'ignore::pyparsing.warnings.PyparsingDeprecationWarning',
+
+    # Deprecated scipy.misc import in NeuroKit2
+    'ignore:scipy\.misc is deprecated:DeprecationWarning:neurokit2\.signal\.signal_findpeaks',
+    
+    # Audioread uses deprecated Python standard-library modules
+    'ignore:.*deprecated and slated for removal in Python 3\.13:DeprecationWarning:audioread\.rawread',
+
+    # MNE report triggers a Matplotlib backend-switching deprecation
+    'ignore:Auto-close.*backend switching is deprecated:DeprecationWarning:mne\.report\.report',
+
+    # Deprecated Python modules imported by Audioread
+    'ignore:.*(aifc|audioop|sunau).*deprecated and slated for removal in Python 3\.13:DeprecationWarning',
+]
 
 [tool.mypy]
 disable_error_code = "import-untyped"

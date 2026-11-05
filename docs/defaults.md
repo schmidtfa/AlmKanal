@@ -42,7 +42,7 @@ step = ak.Filter()              # Uses the study's 30 Hz low-pass setting.
 custom = ak.Filter(lowpass=20)  # Uses 20 Hz for this step only.
 ```
 
-Options are grouped into sections such as `filter`, `ica`, `trf`, and `vpixx`.
+Options are grouped into sections such as `filter`, `ica`, `stimuli`, and `vpixx`.
 Unspecified options retain their values from the selected profile. The complete
 list of sections, types, and general defaults is at the end of this guide.
 
@@ -130,9 +130,9 @@ The Salzburg profile starts from the general defaults and changes these values:
 | Setting | General profile | Salzburg profile |
 | --- | --- | --- |
 | `ica.train` | `False` | `True` |
-| `trf.hw_delay_s` | `0.0` seconds | `0.0165` seconds |
-| `trf.fallback_drift_us_per_s` | `0.0` µs/s | `499.0` µs/s |
-| `trf.audio_channels` | `None` | `("MISC007", "MISC008")` |
+| `stimuli.hw_delay_s` | `0.0` seconds | `0.0165` seconds |
+| `stimuli.fallback_drift_us_per_s` | `0.0` µs/s | `499.0` µs/s |
+| `stimuli.audio_channels` | `None` | `("MISC007", "MISC008")` |
 | `vpixx.meg_stim_channel` | `None` (MNE detection) | `"STI101"` |
 | `vpixx.meg_min_duration` | `0.0` seconds | `0.002` seconds |
 | `vpixx.meg_max_trigger` | `None` (keep all codes) | `4096` (exclude this code and above) |
@@ -146,10 +146,10 @@ For another setup, supply its measured geometry, timing values, and channel
 names. Selecting a profile does not check whether its hardware settings match
 your recording.
 
-Salzburg's audio channels enable recorded-audio alignment during TRF processing.
+Salzburg's audio channels enable recorded-audio alignment during stimulus processing.
 If a recording has no audio channels, use
-`ak.set_defaults("salzburg", trf={"audio_channels": None})` or pass
-`audio_channels=None` to the individual `EpochTRF` step.
+`ak.set_defaults("salzburg", stimuli={"audio_channels": None})` or pass
+`audio_channels=None` to the individual `EpochStimuls` step.
 
 ## When settings take effect
 
@@ -181,7 +181,7 @@ without_train_removal = ak.ICA(train=False)
 ```
 
 Required inputs remain required. For example, `Resample` still needs `sfreq`,
-`ForwardModel` needs `subject_id` and `subjects_dir`, and `EpochTRF` needs its
+`ForwardModel` needs `subject_id` and `subjects_dir`, and `EpochStimuls` needs its
 span callback and audio path. Profiles do not replace the pipeline's step
 ordering requirements.
 
@@ -327,8 +327,8 @@ are listed earlier in this guide.
 the value's type; the processing function determines which inputs it supports.
 
 Related helpers share settings where appropriate. Trial span inference uses
-`trf.fallback_drift_us_per_s`, and `find_train_ica` uses `ica.train_thresh` for its
-`peak_threshold` argument. An explicit `EpochTRF(fallback_drift_us_per_s=...)`
+`stimuli.fallback_drift_us_per_s`, and `find_train_ica` uses `ica.train_thresh` for its
+`peak_threshold` argument. An explicit `EpochStimuls(fallback_drift_us_per_s=...)`
 also supplies the default inside its span callback; an explicit callback
 argument still takes precedence.
 
@@ -535,13 +535,16 @@ Used by `SourceReconstruction` and parcellation helpers.
 | `atlas` | <code>str</code> | `'glasser'` |
 | `morph2fsaverage` | <code>bool</code> | `True` |
 
-### `trf`
+### `stimuli`
 
-Used by `EpochTRF`, TRF epoch helpers, and fallback drift in trial helpers.
+Used by `EpochStimuls`, `build_stimulus_epochs`, and fallback drift in trial helpers.
+Configure these settings through `Defaults.stimuli` and
+`with_overrides(stimuli={...})`.
 
 | Option | Type | General default |
 | --- | --- | --- |
-| `feature` | <code>str</code> | `'envelope'` |
+| `feature` | <code>str &#124; Sequence[str]</code> | `'envelope'` |
+| `resample_sfreq` | <code>float &#124; None</code> | `None` |
 | `audio_cutoff_hz` | <code>float</code> | `80.0` |
 | `hw_delay_s` | <code>float</code> | `0.0` |
 | `epoch_len_s` | <code>float</code> | `5.0` |
@@ -609,7 +612,7 @@ Used by `find_train_ica`.
 
 ### `trials`
 
-Used by `find_audio_trials` and `TRFSpanSpec.from_events`.
+Used by `find_audio_trials` and `StimulusSpanSpec.from_events`.
 
 | Option | Type | General default |
 | --- | --- | --- |
@@ -641,7 +644,8 @@ Used by `prepare_audio`.
 
 | Option | Type | General default |
 | --- | --- | --- |
-| `feature` | <code>str</code> | `'envelope'` |
+| `feature` | <code>str &#124; Sequence[str]</code> | `'envelope'` |
+| `resample_sfreq` | <code>float &#124; None</code> | `None` |
 | `target_fs` | <code>float</code> | `100.0` |
 | `cutoff_hz` | <code>float</code> | `80.0` |
 | `n_mels` | <code>int</code> | `32` |

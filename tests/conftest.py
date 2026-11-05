@@ -1,5 +1,5 @@
-import pytest
 import mne
+import pytest
 
 
 @pytest.fixture(scope='session')
@@ -8,7 +8,7 @@ def _mne_raw_template():
 
     meg_path = data_path / 'MEG' / 'sample'
     raw_fname = meg_path / 'sample_audvis_raw.fif'
-    raw = mne.io.read_raw_fif(raw_fname, preload=True)#.crop(tmin=0, tmax=60)
+    raw = mne.io.read_raw_fif(raw_fname, preload=True)  # .crop(tmin=0, tmax=60)
 
     raw = raw.pick(picks=['meg', 'eog', 'stim'])
 
@@ -23,7 +23,7 @@ def _mne_raw_eeg_template():
 
     meg_path = data_path / 'MEG' / 'sample'
     raw_fname = meg_path / 'sample_audvis_raw.fif'
-    raw = mne.io.read_raw_fif(raw_fname, preload=True)#.crop(tmin=0, tmax=60)
+    raw = mne.io.read_raw_fif(raw_fname, preload=True)  # .crop(tmin=0, tmax=60)
 
     raw = raw.pick(picks=['eeg', 'eog', 'stim'])
 
@@ -34,7 +34,6 @@ def _mne_raw_eeg_template():
 
 @pytest.fixture(scope='session')
 def _mne_epochs_template():
-
     # % now lets check-out the events
     event_id = {
         'Auditory/Left': 1,
@@ -86,8 +85,3 @@ def gen_mne_data_raw_eeg(_mne_raw_eeg_template):
 @pytest.fixture
 def gen_mne_data_epochs(_mne_epochs_template):
     return _mne_epochs_template.copy()
-
-
-
-
-

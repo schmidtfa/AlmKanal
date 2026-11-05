@@ -1,45 +1,75 @@
 from __future__ import annotations
+
 import json
 from copy import deepcopy
 from pathlib import Path
+
 import numpy as np
 import pytest
+
 from almkanal import AlmKanal, preprocessing_report
+from almkanal.info import StepInfo
 from almkanal.report.methods_context import build_context_from_files
 from almkanal.stim_utils.alignment_utils import summarize_alignments
-from almkanal.info import AlmKanalInfo, StepInfo
+
+
 def make_info(drifts: list[float], failures: int = 0) -> dict:
-    trials = [{
-        'drift_us_per_s': drift, 'offset_s': 0.04, 'clock_slope': 1 + drift / 1e6,
-        'total_drift_ms': drift / 100, 'residual_rms_ms': 0.2, 'residual_max_ms': 0.3,
-        'median_correlation': 0.98, 'n_anchor_inliers': 12,
-    } for drift in drifts]
+    trials = [
+        {
+            'drift_us_per_s': drift,
+            'offset_s': 0.04,
+            'clock_slope': 1 + drift / 1e6,
+            'total_drift_ms': drift / 100,
+            'residual_rms_ms': 0.2,
+            'residual_max_ms': 0.3,
+            'median_correlation': 0.98,
+            'n_anchor_inliers': 12,
+        }
+        for drift in drifts
+    ]
     return {
-        'epoch_len_s': 1.0, 'feature': 'envelope', 'audio_cutoff_hz': 80,
-        'hw_delay_s': 0.0165, 'applied_hw_delay_s': 0.016,
-        'realign_audio': True, 'audio_channels': ['recorded'],
+        'epoch_len_s': 1.0,
+        'feature': 'envelope',
+        'audio_cutoff_hz': 80,
+        'hw_delay_s': 0.0165,
+        'applied_hw_delay_s': 0.016,
+        'realign_audio': True,
+        'audio_channels': ['recorded'],
         'alignment_kwargs': {
-            'sync_sfreq': 500, 'window_s': 10, 'step_s': 5, 'max_lag_s': 0.25,
-            'min_corr': 0.3, 'min_anchors': 5, 'reject_outliers': True,
+            'sync_sfreq': 500,
+            'window_s': 10,
+            'step_s': 5,
+            'max_lag_s': 0.25,
+            'min_corr': 0.3,
+            'min_anchors': 5,
+            'reject_outliers': True,
         },
-        'preserve_annotations': True, 'on_alignment_error': 'skip',
+        'preserve_annotations': True,
+        'on_alignment_error': 'skip',
         'alignment_info': {
-            'trials': trials, 'failures': [{'error': 'missing'}] * failures,
-            'n_trials_found': len(trials) + failures, 'n_trials_aligned': len(trials),
-            'n_trials_failed': failures, 'n_trials_epoched': len(trials),
+            'trials': trials,
+            'failures': [{'error': 'missing'}] * failures,
+            'n_trials_found': len(trials) + failures,
+            'n_trials_aligned': len(trials),
+            'n_trials_failed': failures,
+            'n_trials_epoched': len(trials),
             'summary': summarize_alignments(trials),
         },
     }
+
+
 def write_pipeline_json(path: Path, info: dict) -> Path:
     pipeline = AlmKanal(steps=[])
     pipeline.info.add(
         StepInfo(
-            step='EpochTRF',
+            step='StimulusEpochs',
             info={'TRF_info': info},
         )
     )
     pipeline.generate_json(str(path))
     return path
+
+
 def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: Path) -> None:
     first = list(np.arange(75, dtype=float))
     second = [-100.0, 200.0]
@@ -66,33 +96,47 @@ def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: P
     assert f'{np.mean(first + second):.3f} ± {np.std(first + second):.3f} µs/s' in output
     assert 'residual RMS timing error 0.200 ± 0.000 ms' in output
     assert 'physical-delay correction of 16.500 ms was applied after realignment' in output
-    assert 'positive values advance neural events relative to the WAV features to compensate playback-to-ear delay' in output
+    assert (
+        'positive values advance neural events relative to the WAV features to compensate playback-to-ear delay'
+        in output
+    )
     assert 'The WAV feature channels were left unchanged.' in output
     assert 'sampling grid was 16.000 ms' in output
     assert '\n#### Realignment\n\n' in output
     assert 'normalized cross-correlation' in output
     assert 'Without recorded audio' not in output
+
+
 def test_report_checks_configuration_but_allows_different_results(tmp_path: Path) -> None:
     one = make_info([1.0])
     two = deepcopy(one)
     two['hw_delay_s'] = 0.02
     files = [write_pipeline_json(tmp_path / 'one.json', one), write_pipeline_json(tmp_path / 'two.json', two)]
-    with pytest.raises(ValueError, match="Settings mismatch in 'EpochTRF'"):
+    with pytest.raises(ValueError, match="Settings mismatch in 'StimulusEpochs'"):
         build_context_from_files(files)
-@pytest.mark.parametrize('info', [
-    {'epoch_len_s': 5.0},
-    {'epoch_len_s': 5.0, 'realign_audio': False, 'hw_delay_s': -0.0165},
-])
+
+
+@pytest.mark.parametrize(
+    'info',
+    [
+        {'epoch_len_s': 5.0},
+        {'epoch_len_s': 5.0, 'realign_audio': False, 'hw_delay_s': -0.0165},
+    ],
+)
 def test_old_or_disabled_alignment_reports_remain_supported(tmp_path: Path, info: dict) -> None:
     path = write_pipeline_json(tmp_path / 'legacy.json', info)
     text = preprocessing_report([path], tmp_path / 'methods.md').read_text()
     assert 'Data were epoched in 5.0s long epochs.' in text
     assert 'clock drift' not in text
     assert '#### Realignment' not in text
+
+
 def test_one_trial_summary_has_zero_sd(tmp_path: Path) -> None:
     path = write_pipeline_json(tmp_path / 'one.json', make_info([5.0]))
     metrics = build_context_from_files([path]).steps[0].results['metrics']
     assert metrics['drift_us_per_s'] == {'n': 1, 'mean': 5.0, 'sd': 0.0, 'min': 5.0, 'max': 5.0}
+
+
 def test_inference_counts_and_priors_survive_truncation_and_pool_separately(tmp_path: Path) -> None:
     first = make_info([1500.0] * 75, failures=2)
     second = make_info([1000.0])
@@ -117,14 +161,19 @@ def test_inference_counts_and_priors_survive_truncation_and_pool_separately(tmp_
     assert 'normalized cross-correlation' in methods
     assert 'using WAV duration multiplied by' not in methods
     assert 'Without recorded audio' not in methods
+
+
 def test_inferred_end_report_without_audio_alignment(tmp_path: Path) -> None:
     info = {
-        'epoch_len_s': 5.0, 'realign_audio': False,
+        'epoch_len_s': 5.0,
+        'realign_audio': False,
         'alignment_info': {'n_trials_end_inferred': 1, 'end_inference_drift_counts': {'499.0': 1}},
     }
     path = write_pipeline_json(tmp_path / 'unaligned.json', info)
     methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()
     assert methods.strip() == '### Preprocessing\n\nData were epoched in 5.0s long epochs.'
+
+
 @pytest.mark.parametrize('alignment_method', [None, 'audio', 'assumed_drift'])
 @pytest.mark.parametrize('resample_after_epochs', [False, True])
 def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resample_after_epochs: bool) -> None:
@@ -140,11 +189,20 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         info['alignment_kwargs'] = {}
         info['alignment_info']['summary'] = {}
     ica_info = {
-        'method': 'fastica', 'n_components': 20,
-        'ica_hp_freq': 1.0, 'ica_lp_freq': None, 'resample_freq': None,
-        'eog': False, 'ecg': False, 'emg': False, 'train': False,
-        'eog_corr_thresh': None, 'ecg_corr_thresh': None, 'emg_thresh': None,
-        'train_freq': None, 'train_thresh': None,
+        'method': 'fastica',
+        'n_components': 20,
+        'ica_hp_freq': 1.0,
+        'ica_lp_freq': None,
+        'resample_freq': None,
+        'eog': False,
+        'ecg': False,
+        'emg': False,
+        'train': False,
+        'eog_corr_thresh': None,
+        'ecg_corr_thresh': None,
+        'emg_thresh': None,
+        'train_freq': None,
+        'train_thresh': None,
         'components_dict': {'eog': [1, 2]},
     }
     pipeline = AlmKanal(steps=[])
@@ -155,14 +213,10 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         )
     )
     epoch_step = StepInfo(
-        step='EpochTRF',
+        step='StimulusEpochs',
         info={'TRF_info': info},
     )
-    resample_applied_to = (
-        'epoched'
-        if resample_after_epochs
-        else 'continuous'
-    )
+    resample_applied_to = 'epoched' if resample_after_epochs else 'continuous'
     resample_step = StepInfo(
         step='Resample',
         info={
@@ -200,7 +254,7 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         assert '#### Realignment' not in methods
         assert 'Trial endpoints' not in methods
         assert 'physical-delay correction' not in methods
-        assert 'WAV-derived' not in methods
+        assert 'WAV-derived features (envelope)' in methods
         assert 'Data were epoched in 1.0s long epochs.' in ica_section
         assert resample_sentence in ica_section
     else:
@@ -221,3 +275,57 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
             assert 'zero offset' in realignment
             assert 'normalized cross-correlation' not in methods
             assert 'mean ± population SD' not in methods
+
+
+@pytest.mark.parametrize('realign', [False, True])
+def test_resampling_and_multiple_features_methods_report(tmp_path, realign):
+    infos = []
+    for rate in (500.0, 1000.0):
+        info = make_info([1.0])
+        info.update(
+            {
+                'realign_audio': realign,
+                'feature': ['envelope', 'rectify'],
+                'feature_channels': ['envelope', 'rectify_pos_rect', 'rectify_neg_rect'],
+                'resample_sfreq': 125.0,
+                'original_sfreq': rate,
+                'sfreq': 125.0,
+                'resample_info': {
+                    'sfreq': 125.0,
+                    'original_sfreq': rate,
+                    'applied_to': 'continuous trial segments',
+                    'method': 'fft',
+                    'window': 'boxcar',
+                    'npad': 'auto',
+                    'pad': 'reflect_limited',
+                },
+            }
+        )
+        infos.append(write_pipeline_json(tmp_path / f'{rate}.json', info))
+    context = build_context_from_files(infos)
+    assert context.steps[0].results['resampling_original_sfreqs'] == [500, 1000]
+    text = preprocessing_report(infos, tmp_path / 'methods.md').read_text()
+    assert 'from 500.0, 1000.0 Hz to 125.0 Hz' in text
+    assert 'FFT-based resampling with a boxcar frequency-domain window' in text
+    assert 'preceded audio-feature extraction and appending' in text
+    assert 'WAV-derived features (envelope, rectify)' in text
+    assert 'rectify_pos_rect' in text
+
+
+def test_report_rejects_different_resampling_targets(tmp_path):
+    first = make_info([1.0])
+    first['resample_sfreq'] = 125
+    second = deepcopy(first)
+    second['resample_sfreq'] = 200
+    files = [write_pipeline_json(tmp_path / 'a.json', first), write_pipeline_json(tmp_path / 'b.json', second)]
+    with pytest.raises(ValueError, match='Settings mismatch'):
+        build_context_from_files(files)
+
+
+def test_many_feature_channels_report_after_json_truncation(tmp_path):
+    info = make_info([1.0])
+    info.update(feature=['mel', 'mel_onsets'], feature_channels=[f'band_{i}' for i in range(64)])
+    path = write_pipeline_json(tmp_path / 'mel.json', info)
+    text = preprocessing_report([path], tmp_path / 'methods.md').read_text()
+    assert '64 audio feature channels were appended.' in text
+    assert 'Feature channels: length' not in text

@@ -9,7 +9,7 @@ import pytest
 from scipy.io import wavfile
 from scipy.signal import butter, hilbert, sosfiltfilt
 
-from almkanal import AlmKanal, EpochTRF, TRFSpanSpec, preprocessing_report
+from almkanal import AlmKanal, StimulusEpochs, StimulusSpanSpec, preprocessing_report
 from almkanal.stim_utils.alignment_utils import (
     apply_raw_wav_alignment,
     estimate_raw_wav_alignment,
@@ -43,9 +43,7 @@ def synthetic_audio_alignment(tmp_path_factory: pytest.TempPathFactory) -> dict[
         rng.normal(size=len(wav_times)),
     )
     modulation /= np.max(np.abs(modulation))
-    wav = (0.55 + 0.4 * modulation) * (
-        np.sin(2 * np.pi * 110 * wav_times) + 0.35 * np.sin(2 * np.pi * 173 * wav_times)
-    )
+    wav = (0.55 + 0.4 * modulation) * (np.sin(2 * np.pi * 110 * wav_times) + 0.35 * np.sin(2 * np.pi * 173 * wav_times))
     wav = (wav / np.max(np.abs(wav))).astype(np.float32)
 
     trigger_time_s = 0.5
@@ -148,18 +146,24 @@ def test_estimation_and_application_correct_known_drift(synthetic_audio_alignmen
     wav_envelope = np.abs(hilbert(sosfiltfilt(bandpass, wav_at_raw_sfreq)))
     assert np.corrcoef(recorded_envelope, wav_envelope)[0, 1] > 0.75
 
-
+@pytest.mark.filterwarnings(
+    "ignore:Channel locations not available:RuntimeWarning"
+)
 @pytest.mark.parametrize('missing_end', [False, True])
-def test_epoch_trf_realigns_audio_and_records_diagnostics(
+def test_epoch_stimuls_realigns_audio_and_records_diagnostics(
     synthetic_audio_alignment: dict[str, Any],
     tmp_path: Path,
     missing_end: bool,
 ) -> None:
     wav_path = synthetic_audio_alignment['wav_path']
-    step = EpochTRF(
-        gen_span_spec=lambda raw: TRFSpanSpec.from_events(
-            raw, {11: wav_path.name}, 99, stim_channel='stim',
-            infer_missing_ends=missing_end, base_audio_path=wav_path.parent,
+    step = StimulusEpochs(
+        gen_span_spec=lambda raw: StimulusSpanSpec.from_events(
+            raw,
+            {11: wav_path.name},
+            99,
+            stim_channel='stim',
+            infer_missing_ends=missing_end,
+            base_audio_path=wav_path.parent,
         ),
         base_audio_path=wav_path.parent,
         audio_channels=['MISC flat', 'audio'],
@@ -173,12 +177,12 @@ def test_epoch_trf_realigns_audio_and_records_diagnostics(
     original = raw.get_data().copy()
     pipeline = AlmKanal(steps=[step])
     epochs, report = pipeline.run(raw)
-    trf_info = pipeline.info.get_step_info('EpochTRF', required=True)['TRF_info']
+    trf_info = pipeline.info.get_step_info('StimulusEpochs', required=True)['TRF_info']
     alignment = trf_info['alignment_info']
 
     assert len(epochs) == 8
     assert epochs.get_data().shape[-1] == 500
-    assert 'env_rms' in epochs.ch_names
+    assert 'envelope' in epochs.ch_names
     assert alignment['n_trials_aligned'] == 1
     assert alignment['n_trials_failed'] == 0
     assert alignment['n_trials_end_inferred'] == int(missing_end)
@@ -190,7 +194,7 @@ def test_epoch_trf_realigns_audio_and_records_diagnostics(
     assert epochs.metadata['stimulus'].unique().tolist() == ['stimulus']
     np.testing.assert_array_equal(raw.get_data(), original)
 
-    assert 'TRF audio realignment' in report.get_contents()[0]
+    assert 'Stimulus audio realignment' in report.get_contents()[0]
     json_path = tmp_path / 'pipeline.json'
     pipeline.generate_json(str(json_path))
     methods = preprocessing_report([json_path], tmp_path / 'methods.md').read_text()
@@ -218,9 +222,12 @@ def test_span_spec_preserves_repeated_wavs_and_event_order() -> None:
     stim[[0, 10, 20]] = [11, 12, 11]
     stim[[8, 18, 28]] = 99
     raw = mne.io.RawArray(
-        stim[None], mne.create_info(['trigger'], 100.0, ['stim']), first_samp=100, verbose=False,
+        stim[None],
+        mne.create_info(['trigger'], 100.0, ['stim']),
+        first_samp=100,
+        verbose=False,
     )
-    spec = TRFSpanSpec.from_events(raw, {11: 'same.wav', 12: 'other.wav'}, 99)
+    spec = StimulusSpanSpec.from_events(raw, {11: 'same.wav', 12: 'other.wav'}, 99)
     assert list(spec.spans_by_label.values()) == [(100, 108), (110, 118), (120, 128)]
     assert list(spec.wav_by_label.values()) == ['same.wav', 'other.wav', 'same.wav']
     assert [meta['onset_code'] for meta in spec.metadata_by_label.values()] == [11, 12, 11]

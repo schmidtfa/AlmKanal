@@ -1,10 +1,14 @@
 import mne
 import numpy as np
+import pytest
 
 from almkanal import Epochs, SourceReconstruction, SpatialFilter
 from almkanal.info import AlmKanalInfo, StepInfo
 
 
+@pytest.mark.filterwarnings(
+    r'ignore:\d+ events are outside the data range:RuntimeWarning'
+)  # these warnings occur just because i need to downsample to ensure running speed of the test is ok
 def test_src(gen_mne_data_epochs):
     data_path = mne.datasets.sample.data_path()
     meg_path = data_path / 'MEG' / 'sample'
@@ -53,9 +57,7 @@ def test_src(gen_mne_data_epochs):
         StepInfo(
             step='SpatialFilter',
             info={
-                'spatial_filter_info': spatial_result[
-                    'spatial_filter_info'
-                ],
+                'spatial_filter_info': spatial_result['spatial_filter_info'],
             },
         )
     )

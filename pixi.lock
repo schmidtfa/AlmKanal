@@ -6768,7 +6768,7 @@ packages:
 - pypi: ./
   name: almkanal
   version: 1.0.0.dev0
-  sha256: 2d6ec85940e990b4382ead487cdfa68d7bfdf56df3432dcb5a8e4889b0ac343f
+  sha256: 5d048f139b35c45524f974762f6e6b894f0dbb2277ee22000687c113021e1cec
   requires_dist:
   - attrs
   - autoreject>=0.4.3

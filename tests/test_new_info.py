@@ -1,5 +1,6 @@
 from almkanal.info import AlmKanalInfo, StepInfo
 
+
 def test_info_retains_repeated_steps():
     info = AlmKanalInfo()
 

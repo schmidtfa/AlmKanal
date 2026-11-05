@@ -1,6 +1,6 @@
 """TRF example: physical-delay correction with realignment disabled.
 
-Existing onset/end triggers define the trials. EpochTRF attaches WAV-derived
+Existing onset/end triggers define the trials. EpochStimuls attaches WAV-derived
 features and applies hw_delay_s, without estimating offset or resampling for
 clock drift. This is the default behavior when audio_channels=None and
 realign_without_audio=False.
@@ -18,7 +18,7 @@ import joblib
 import mne
 from plus_slurm import Job
 
-from almkanal import AlmKanal, EpochTRF, TRFSpanSpec
+from almkanal import AlmKanal, EpochStimuls, StimulusSpanSpec
 
 
 class TRFFixedDelayPipe(Job):
@@ -38,8 +38,8 @@ class TRFFixedDelayPipe(Job):
         pick_dict = {'meg': True, 'eog': True, 'ecg': True, 'eeg': False, 'stim': True, 'misc': False}
         onset_trigger_to_wav = {11: 'story_a.wav', 12: 'story_b.wav'}
 
-        def make_spans(current_raw: mne.io.BaseRaw) -> TRFSpanSpec:
-            return TRFSpanSpec.from_events(
+        def make_spans(current_raw: mne.io.BaseRaw) -> StimulusSpanSpec:
+            return StimulusSpanSpec.from_events(
                 current_raw,
                 onset_trigger_to_wav=onset_trigger_to_wav,
                 end_triggers=99,
@@ -49,14 +49,14 @@ class TRFFixedDelayPipe(Job):
         ak = AlmKanal(
             pick_params=pick_dict,
             steps=[
-                EpochTRF(
+                EpochStimuls(
                     gen_span_spec=make_spans,
                     base_audio_path=audio_path,
                     # Explicitly show the defaults that disable realignment.
                     audio_channels=None,
                     realign_without_audio=False,
                     # Omit alignment_kwargs; no recorded audio is used.
-                    feature=feature,  # Use 'envelope' or 'flux', not 'env_rms'.
+                    feature=feature,  # Feature names also identify the appended channels.
                     # Positive values advance neural data relative to the WAV
                     # features to compensate the 16.5 ms playback-to-ear delay.
                     hw_delay_s=hw_delay_s,

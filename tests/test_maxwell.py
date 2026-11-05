@@ -1,11 +1,10 @@
 import mne
-from almkanal.almkanal_steps.channel_utils import Maxwell
-from almkanal import AlmKanal
 
+from almkanal import AlmKanal
+from almkanal.almkanal_steps.channel_utils import Maxwell
 
 
 def test_maxwell(gen_mne_data_raw):
-
     raw, data_path = gen_mne_data_raw
 
     ak = AlmKanal(steps=[Maxwell()])

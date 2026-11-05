@@ -192,7 +192,7 @@ def process_empty_room(
 
 
 @function_defaults('spatial_filter')
-def comp_spatial_filters(
+def comp_spatial_filters(  # noqa: C901
     data: mne.io.BaseRaw | mne.BaseEpochs,
     fwd: mne.Forward,
     pick_dict: dict | None,
@@ -256,24 +256,33 @@ def comp_spatial_filters(
     # check if multiple channel types are present after picking
     n_ch_types = len({'mag', 'grad', 'eeg'} & set(data.get_channel_types(unique=True)))
 
-    # compute a data covariance matrix
     if data_cov is None:
         if isinstance(data, mne.io.BaseRaw):
             data_cov = mne.compute_raw_covariance(data, rank=None, method='auto')
         elif isinstance(data, mne.BaseEpochs):
             data_cov = mne.compute_covariance(data, rank=None, method='auto')
 
+    data_rank = mne.compute_rank(
+        data_cov,
+        info=info,
+        rank=None,
+    )
+
+    # Determine noise covariance
+    is_ad_hoc = False
+    noise_rank = None
+
     # if you have mixed sensor types we need a noise covariance matrix
     # per default we take this from an empty room recording
     # importantly this should be preprocessed similarly to the actual data
     if noise_cov is not None:
-        true_rank = mne.compute_rank(noise_cov, info=info)
+        noise_rank = mne.compute_rank(noise_cov, info=info)
 
-    elif n_ch_types > 1 and isinstance(empty_room, str | mne.io.BaseRaw):
+    elif isinstance(empty_room, (str | mne.io.BaseRaw)):
         # assert np.logical_or(isinstance(empty_room, str), isinstance(empty_room, mne.io.Raw)), """Please
         # supply either a mne.io.raw object, a path that leads directly
         #  to an empty_room recording or a folder with a bunch of empty room recordings"""
-        true_rank, noise_cov = process_empty_room(
+        noise_rank, noise_cov = process_empty_room(
             data=data,
             info=info,
             picks=picks,
@@ -282,16 +291,27 @@ def comp_spatial_filters(
             get_nearest=nearest_empty_room,
         )
 
-    elif n_ch_types > 1 and empty_room is None:
+    elif n_ch_types > 1:
         warnings.warn("""You have multiple sensor types, but did neither specify a noise covariance
                       matrix or supply a path to an empty room file. Computing an ad-hoc covariance matrix!""")
 
         noise_cov = mne.make_ad_hoc_cov(info)
-        true_rank = mne.compute_rank(data_cov, info=info)
+        is_ad_hoc = True
 
-    elif n_ch_types == 1:
-        true_rank = mne.compute_rank(data_cov, info=info)
-        noise_cov = None
+    # Determine effective rank
+    if noise_cov is not None and not is_ad_hoc:
+        if data_rank != noise_rank:
+            raise ValueError(
+                f'Data and noise covariance ranks differ: '
+                f'data={data_rank}, noise={noise_rank}. '
+                'Check preprocessing and covariance estimation.'
+            )
+
+        # Use the rank of the covariance employed for whitening
+        true_rank = noise_rank
+    else:
+        # No whitening covariance, or synthetic ad-hoc covariance
+        true_rank = data_rank
 
     lcmv_settings = {
         'reg': lcmv_reg,
