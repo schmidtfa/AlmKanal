@@ -120,10 +120,22 @@ def preproc_empty_room(  # noqa: C901
 
         elif step.step == 'Filter':
             filter_info = step.info['filter_info'].copy()
+            filter_info = {
+                k: v
+                for k, v in filter_info.items()
+                if k
+                not in (
+                    'applied_to',
+                    'filter_order',
+                    'filter_length_seconds',
+                    'filter_length_samples',
+                )
+            }
             raw_er.filter(**filter_info)
 
         elif step.step == 'Resample':
             resample_info = step.info['resample_info'].copy()
+            resample_info = {k: v for k, v in resample_info.items() if k not in ('original_sfreq',)}
             raw_er.resample(**resample_info)
 
         elif step.step == 'ICA':
