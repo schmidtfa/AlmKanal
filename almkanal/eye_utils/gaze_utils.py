@@ -11,6 +11,7 @@ therefore be used independently of MEG recordings.
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -301,10 +302,14 @@ def _combine_eyes(
 ) -> np.ndarray:
     """Combine two eye signals while tolerating missing values."""
     stacked = np.vstack([left, right])
-
     valid = np.isfinite(stacked)
 
-    with np.errstate(invalid='ignore'):
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            'ignore',
+            message=r'Mean of empty slice',  # this will always happen when someone blinks
+            category=RuntimeWarning,
+        )
         result = np.nanmean(stacked, axis=0)
 
     # Avoid warnings and preserve missing values when both eyes are absent.
