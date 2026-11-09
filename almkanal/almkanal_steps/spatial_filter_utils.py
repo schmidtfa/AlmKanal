@@ -106,7 +106,9 @@ def preproc_empty_room(  # noqa: C901
 
     for step in replay_steps:
         if step.step == 'Maxwell':
-            maxwell_info = step.info['maxwell_info']
+            maxwell_info = step.info['maxwell_info'].copy()
+            maxwell_info.pop('calibration_applied')
+            maxwell_info.pop('cross_talk_applied')
             if isinstance(data, mne.BaseEpochs):
                 raw = mne.io.RawArray(np.zeros((len(data.ch_names), 1)), info=data.info)
             else:
