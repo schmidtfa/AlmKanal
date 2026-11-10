@@ -1,4 +1,6 @@
+
 # Template pipeline for EOG preprocessing with AlmKanal
+
 from pathlib import Path
 
 import joblib
@@ -18,18 +20,18 @@ class EOGPipe(Job):
         eog_channels: tuple[str, str] = ('EOG001', 'EOG002'),
         find_blinks: bool = True,
         interpolate_blinks: bool = True,
-        peak_threshold: float = 3.0,
-        blink_window_ms: float = 300.0,
+        peak_threshold: float = 2.0,
+        blink_rel_height: float = 0.8,
         check_and_correct_eog_polarity: bool = True,
         check_and_correct_eog_channel_assignment: bool = True,
         flat_threshold_v: float = 1e-8,
-        max_amplitude_v: float | None = None,
-        max_bad_fraction: float = 0.3,
+        max_bad_fraction: float = 0.8,
         l_freq: float | None = 0.1,
         h_freq: float | None = 40.0,
     ) -> None:
+
         data_path = Path(self.full_input_path)
-        files = sorted(Path(data_path).glob(f'{subject_id}*.fif'))
+        files = sorted(data_path.glob(f'{subject_id}*.fif'))
 
         if len(files) != 1:
             raise ValueError(
@@ -66,11 +68,10 @@ class EOGPipe(Job):
                     find_blinks=find_blinks,
                     interpolate_blinks=interpolate_blinks,
                     peak_threshold=peak_threshold,
-                    blink_window_ms=blink_window_ms,
+                    blink_rel_height=blink_rel_height,
                     check_and_correct_eog_polarity=check_and_correct_eog_polarity,
                     check_and_correct_eog_channel_assignment=check_and_correct_eog_channel_assignment,
                     flat_threshold_v=flat_threshold_v,
-                    max_amplitude_v=max_amplitude_v,
                     max_bad_fraction=max_bad_fraction,
                     l_freq=l_freq,
                     h_freq=h_freq,
