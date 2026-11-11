@@ -620,6 +620,9 @@ class StimulusEpochs(AlmKanalStep):
         Names must not overlap existing recording channels. Available features:
         ``'envelope'`` (RMS), ``'rectify'``, ``'mel'``, ``'flux'``,
         ``'mel_onsets'``, ``'pitch'``, or ``'pitch_voicing'``. See ``prepare_audio``.
+        All generated channels are automatically preserved by a later
+        ``SpatialFilter`` step and returned in the source-reconstruction output's
+        ``extra_data`` dictionary.
     audio_cutoff_hz : float, default=80.0
         Low-pass cutoff in Hz for WAV features, capped below their Nyquist rate.
     hw_delay_s : float, default=0.0
