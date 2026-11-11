@@ -28,7 +28,7 @@ BLINK_SEARCH_RADIUS_S = 0.05
 DEFAULT_EOG_CHANNELS = ('EOG001', 'EOG002')
 DEFAULT_FIND_BLINKS = True
 DEFAULT_INTERPOLATE_BLINKS = True
-DEFAULT_PEAK_THRESHOLD = 2.0
+DEFAULT_PEAK_THRESHOLD = 3.0
 DEFAULT_BLINK_REL_HEIGHT = 0.8
 DEFAULT_CHECK_POLARITY = True
 DEFAULT_CHECK_CHANNEL_ASSIGNMENT = True
@@ -810,7 +810,7 @@ def clean_eog(
     })
 
     eog.reorder_channels([
-        'EOG001', 'EOG002'] + 
+        'EOG001', 'EOG002'] +
         [ch for ch in eog.ch_names if ch not in('EOG001', 'EOG002')]
     )
 

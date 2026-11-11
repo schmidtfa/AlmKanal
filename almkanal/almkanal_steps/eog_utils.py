@@ -1,10 +1,25 @@
-
 import mne
 from attrs import define, field
 
 from almkanal.almkanal import AlmKanalStep
-from almkanal.eye_utils.eog_utils import clean_eog
 from almkanal.info import AlmKanalInfo
+
+from almkanal.eye_utils.eog_utils import (
+    clean_eog,
+    DEFAULT_EOG_CHANNELS,
+    DEFAULT_FIND_BLINKS,
+    DEFAULT_INTERPOLATE_BLINKS,
+    DEFAULT_PEAK_THRESHOLD,
+    DEFAULT_BLINK_REL_HEIGHT,
+    DEFAULT_CHECK_POLARITY,
+    DEFAULT_CHECK_CHANNEL_ASSIGNMENT,
+    DEFAULT_FLAT_THRESHOLD_V,
+    DEFAULT_MAX_BAD_FRACTION,
+    DEFAULT_L_FREQ,
+    DEFAULT_H_FREQ,
+)
+
+
 
 @define
 class EOGCleaner(AlmKanalStep):
@@ -21,24 +36,22 @@ class EOGCleaner(AlmKanalStep):
     File discovery, block iteration, resampling and epoching are
     handled by the surrounding pipeline.
     """
+    eog_channels: tuple[str, str] = DEFAULT_EOG_CHANNELS
 
-    eog_channels: tuple[str, str] = ('EOG001', 'EOG002')
+    find_blinks: bool = DEFAULT_FIND_BLINKS
+    interpolate_blinks: bool = DEFAULT_INTERPOLATE_BLINKS
 
-    find_blinks: bool = True
-    interpolate_blinks: bool = True
+    peak_threshold: float = DEFAULT_PEAK_THRESHOLD
+    blink_rel_height: float = DEFAULT_BLINK_REL_HEIGHT
 
-    peak_threshold: float = 2.0
-    blink_rel_height: float = 0.8
+    check_and_correct_eog_polarity: bool = DEFAULT_CHECK_POLARITY
+    check_and_correct_eog_channel_assignment: bool = DEFAULT_CHECK_CHANNEL_ASSIGNMENT
 
-    check_and_correct_eog_polarity: bool = True
-    check_and_correct_eog_channel_assignment: bool = True
+    flat_threshold_v: float = DEFAULT_FLAT_THRESHOLD_V
+    max_bad_fraction: float = DEFAULT_MAX_BAD_FRACTION
 
-    flat_threshold_v: float = 1e-8
-    max_amplitude_v: float | None = None
-    max_bad_fraction: float = 0.8
-
-    l_freq: float | None = 0.1
-    h_freq: float | None = 40.0
+    l_freq: float | None = DEFAULT_L_FREQ
+    h_freq: float | None = DEFAULT_H_FREQ
 
     must_be_before: tuple = (
         'Resample',
@@ -69,7 +82,6 @@ class EOGCleaner(AlmKanalStep):
             check_and_correct_eog_polarity=self.check_and_correct_eog_polarity,
             check_and_correct_eog_channel_assignment=self.check_and_correct_eog_channel_assignment,
             flat_threshold_v=self.flat_threshold_v,
-            max_amplitude_v=self.max_amplitude_v,
             max_bad_fraction=self.max_bad_fraction,
             l_freq=self.l_freq,
             h_freq=self.h_freq,
