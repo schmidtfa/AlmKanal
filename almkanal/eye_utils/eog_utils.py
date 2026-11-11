@@ -28,7 +28,7 @@ BLINK_SEARCH_RADIUS_S = 0.05
 DEFAULT_EOG_CHANNELS = ('EOG001', 'EOG002')
 DEFAULT_FIND_BLINKS = True
 DEFAULT_INTERPOLATE_BLINKS = True
-DEFAULT_PEAK_THRESHOLD = 3.0
+DEFAULT_PEAK_THRESHOLD = 2.0
 DEFAULT_BLINK_REL_HEIGHT = 0.8
 DEFAULT_CHECK_POLARITY = True
 DEFAULT_CHECK_CHANNEL_ASSIGNMENT = True
@@ -128,16 +128,15 @@ def get_intervals(mask: np.ndarray) -> Iterator[tuple[int, int]]:
     return zip(starts.tolist(), stops.tolist())
 
 
-def get_bad_mask(
+def get_flat_mask(
     raw: mne.io.BaseRaw,
     signals: np.ndarray,
     flat_threshold_v: float,
 ) -> np.ndarray:
 
-    """Identify unusable EOG samples from annotations and signal quality.
+    """Identify unusable & flat EOG samples.
 
-    Includes existing BAD and EDGE annotations and marks one-second
-    windows as bad if either EOG channel is flat.
+    Marks one-second windows as bad if either EOG channel is flat.
 
     Parameters
     ----------
@@ -154,24 +153,8 @@ def get_bad_mask(
         Boolean mask indicating unusable samples.
     """
 
-    bad_mask = np.zeros(raw.n_times, dtype=bool)
+    flat_mask = np.zeros(raw.n_times, dtype=bool)
     sfreq = raw.info['sfreq']
-
-    # include existing BAD/EDGE annotations
-    for annotation in raw.annotations:
-        if annotation['description'].lower().startswith(('bad', 'edge')):
-            onset = annotation['onset'] - raw.first_time
-            end = onset + annotation['duration']
-
-            start = int(np.floor(np.round(onset * sfreq, 7)))
-            stop = int(np.ceil(np.round(end * sfreq, 7)))
-
-            if annotation['duration'] == 0:
-                stop = start + 1
-
-            start = min(raw.n_times, max(0, start))
-            stop = min(raw.n_times, max(0, stop))
-            bad_mask[start:stop] = True
 
     # check signal quality in one-second windows
     window_samples = max(2, round(sfreq))
@@ -179,26 +162,21 @@ def get_bad_mask(
     for start in range(0, signals.shape[1], window_samples):
         stop = min(signals.shape[1], start + window_samples)
 
-        usable = ~bad_mask[start:stop]
-
-        if usable.sum() < MIN_USABLE_SAMPLES:
-            continue
-
         for signal in signals:
-            segment = signal[start:stop][usable]
+            segment = signal[start:stop]
             amplitude = np.ptp(segment)
 
             if amplitude <= flat_threshold_v:
-                bad_mask[start:stop] = True
+                flat_mask[start:stop] = True
                 break
 
-    return bad_mask
+    return flat_mask
 
 
 def find_blinks_eog(
     signal: np.ndarray,
     sfreq: float,
-    bad_mask: np.ndarray,
+    flat_mask: np.ndarray,
     peak_threshold: float,
     blink_rel_height: float,
 ) -> dict[str, Any]:
@@ -214,7 +192,7 @@ def find_blinks_eog(
         One-dimensional EOG signal.
     sfreq : float
         Sampling frequency in Hz.
-    bad_mask : numpy.ndarray
+    flat_mask : numpy.ndarray
         Boolean mask indicating unusable samples.
     peak_threshold : float
         Minimum absolute z-score for peak detection.
@@ -231,7 +209,7 @@ def find_blinks_eog(
     # clean a copy of the original (usable) signal for blink detection
     detection = np.full(signal.size, np.nan)
 
-    for start, stop in get_intervals(~bad_mask):
+    for start, stop in get_intervals(~flat_mask):
         detection[start:stop] = nk.eog_clean(
             signal[start:stop].copy(),
             sampling_rate=sfreq,
@@ -265,11 +243,14 @@ def find_blinks_eog(
 
         segment_z = signal_z[start:stop]
 
+        min_width = 0.1 * sfreq
+        max_width = 0.4 * sfreq
+
         # positive peaks
         peaks, properties = find_peaks(
             segment_z,
             height=peak_threshold,
-            width=(None, None),
+            width=(min_width, max_width),
             rel_height=blink_rel_height,
         )
 
@@ -281,7 +262,7 @@ def find_blinks_eog(
         peaks, properties = find_peaks(
             -segment_z,
             height=peak_threshold,
-            width=(None, None),
+            width=(min_width, max_width),
             rel_height=blink_rel_height,
         )
 
@@ -343,7 +324,7 @@ def find_blinks_eog(
 def check_channel_assignment(
     signals: np.ndarray,
     sfreq: float,
-    bad_mask: np.ndarray,
+    flat_mask: np.ndarray,
     peak_threshold: float,
     blink_rel_height: float,
 ) -> tuple[int, dict[str, Any]]:
@@ -360,7 +341,7 @@ def check_channel_assignment(
         EOG signals with shape (2, n_samples).
     sfreq : float
         Sampling frequency in Hz.
-    bad_mask : numpy.ndarray
+    flat_mask : numpy.ndarray
         Boolean mask indicating unusable samples.
     peak_threshold : float
         Minimum absolute z-score for peak detection.
@@ -381,7 +362,7 @@ def check_channel_assignment(
     detections = []
     candidate_peaks = []
     for signal in signals:
-        result = find_blinks_eog(signal, sfreq, bad_mask, peak_threshold, blink_rel_height)
+        result = find_blinks_eog(signal, sfreq, flat_mask, peak_threshold, blink_rel_height)
         detection = result['detection']
         detections.append(detection)
         candidate_peaks.extend(result['accepted_peaks'].tolist())
@@ -447,7 +428,7 @@ def process_eog_blinks(
     eog: mne.io.BaseRaw,
     find_blinks: bool,
     sfreq: float,
-    bad_mask: np.ndarray,
+    flat_mask: np.ndarray,
     peak_threshold: float,
     blink_rel_height: float,
     check_and_correct_eog_polarity: bool,
@@ -468,7 +449,7 @@ def process_eog_blinks(
         Whether to detect blinks.
     sfreq : float
         Sampling frequency in Hz.
-    bad_mask : numpy.ndarray
+    flat_mask : numpy.ndarray
         Boolean mask indicating unusable samples.
     peak_threshold : float
         Minimum absolute z-score for peak detection.
@@ -492,14 +473,14 @@ def process_eog_blinks(
     unfilled_mask = np.zeros(eog.n_times, dtype=bool)
     if find_blinks:
         vertical = eog.get_data(picks=['vertical'])[0]
-        blinks = find_blinks_eog(vertical, sfreq, bad_mask, peak_threshold, blink_rel_height)
+        blinks = find_blinks_eog(vertical, sfreq, flat_mask, peak_threshold, blink_rel_height)
         if check_and_correct_eog_polarity:
             polarity_info = correct_eog_polarity(eog, blinks)
         if interpolate_blinks:
             interpolated_mask, unfilled_mask = interpolate_eog_blinks(
                 eog,
                 blinks['blink_mask'],
-                bad_mask,
+                flat_mask,
             )
         else:
             unfilled_mask = blinks['blink_mask'].copy()
@@ -582,7 +563,7 @@ def correct_eog_polarity(
 def interpolate_eog_blinks(
     eog: mne.io.BaseRaw,
     blink_mask: np.ndarray,
-    bad_mask: np.ndarray,
+    flat_mask: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
 
     """Interpolate detected blink intervals in both EOG channels using PCHIP.
@@ -596,7 +577,7 @@ def interpolate_eog_blinks(
         Recording with vertical and horizontal EOG channels.
     blink_mask : numpy.ndarray
         Boolean mask indicating detected blink intervals.
-    bad_mask : numpy.ndarray
+    flat_mask : numpy.ndarray
         Boolean mask indicating unusable samples.
 
     Returns
@@ -616,13 +597,13 @@ def interpolate_eog_blinks(
             (stop - start) / sfreq > MAX_INTERPOLATION_WINDOW_S
             or start == 0
             or stop == eog.n_times
-            or bad_mask[start:stop].any()
+            or flat_mask[start:stop].any()
         ):
             unfilled_mask[start:stop] = True
             continue
         anchors = np.array([start - 2, start - 1, stop, stop + 1])
         anchors = anchors[(anchors >= 0) & (anchors < eog.n_times)]
-        anchors = anchors[~blink_mask[anchors] & ~bad_mask[anchors]]
+        anchors = anchors[~blink_mask[anchors] & ~flat_mask[anchors]]
         if not (np.any(anchors < start) and np.any(anchors >= stop)):
             unfilled_mask[start:stop] = True
             continue
@@ -638,7 +619,7 @@ def interpolate_eog_blinks(
     return (
         interpolated_mask,
         unfilled_mask,
-    )  # interpolated_mask: True=interpol. blinks, unfilled_mask: True=interpol. would've violated QC measures
+    )
 
 
 def add_eog_annotations(
@@ -758,8 +739,8 @@ def clean_eog(
     if not np.isfinite(signals).all():
         raise ValueError('EOG contains NaN or infinite values.')
 
-    bad_mask = get_bad_mask(eog, signals, flat_threshold_v)
-    add_eog_annotations(eog, bad_mask, 'BAD_EOG_quality')
+    flat_mask = get_flat_mask(eog, signals, flat_threshold_v)
+    add_eog_annotations(eog, flat_mask, 'BAD_EOG_quality')
 
     vertical_idx = 0
     assignment_info: dict[str, Any] = {'method': 'supplied_order'}
@@ -767,7 +748,7 @@ def clean_eog(
         vertical_idx, assignment_info = check_channel_assignment(
             signals,
             sfreq,
-            bad_mask,
+            flat_mask,
             peak_threshold,
             blink_rel_height,
         )
@@ -788,14 +769,14 @@ def clean_eog(
         eog,
         find_blinks,
         sfreq,
-        bad_mask,
+        flat_mask,
         peak_threshold,
         blink_rel_height,
         check_and_correct_eog_polarity,
         interpolate_blinks,
     )
 
-    excluded_mask = bad_mask | unfilled_mask
+    excluded_mask = flat_mask | unfilled_mask
 
     excluded_fraction = float(excluded_mask.mean())
 
