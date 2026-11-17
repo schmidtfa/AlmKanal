@@ -135,7 +135,7 @@ def preproc_empty_room(  # noqa: C901
 
         elif step.step == 'Resample':
             resample_info = step.info['resample_info'].copy()
-            resample_info = {k: v for k, v in resample_info.items() if k not in ('original_sfreq',)}
+            resample_info = {k: v for k, v in resample_info.items() if k not in ('original_sfreq', 'applied_to')}
             raw_er.resample(**resample_info)
 
         elif step.step == 'ICA':
