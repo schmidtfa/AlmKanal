@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any, Literal
 
 import mne
@@ -274,6 +275,11 @@ class Resample(AlmKanalStep):
 
     Resampling is performed in place on the supplied MNE object.
 
+    Changing the sampling rate after ``StimulusEpochs`` emits a warning because
+    it also resamples appended stimulus features, which can distort binary
+    (0/1) values. Use ``StimulusEpochs(resample_sfreq=...)`` to resample before
+    feature extraction instead.
+
     The processing metadata returned by :meth:`run` is stored under
     ``'resample_info'`` and contains the target sampling frequency together
     with the effective resampling parameters.
@@ -323,6 +329,15 @@ class Resample(AlmKanalStep):
             raise ValueError(
                 'Resampling with AlmKanal requires either "fft" or "polyphase" resampling. '
                 'This decision is made to streamline methods reporting.'
+            )
+
+        if self.sfreq != old_sfreq and info.get_step('StimulusEpochs') is not None:
+            warnings.warn(
+                'Resampling after StimulusEpochs also resamples its appended stimulus feature channels. '
+                'This can distort binary (0/1) features by introducing intermediate values or ringing. '
+                'Use StimulusEpochs(resample_sfreq=...) instead to resample before computing and appending features.',
+                UserWarning,
+                stacklevel=2,
             )
 
         data.resample(

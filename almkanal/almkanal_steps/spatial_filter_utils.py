@@ -370,6 +370,8 @@ class SpatialFilter(AlmKanalStep):
         Channels to preserve separately before spatial-filter channel selection,
         for example stimulus features, ECG, EOG, or eye-tracking channels.
         Their data are stored in the returned spatial-filter metadata.
+        Feature channels added by a preceding ``StimulusEpochs`` step are
+        automatically preserved in addition to these explicitly listed channels.
     lcmv_reg : float, default=0.05
         Regularization parameter passed to the LCMV beamformer computation.
     lcmv_pick_ori : str | None, default='max-power'
@@ -390,7 +392,8 @@ class SpatialFilter(AlmKanalStep):
     The input data are returned unchanged. Computed spatial-filter information
     is stored under ``'spatial_filter_info'`` and contains the beamformer
     filters, effective LCMV settings, data covariance, noise covariance, and any
-    channels preserved through ``chans2keep``.
+    channels preserved through ``chans2keep`` or added by ``StimulusEpochs``.
+    ``SourceReconstruction`` returns these channels in its ``extra_data`` dictionary.
 
     When empty-room data are used, the pipeline's ordered processing history is
     passed to the empty-room preprocessing machinery so that relevant previous
@@ -440,7 +443,12 @@ class SpatialFilter(AlmKanalStep):
             raise ValueError('pick_dict must be provided for spatial filtering.')
 
         # before picking data we want to keep our extra data (e.g. envelopes, ECG, EOG or eyetracker)
-        extra_data = {ch: data.get_data(ch) for ch in self.chans2keep} if self.chans2keep is not None else None
+        stimulus_info = info.get_step_info('StimulusEpochs') or {}
+        feature_channels = stimulus_info.get('TRF_info', {}).get('feature_channels', [])
+        chans2keep = self.chans2keep
+        if feature_channels:
+            chans2keep = list(dict.fromkeys([*(chans2keep or []), *feature_channels]))
+        extra_data = {ch: data.get_data(ch) for ch in chans2keep} if chans2keep is not None else None
 
         fwd = self.fwd
 
