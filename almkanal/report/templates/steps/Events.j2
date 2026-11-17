@@ -1,0 +1,19 @@
+#### Event detection
+
+Events were detected using MNE-Python
+{%- if s.settings.stim_channel is not none %}
+ from stimulus channel {{ s.settings.stim_channel }}
+{%- endif %}
+ with output="{{ s.settings.output }}",
+ consecutive={{ s.settings.consecutive }},
+ a minimum duration of {{ s.settings.min_duration }} s,
+ and a shortest event length of {{ s.settings.shortest_event }} samples
+{%- if s.settings.mask is not none %},
+ using mask={{ s.settings.mask }} with mask_type="{{ s.settings.mask_type }}"
+{%- endif %}
+{%- if s.settings.uint_cast %},
+ with unsigned-integer casting
+{%- endif %}
+{%- if s.settings.initial_event %},
+ and with initial-event detection enabled
+{%- endif %}.
