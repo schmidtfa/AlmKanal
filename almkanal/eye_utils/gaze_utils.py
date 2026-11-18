@@ -600,6 +600,9 @@ def align_eye_to_meg(
     eye_stim_channel: str = 'Digital Output',
     meg_min_duration: float = 0.0,
     meg_max_trigger: int | None = None,
+    meg_mask: int | None = None,
+    meg_mask_type: Literal['and', 'not_and'] = 'and',
+    shortest_event: int | None = 2,
 ) -> mne.io.BaseRaw:
     """Align an eye-tracking Raw object to an MEG Raw object.
 
@@ -622,6 +625,15 @@ def align_eye_to_meg(
     meg_max_trigger
         Triggers at or above this value are ignored in the MEG recording.
         None keeps all trigger codes.
+    meg_mask
+        Bit mask applied to MEG trigger values during event extraction.
+        None keeps the original trigger values.
+    meg_mask_type
+        Masking operation passed to :func:`mne.find_events` for MEG.
+        Either 'and' or 'not_and'.
+    shortest_event
+        Minimum number of samples an event must last (default is 2).
+        If the duration is less than this an exception will be raised.
 
     Returns
     -------
@@ -651,11 +663,15 @@ def align_eye_to_meg(
     if eye_stim_channel not in eye_data.ch_names:
         raise ValueError(f'Eye stimulus channel {eye_stim_channel!r} ' 'was not found in the recording.')
 
+    if meg_mask_type not in ('and', 'not_and'):
+        raise ValueError("meg_mask_type must be either 'and' or 'not_and'.")
+
     logger.info('Finding MEG synchronization events.')
 
     eye_events = mne.find_events(
         eye_data,
         stim_channel=eye_stim_channel,
+        shortest_event=shortest_event,
         initial_event=True,
     )
 
@@ -663,6 +679,9 @@ def align_eye_to_meg(
         meg_data,
         stim_channel=meg_stim_channel,
         min_duration=meg_min_duration,
+        shortest_event=shortest_event,
+        mask=meg_mask,
+        mask_type=meg_mask_type,
     )
 
     eye_events = eye_events[eye_events[:, 1] == 0]
@@ -805,6 +824,9 @@ def add_eye_tracking_data(
     eye_stim_channel: str = 'Digital Output',
     meg_min_duration: float = 0.0,
     meg_max_trigger: int | None = None,
+    meg_mask: int | None = None,
+    meg_mask_type: Literal['and', 'not_and'] = 'and',
+    shortest_event: int | None = 2,
 ) -> mne.io.BaseRaw:
     """Add preprocessed eye tracking to an MEG recording.
 
@@ -835,6 +857,15 @@ def add_eye_tracking_data(
         Minimum MEG event duration in seconds.
     meg_max_trigger
         Ignore MEG trigger codes at or above this value. None keeps all codes.
+    meg_mask
+        Bit mask applied to MEG trigger values during event extraction.
+        None keeps the original trigger values.
+    meg_mask_type
+        Masking operation passed to :func:`mne.find_events` for MEG.
+        Either 'and' or 'not_and'.
+    shortest_event
+        Minimum number of samples an event must last (default is 2).
+        If the duration is less than this an exception will be raised.
 
     Returns
     -------
@@ -874,6 +905,9 @@ def add_eye_tracking_data(
             eye_stim_channel=eye_stim_channel,
             meg_min_duration=meg_min_duration,
             meg_max_trigger=meg_max_trigger,
+            meg_mask=meg_mask,
+            meg_mask_type=meg_mask_type,
+            shortest_event=shortest_event,
         )
     else:
         logger.info('Eye-tracking/MEG alignment disabled; ' 'adding eye tracking without synchronization.')
