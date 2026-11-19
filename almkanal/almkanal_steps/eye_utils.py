@@ -43,7 +43,7 @@ class VPixxCleaner(AlmKanalStep):
     meg_max_trigger: int | None = default_field('vpixx', 'meg_max_trigger')
     meg_mask: int | None = default_field('vpixx', 'meg_mask')
     meg_mask_type: Literal['and', 'not_and'] = default_field('vpixx', 'meg_mask_type')
-    shortest_event: int | None = 2
+    shortest_event: int | None = default_field('vpixx', 'shortest_event')
     concatenate_raws: bool = default_field('vpixx', 'concatenate_raws')
     must_be_before: tuple = ('MultiBlockMaxwell', 'Maxwell', 'Epochs', 'Events')
     must_be_after: tuple = ()

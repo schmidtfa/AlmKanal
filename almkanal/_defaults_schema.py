@@ -137,6 +137,7 @@ class EpochsDefaults:
     metadata: None | pd.DataFrame = None
     event_repeated: str = 'error'
     verbose: bool | str | int | None = None
+    filter_events: bool = False
 
 
 @frozen
@@ -218,6 +219,9 @@ class VPixxDefaults:
     eye_stim_channel: str = 'Digital Output'
     meg_min_duration: float = 0.0
     meg_max_trigger: int | None = None
+    meg_mask: int | None = None
+    meg_mask_type: Literal['and', 'not_and'] = 'and'
+    shortest_event: int | None = 2
     concatenate_raws: bool = False
     align: bool = True
 
