@@ -77,7 +77,7 @@ def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: P
         write_pipeline_json(tmp_path / 'first.json', make_info(first, failures=2)),
         write_pipeline_json(tmp_path / 'second.json', make_info(second)),
     ]
-    exported = json.loads(files[0].read_text())['processing_history'][0]['info']['TRF_info']['alignment_info']
+    exported = json.loads(files[0].read_text(encoding='utf-8'))['processing_history'][0]['info']['TRF_info']['alignment_info']
     assert exported['trials'] == {'length': 75}
     assert exported['summary']['drift_us_per_s']['n'] == 75
     ctx = build_context_from_files(files)
@@ -90,7 +90,7 @@ def test_preprocessing_report_pools_all_trials_after_json_truncation(tmp_path: P
     assert stats['max'] == 200
     assert results['n_trials_failed'] == 2
     assert results['n_recordings'] == 2
-    output = preprocessing_report(files, tmp_path / 'methods.md').read_text()
+    output = preprocessing_report(files, tmp_path / 'methods.md').read_text(encoding='utf-8')
     assert '77 of 79 trials' in output
     assert '2 failed and were skipped' in output
     assert f'{np.mean(first + second):.3f} ± {np.std(first + second):.3f} µs/s' in output
@@ -125,7 +125,7 @@ def test_report_checks_configuration_but_allows_different_results(tmp_path: Path
 )
 def test_old_or_disabled_alignment_reports_remain_supported(tmp_path: Path, info: dict) -> None:
     path = write_pipeline_json(tmp_path / 'legacy.json', info)
-    text = preprocessing_report([path], tmp_path / 'methods.md').read_text()
+    text = preprocessing_report([path], tmp_path / 'methods.md').read_text(encoding='utf-8')
     assert 'Data were epoched in 5.0s long epochs.' in text
     assert 'clock drift' not in text
     assert '#### Realignment' not in text
@@ -148,14 +148,14 @@ def test_inference_counts_and_priors_survive_truncation_and_pool_separately(tmp_
         write_pipeline_json(tmp_path / 'second.json', second),
         write_pipeline_json(tmp_path / 'complete.json', make_info([800.0])),
     ]
-    exported = json.loads(files[0].read_text())['processing_history'][0]['info']['TRF_info']['alignment_info']
+    exported = json.loads(files[0].read_text(encoding='utf-8'))['processing_history'][0]['info']['TRF_info']['alignment_info']
     assert exported['trials'] == {'length': 75}
     assert exported['end_inference_drift_counts'] == {'499.0': 77}
     result = build_context_from_files(files).steps[0].results
     assert result['n_trials_end_inferred'] == 78
     assert result['end_inference_drift_counts'] == {'499.0': 77, '500.0': 1}
     assert result['metrics']['drift_us_per_s']['mean'] == pytest.approx((75 * 1500 + 1000 + 800) / 77)
-    methods = preprocessing_report(files, tmp_path / 'methods.md').read_text()
+    methods = preprocessing_report(files, tmp_path / 'methods.md').read_text(encoding='utf-8')
     assert 'Trial endpoints were inferred for 78 trials without end triggers' in methods
     assert '499.000 µs/s for 77 trials; 500.000 µs/s for 1 trial' in methods
     assert 'normalized cross-correlation' in methods
@@ -170,7 +170,7 @@ def test_inferred_end_report_without_audio_alignment(tmp_path: Path) -> None:
         'alignment_info': {'n_trials_end_inferred': 1, 'end_inference_drift_counts': {'499.0': 1}},
     }
     path = write_pipeline_json(tmp_path / 'unaligned.json', info)
-    methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()
+    methods = preprocessing_report([path], tmp_path / 'methods.md').read_text(encoding='utf-8')
     assert methods.strip() == '### Preprocessing\n\nData were epoched in 5.0s long epochs.'
 
 
@@ -239,7 +239,7 @@ def test_realignment_subsection_after_ica(tmp_path: Path, alignment_method, resa
         pipeline.info.add(epoch_step)
     path = tmp_path / 'pipeline.json'
     pipeline.generate_json(str(path))
-    methods = preprocessing_report([path], tmp_path / 'methods.md').read_text()
+    methods = preprocessing_report([path], tmp_path / 'methods.md').read_text(encoding='utf-8')
     preprocessing = methods.split('### References')[0]
     ica_section = preprocessing.split('#### Independent Component Analysis\n', 1)[1]
     assert '2.00 components were rejected per subject' in ica_section
@@ -304,7 +304,7 @@ def test_resampling_and_multiple_features_methods_report(tmp_path, realign):
         infos.append(write_pipeline_json(tmp_path / f'{rate}.json', info))
     context = build_context_from_files(infos)
     assert context.steps[0].results['resampling_original_sfreqs'] == [500, 1000]
-    text = preprocessing_report(infos, tmp_path / 'methods.md').read_text()
+    text = preprocessing_report(infos, tmp_path / 'methods.md').read_text(encoding='utf-8')
     assert 'from 500.0, 1000.0 Hz to 125.0 Hz' in text
     assert 'FFT-based resampling with a boxcar frequency-domain window' in text
     assert 'preceded audio-feature extraction and appending' in text
@@ -326,6 +326,6 @@ def test_many_feature_channels_report_after_json_truncation(tmp_path):
     info = make_info([1.0])
     info.update(feature=['mel', 'mel_onsets'], feature_channels=[f'band_{i}' for i in range(64)])
     path = write_pipeline_json(tmp_path / 'mel.json', info)
-    text = preprocessing_report([path], tmp_path / 'methods.md').read_text()
+    text = preprocessing_report([path], tmp_path / 'methods.md').read_text(encoding='utf-8')
     assert '64 audio feature channels were appended.' in text
     assert 'Feature channels: length' not in text

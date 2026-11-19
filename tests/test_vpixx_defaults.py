@@ -182,12 +182,16 @@ def test_add_helper_shares_alignment_and_loading_defaults(monkeypatch, tmp_path)
         gaze_utils.add_eye_tracking_data(make_synthetic_meg(sfreq=1024), path)
         assert observed == []
         gaze_utils.add_eye_tracking_data(make_synthetic_meg(sfreq=1024), path, align=True, meg_max_trigger=None)
+    print("ACTUAL:", observed)
     assert observed == [
         {
             'meg_stim_channel': 'STI101',
             'eye_stim_channel': 'Digital Output',
             'meg_min_duration': 0.01,
             'meg_max_trigger': None,
+            'meg_mask': None,
+            'meg_mask_type': 'and',
+            'shortest_event': 2,
         }
     ]
 

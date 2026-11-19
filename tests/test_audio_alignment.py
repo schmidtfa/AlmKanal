@@ -197,7 +197,7 @@ def test_epoch_stimuls_realigns_audio_and_records_diagnostics(
     assert 'Stimulus audio realignment' in report.get_contents()[0]
     json_path = tmp_path / 'pipeline.json'
     pipeline.generate_json(str(json_path))
-    methods = preprocessing_report([json_path], tmp_path / 'methods.md').read_text()
+    methods = preprocessing_report([json_path], tmp_path / 'methods.md').read_text(encoding='utf-8')
     assert '1 of 1 trials were successfully aligned' in methods
     assert 'physical-delay correction of 0.000 ms was applied after realignment' in methods
     assert f"signed clock drift {alignment['trials'][0]['drift_us_per_s']:.3f}" in methods
