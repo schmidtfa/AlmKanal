@@ -1,0 +1,6 @@
+{# generic fallback if no specific partial exists #}
+{{ s.name }}{% set extras = [] -%}
+{%- for k, v in s.settings.items() if v is not none -%}
+{%- set _ = extras.append(k ~ '=' ~ v) -%}
+{%- endfor -%}
+{%- if extras %} ({{ extras | join('; ') }}){% elif s.settings %} (default settings){% endif %}.
