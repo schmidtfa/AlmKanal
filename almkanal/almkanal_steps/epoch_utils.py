@@ -144,8 +144,8 @@ class Epochs(AlmKanalStep):
 
             events = event_info['event_info']['events']
 
-        events = np.asarray(events)
-        all_events = events
+        all_events = np.asarray(events)
+        events = all_events.copy()
 
         if self.filter_events and self.event_id is not None:
             selected_ids = list(self.event_id.values())
