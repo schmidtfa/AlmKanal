@@ -41,6 +41,9 @@ class VPixxCleaner(AlmKanalStep):
     eye_stim_channel: str = default_field('vpixx', 'eye_stim_channel')
     meg_min_duration: float = default_field('vpixx', 'meg_min_duration')
     meg_max_trigger: int | None = default_field('vpixx', 'meg_max_trigger')
+    meg_mask: int | None = default_field('vpixx', 'meg_mask')
+    meg_mask_type: Literal['and', 'not_and'] = default_field('vpixx', 'meg_mask_type')
+    shortest_event: int | None = default_field('vpixx', 'shortest_event')
     concatenate_raws: bool = default_field('vpixx', 'concatenate_raws')
     must_be_before: tuple = ('MultiBlockMaxwell', 'Maxwell', 'Epochs', 'Events')
     must_be_after: tuple = ()
@@ -95,6 +98,9 @@ class VPixxCleaner(AlmKanalStep):
                 eye_stim_channel=self.eye_stim_channel,
                 meg_min_duration=self.meg_min_duration,
                 meg_max_trigger=self.meg_max_trigger,
+                meg_mask=self.meg_mask,
+                meg_mask_type=self.meg_mask_type,
+                shortest_event=self.shortest_event,
             )
 
             raw.load_data()
@@ -145,6 +151,9 @@ class VPixxCleaner(AlmKanalStep):
                 'eye_stim_channel': self.eye_stim_channel,
                 'meg_min_duration': self.meg_min_duration,
                 'meg_max_trigger': self.meg_max_trigger,
+                'meg_mask': self.meg_mask,
+                'meg_mask_type': self.meg_mask_type,
+                'shortest_event': self.shortest_event,
                 'concatenate_raws': self.concatenate_raws,
             },
         }

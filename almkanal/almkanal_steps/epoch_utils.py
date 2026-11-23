@@ -1,4 +1,5 @@
 import mne
+import numpy as np
 import pandas as pd
 from attrs import define, field
 from numpy.typing import ArrayLike
@@ -41,6 +42,10 @@ class Epochs(AlmKanalStep):
         Channels to include in the epochs.
     reject : dict | None, default=None
         Peak-to-peak amplitude rejection thresholds by channel type.
+    filter_events : bool, default=False
+        Whether to filter the event array to include only event codes specified
+        in ``event_id`` before constructing epochs. This is useful when metadata
+        contains rows only for the selected events.
     flat : dict | None, default=None
         Minimum acceptable peak-to-peak amplitudes by channel type.
     proj : bool | str, default=True
@@ -108,6 +113,7 @@ class Epochs(AlmKanalStep):
     preload: bool = default_field('epochs', 'preload')
     picks: str | ArrayLike | None = default_field('epochs', 'picks')
     reject: dict | None = default_field('epochs', 'reject')
+    filter_events: bool = default_field('epochs', 'filter_events')
     flat: dict | None = default_field('epochs', 'flat')
     proj: bool | str = default_field('epochs', 'proj')
     reject_tmin: float | None = default_field('epochs', 'reject_tmin')
@@ -138,6 +144,18 @@ class Epochs(AlmKanalStep):
 
             events = event_info['event_info']['events']
 
+        all_events = np.asarray(events)
+        events = all_events.copy()
+
+        if self.filter_events and self.event_id is not None:
+            selected_ids = list(self.event_id.values())
+            events = events[np.isin(events[:, 2], selected_ids)]
+
+        if self.metadata is not None and len(self.metadata) != len(events):
+            raise ValueError(
+                f'Metadata contains {len(self.metadata)} rows, ' f'but {len(events)} events were supplied to Epochs.'
+            )
+
         epochs = mne.Epochs(
             data,
             events=events,
@@ -163,7 +181,9 @@ class Epochs(AlmKanalStep):
         return {
             'data': epochs,
             'epochs_info': {
-                'events': events,
+                'events': all_events,
+                'selected_events': events,
+                'filter_events': self.filter_events,
                 'event_id': self.event_id,
                 'baseline': self.baseline,
                 'tmin': self.tmin,
