@@ -4,7 +4,10 @@ from datetime import UTC, datetime
 import mne
 import pytest
 
+import numpy as np
+
 from almkanal.almkanal_steps.spatial_filter_utils import (
+    _get_empty_room_picks,
     get_nearest_empty_room,
     preproc_empty_room,
 )
@@ -73,6 +76,84 @@ def test_get_nearest_empty_room(
     expected = setup_empty_room_dir / '240110' / 'empty_room_68.fif'
 
     assert result_path == expected
+
+
+def _create_test_raw(ch_names, ch_types):
+    info = mne.create_info(
+        ch_names=ch_names,
+        sfreq=1000,
+        ch_types=ch_types,
+    )
+    return mne.io.RawArray(
+        np.zeros((len(ch_names), 100)),
+        info,
+        verbose='ERROR',
+    )
+
+
+def test_get_empty_room_picks():
+    """Test that MEG and EEG channels are correctly selected."""
+    data = _create_test_raw(
+        ['MEG 001', 'MEG 002', 'EEG 001'],
+        ['mag', 'grad', 'eeg'],
+    )
+    raw_er = _create_test_raw(
+        ['MEG 001', 'MEG 002', 'EEG 001'],
+        ['mag', 'grad', 'eeg'],
+    )
+
+    picks = ['MEG 001', 'MEG 002', 'EEG 001']
+
+    result = _get_empty_room_picks(data, raw_er, picks)
+
+    assert result == picks
+
+
+def test_get_empty_room_picks_missing_channels():
+    """Test that unavailable channels are excluded with a warning."""
+    data = _create_test_raw(
+        ['MEG 001', 'MEG 002', 'EEG 001'],
+        ['mag', 'grad', 'eeg'],
+    )
+    raw_er = _create_test_raw(
+        ['MEG 001', 'EEG 001'],
+        ['mag', 'eeg'],
+    )
+
+    picks = ['MEG 001', 'MEG 002', 'EEG 001']
+
+    with pytest.warns(UserWarning, match='not available'):
+        result = _get_empty_room_picks(data, raw_er, picks)
+
+    assert result == ['MEG 001', 'EEG 001']
+
+
+def test_get_empty_room_picks_no_meg_or_eeg():
+    """Test that an error is raised if no MEG/EEG channels are selected."""
+    data = _create_test_raw(
+        ['STI 001'],
+        ['stim'],
+    )
+    raw_er = data.copy()
+
+    with pytest.raises(ValueError, match='No MEG or EEG channels'):
+        _get_empty_room_picks(data, raw_er, ['STI 001'])
+
+
+def test_get_empty_room_picks_no_matching_channels():
+    """Test that an error is raised if no selected channels exist in empty room."""
+    data = _create_test_raw(
+        ['MEG 001'],
+        ['mag'],
+    )
+    raw_er = _create_test_raw(
+        ['MEG 002'],
+        ['mag'],
+    )
+
+    with pytest.warns(UserWarning, match='not available'):
+        with pytest.raises(ValueError, match='No matching MEG/EEG channels'):
+            _get_empty_room_picks(data, raw_er, ['MEG 001'])
 
 
 def test_empty_room_filtering(
