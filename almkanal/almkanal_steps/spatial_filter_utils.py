@@ -71,6 +71,33 @@ def get_nearest_empty_room(info: mne.Info, empty_room_dir: str) -> Path:
     raise ValueError(f'No empty room recordings found in {empty_room_path}')
 
 
+def _get_empty_room_picks(
+    data: mne.io.Raw | mne.Epochs,
+    raw_er: mne.io.Raw,
+    picks: list[str],
+) -> list[str]:
+    """Get MEG/EEG picks available in the empty-room recording."""
+    pick_types = set(data.get_channel_types(picks=picks))
+
+    valid_types = pick_types & {'mag', 'grad', 'eeg'}
+    if not valid_types:
+        raise ValueError(f'No MEG or EEG channels found in picks: {pick_types}')
+
+    picks_er = [ch for ch in picks if ch in raw_er.ch_names and raw_er.get_channel_types(picks=[ch])[0] in valid_types]
+
+    if len(picks_er) < len(picks):
+        missing = set(picks) - set(picks_er)
+        warnings.warn(
+            f'{len(missing)} channels specified in picks are not available '
+            f'as MEG/EEG channels in the empty-room recording: {sorted(missing)}'
+        )
+
+    if not picks_er:
+        raise ValueError('No matching MEG/EEG channels found in the empty-room recording.')
+
+    return picks_er
+
+
 def preproc_empty_room(  # noqa: C901
     raw_er: mne.io.Raw,
     data: mne.io.Raw | mne.Epochs,
@@ -100,7 +127,12 @@ def preproc_empty_room(  # noqa: C901
     """
 
     if picks is not None:
-        raw_er.pick(picks)
+        picks_er = _get_empty_room_picks(
+            data=data,
+            raw_er=raw_er,
+            picks=picks,
+        )
+        raw_er.pick(picks=picks_er)
 
     replay_steps = [step for step in preproc_info if step.step in {'Maxwell', 'Filter', 'Resample', 'ICA'}]
 
